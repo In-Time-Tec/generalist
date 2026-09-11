@@ -85,7 +85,7 @@ admitReviewers(["api", "storage"])
     ├── ToolContext -> parent "run_parent", call "call-1"
     ├── ToolContext -> operation "run:parent:tool:0:typescript"
     ├── listDirect("run_parent")
-    │   └── assign ordinal 0 (or recover the key's ordinal)
+    │   └── assign the next operation ordinal (or recover this call+key's ordinal)
     ├── invocationIdFor(...) -> encoded admission identity
     └── RunStore.admitSpawn(...)
         ├── new identity -> persist child -> duplicate: false
@@ -134,7 +134,10 @@ Exact retries are idempotent; changed immutable placement, root, executable, or 
 - Ordinals are read from the parent's durable direct children, never an in-process counter; this costs one direct-child read per admission.
 - Ordinals are scoped independently by parent Run and operation key.
 - New ordinals follow admission order and are dense only when recorded predecessors are dense.
-- Re-admitting the same key under the same operation preserves its ordinal and does not advance the sequence.
+- Re-admitting the same `(tool call, key)` under the same operation preserves its ordinal and does not
+  advance the sequence.
+- A key admitted under a different tool call of the same operation is a distinct child and extends
+  that operation's ordinal sequence.
 - The next ordinal is greater than every recorded ordinal, so sparse pre-existing ordinals are never reused.
 - Rejection before store admission consumes no ordinal.
 - Durable ordinal recovery makes replay and host restart reattach to existing children instead of duplicating them.
@@ -143,6 +146,6 @@ Exact retries are idempotent; changed immutable placement, root, executable, or 
 ## Related
 
 - Source: `packages/generalist/src/runtime/child/admission.ts`, `packages/generalist/src/runtime/child/external/placement.ts`, `packages/generalist/src/runtime/child/external/store.ts`
-- Tests: `packages/generalist/test/runtime/executable/registered-agent.test.ts`, `packages/generalist/test/runtime/child/admission.test.ts`, `packages/generalist/test/host/index.test.ts`
+- Tests: `packages/generalist/test/runtime/executable/registered-agent.test.ts`, `packages/generalist/test/runtime/child/admission.test.ts`, `packages/generalist/test/runtime/child/session.test.ts`, `packages/generalist/test/host/index.test.ts`
 - Site: `/docs/multi-agent`
 - Decisions/tradeoffs: [Admission returns at admission](../decisions/child-admission-returns-at-admission.md)

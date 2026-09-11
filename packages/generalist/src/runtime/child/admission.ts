@@ -434,8 +434,10 @@ export class AgentChildren extends Context.Service<
  * because cell code cannot influence what the Run store already recorded. And it is stable across
  * replay: the ordinal is encoded into the invocation id, which derives the idempotency key, so a
  * counter that restarted at zero after a restart would mint a second invocation id for the same
- * logical spawn and silently duplicate a child Run. A key already admitted under this operation
- * keeps the exact ordinal it was first given; only a genuinely new key extends the sequence.
+ * logical spawn and silently duplicate a child Run. An admission identity already recorded under
+ * this operation keeps the exact ordinal it was first given; any other identity extends the
+ * sequence. Identity is `(tool call, key)`, so the same key under two tool calls is two children
+ * that each take an ordinal from the one operation sequence.
  *
  * This costs one direct-child read per admission. That cost is deliberate: caching the sequence in
  * process would reintroduce exactly the duplicate-child failure above, so restart safety is chosen
@@ -447,10 +449,21 @@ export const makeAgentChildren = (store: RunStoreService): AgentChildren["Servic
     Effect.map(operations.listDirect(runId), (children) => {
       const origins = children.flatMap((child) => {
         const admission = child.invocationId === undefined ? undefined : admissionOf(child.invocationId)
-        return admission?.origin?.operationKey === operationKey ? [{ key: admission.key, ...admission.origin }] : []
+        return admission?.origin?.operationKey === operationKey
+          ? [{ toolCallId: admission.toolCallId, key: admission.key, ordinal: admission.origin.ordinal }]
+          : []
       })
+      // Key by `(tool call, key)`, never the key alone: identity includes the tool call, so the same
+      // key under another tool call must extend this operation's sequence instead of reusing an
+      // ordinal. `next` still spans every recorded tool call, which keeps the sequence increasing.
+      const assigned = new Map<string, Map<string, number>>()
+      for (const entry of origins) {
+        const byKey = assigned.get(entry.toolCallId)
+        if (byKey === undefined) assigned.set(entry.toolCallId, new Map([[entry.key, entry.ordinal]]))
+        else byKey.set(entry.key, entry.ordinal)
+      }
       return {
-        assigned: new Map(origins.map((entry) => [entry.key, entry.ordinal] as const)),
+        assigned,
         next: origins.reduce((highest, entry) => Math.max(highest, entry.ordinal + 1), 0),
       }
     })
@@ -463,7 +476,10 @@ export const makeAgentChildren = (store: RunStoreService): AgentChildren["Servic
           operations.admit({
             ...input,
             ...derived,
-            origin: { operationKey, ordinal: ordinals.assigned.get(input.key) ?? ordinals.next },
+            origin: {
+              operationKey,
+              ordinal: ordinals.assigned.get(derived.toolCallId)?.get(input.key) ?? ordinals.next,
+            },
           }),
         )
       }),

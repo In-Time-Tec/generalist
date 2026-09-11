@@ -232,6 +232,42 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
     }),
   )
 
+  it.effect("extends one operation's ordinal sequence across tool calls that reuse a key", () =>
+    Effect.gen(function* () {
+      const { children, operations, parentRunId, store } = yield* parentRun("cross-toolcall-ordinals")
+      const firstCall = { runId: parentRunId, toolCallId: "call-1", operationKey: cellOperationKey }
+      const secondCall = { runId: parentRunId, toolCallId: "call-2", operationKey: cellOperationKey }
+      const otherOperation = { runId: parentRunId, toolCallId: "call-3", operationKey: "other-cell" }
+
+      const first = yield* children.admit(spawn("same")).pipe(withCell(firstCall))
+      // A restarted host holds no in-process state, so the second tool call must extend the durable
+      // sequence rather than inherit the first call's ordinal.
+      const restarted = ChildAdmission.makeAgentChildren(store)
+      const second = yield* restarted.admit(spawn("same")).pipe(withCell(secondCall))
+      const other = yield* children.admit(spawn("same")).pipe(withCell(otherOperation))
+      // The high-water mark spans every tool call of the operation: a new key under call-1 must clear
+      // call-2's recorded ordinal even though call-1's own recorded maximum is lower.
+      const later = yield* children.admit(spawn("later")).pipe(withCell(firstCall))
+
+      // Identity includes the tool call, so the same key under a second tool call is a distinct child
+      // that must extend the operation's ordinal sequence rather than reuse the first ordinal.
+      const direct = yield* operations.listDirect(parentRunId)
+      const originOf = (childRunId: string) => direct.find((entry) => entry.childRunId === childRunId)?.origin
+      expect(first.childRunId).not.toBe(second.childRunId)
+      expect(originOf(first.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 0 })
+      expect(originOf(second.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 1 })
+      expect(originOf(other.childRunId)).toEqual({ operationKey: "other-cell", ordinal: 0 })
+      expect(originOf(later.childRunId)).toEqual({ operationKey: cellOperationKey, ordinal: 2 })
+
+      // Each tool call's own identity still recovers its original child and ordinal on replay.
+      const replay = yield* children.admit(spawn("same")).pipe(withCell(firstCall))
+      const replaySecond = yield* restarted.admit(spawn("same")).pipe(withCell(secondCall))
+      expect(replay).toEqual(first)
+      expect(replaySecond).toEqual(second)
+      expect(yield* operations.listDirect(parentRunId)).toHaveLength(4)
+    }),
+  )
+
   it.effect("distinguishes children of different cells under one tool call", () =>
     Effect.gen(function* () {
       const { children, operations, parentRunId } = yield* parentRun("distinct-cells")

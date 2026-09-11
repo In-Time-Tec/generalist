@@ -266,6 +266,69 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
     }),
   )
 
+  it.effect("rejects a rewind on a root with admitted children without mutating the Run", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const started = yield* runtime.startExecution({
+        ...base,
+        sessionId: "rewind-initial-root",
+        idempotencyKey: "rewind-initial-root",
+        initialChildren: [
+          {
+            ...base.initialChildren[0]!,
+            invocationId: "rewind-initial-research",
+            idempotencyKey: "rewind-initial-research",
+            sessionId: "rewind-initial-child",
+          },
+        ],
+      })
+      const childRunId = started.childRunIds[0]!
+      const childClaim = yield* store.claimExecution({
+        commandId: `${childRunId}:rewind:claim`,
+        runId: childRunId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.complete({
+        commandId: `${childRunId}:rewind:complete`,
+        ...childClaim,
+        result: completedResult("researched"),
+      })
+      expect((yield* runtime.inspect(started.runId)).status).toBe("running")
+      const rootClaim = yield* store.claimExecution({
+        commandId: `${started.runId}:rewind:claim`,
+        runId: started.runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.complete({
+        commandId: `${started.runId}:rewind:complete`,
+        ...rootClaim,
+        result: completedResult("root done"),
+      })
+      const before = yield* runtime.inspect(started.runId)
+      const historyBefore = yield* runtime.history({ runId: started.runId, limit: 100 })
+      expect(before.status).toBe("succeeded")
+
+      const rewind = yield* runtime
+        .rewind(started.runId, { commandId: "rewind-initial-root", toSequence: 0 })
+        .pipe(Effect.flip)
+      expect(rewind).toBeInstanceOf(Errors.RuntimeUnavailable)
+      expect(rewind).toMatchObject({ message: `run ${started.runId} has initial children` })
+
+      const inspection = yield* runtime.inspect(started.runId)
+      expect(inspection).toEqual(before)
+      expect(inspection.status).toBe("succeeded")
+      expect(inspection.children).toHaveLength(1)
+      expect(yield* runtime.history({ runId: started.runId, limit: 100 })).toEqual(historyBefore)
+      expect(historyBefore.some((event) => event._tag === "RunRewound")).toBe(false)
+      expect(
+        yield* store
+          .claimExecution({ commandId: "rewind-initial-root-reclaim", runId: started.runId, ownerId: objectWorkerId })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/runtime/RunTerminal", status: "succeeded" })
+    }),
+  )
+
   it.effect("rolls back all admission on an invalid selection and conflicts on changed source", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime

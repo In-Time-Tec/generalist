@@ -1,8 +1,9 @@
 import { objectRuntimeLayer } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
+import { cost as catalogCost, layerTest } from "../../src/ai/model-catalog.js"
 import {
   SuiteResult,
   gatesPassed,
@@ -60,6 +61,44 @@ const trajectory: Trajectory = {
   ],
 }
 
+const usageTrajectory = (provider: string, model: string, turnUsage: Response.Usage): Trajectory => ({
+  runId: "run:eval",
+  agent: "triage",
+  input: Prompt.make("triage"),
+  output: { severity: "high" },
+  gates: [],
+  stopReason: "stop",
+  turns: [
+    {
+      prompt: Prompt.make("triage"),
+      response: {
+        content: [
+          Response.makePart("text", { text: "high" }),
+          Response.makePart("finish", { reason: "stop", usage: turnUsage }),
+        ],
+        usage: turnUsage,
+        finishReason: "stop",
+      },
+      toolCalls: [],
+      usageFacts: [
+        {
+          _tag: "Completed",
+          runId: "run:eval",
+          turn: 0,
+          purpose: "conversation",
+          modelCallId: "call-1",
+          modelAttemptId: "attempt-1",
+          attempt: 0,
+          provider,
+          model,
+          usageAt: 1,
+          usage: turnUsage,
+        },
+      ],
+    },
+  ],
+})
+
 it.effect("scores output schemas deterministically", () =>
   Effect.gen(function* () {
     const [pass, fail] = yield* score(trajectory, [
@@ -112,6 +151,135 @@ it.effect("checks token and bundled-catalog USD limits", () =>
       usageUnder({ usd: 0.74 }),
     ])
     expect(pass).toMatchObject({ passed: true, message: "2000000 tokens; $0.750000" })
+    expect(fail?.passed).toBe(false)
+  }),
+)
+
+it.effect("prices cached bundled-catalog usage with the catalog price components", () =>
+  Effect.gen(function* () {
+    const cachedUsage = Response.Usage.make({
+      inputTokens: { total: 23, uncached: 11, cacheRead: 7, cacheWrite: 5 },
+      outputTokens: { total: 13, text: 8, reasoning: 5 },
+    })
+    const [scored, oracle] = yield* Effect.all([
+      score(usageTrajectory("openai", "gpt-4o-mini", cachedUsage), [usageUnder({ usd: 0.001 })]),
+      catalogCost({ provider: "openai", model: "gpt-4o-mini" }, cachedUsage),
+    ])
+    expect(oracle).toEqual(Option.some(0.00001125))
+    expect(scored[0]).toMatchObject({ passed: true, message: "36 tokens; $0.000011" })
+  }),
+)
+
+it.effect("prices declared uncached input with separate cache rates", () =>
+  Effect.gen(function* () {
+    const declaredUsage = Response.Usage.make({
+      inputTokens: { total: 100, uncached: 80, cacheRead: 10, cacheWrite: 10 },
+      outputTokens: { total: 0 },
+    })
+    const catalog = layerTest([
+      {
+        provider: "stress",
+        model: "priced",
+        contextWindow: 8_192,
+        maxOutput: 1_024,
+        logprobs: false,
+        pricing: { inputPerMTok: 1, outputPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 0.1 },
+      },
+    ])
+    const [tight, loose, over, oracle] = yield* provideScoped(
+      catalog,
+      Effect.all([
+        score(usageTrajectory("stress", "priced", declaredUsage), [usageUnder({ usd: 0.000085 })]),
+        score(usageTrajectory("stress", "priced", declaredUsage), [usageUnder({ usd: 0.001 })]),
+        score(usageTrajectory("stress", "priced", declaredUsage), [usageUnder({ usd: 0.00008 })]),
+        catalogCost({ provider: "stress", model: "priced" }, declaredUsage),
+      ]),
+    )
+    expect(oracle).toEqual(Option.some(0.000082))
+    expect(tight[0]).toMatchObject({ passed: true, message: "100 tokens; $0.000082" })
+    expect(loose[0]?.passed).toBe(true)
+    expect(over[0]?.passed).toBe(false)
+  }),
+)
+
+it.effect("prefers a declared uncached count over the derived total", () =>
+  Effect.gen(function* () {
+    const splitUsage = Response.Usage.make({
+      inputTokens: { total: 100, uncached: 70, cacheRead: 10, cacheWrite: 10 },
+      outputTokens: { total: 0 },
+    })
+    const catalog = layerTest([
+      {
+        provider: "stress",
+        model: "priced",
+        contextWindow: 8_192,
+        maxOutput: 1_024,
+        logprobs: false,
+        pricing: { inputPerMTok: 1, outputPerMTok: 2, cacheReadPerMTok: 0.1, cacheWritePerMTok: 0.1 },
+      },
+    ])
+    const [within, beyond, oracle] = yield* provideScoped(
+      catalog,
+      Effect.all([
+        score(usageTrajectory("stress", "priced", splitUsage), [usageUnder({ usd: 0.000075 })]),
+        score(usageTrajectory("stress", "priced", splitUsage), [usageUnder({ usd: 0.00007 })]),
+        catalogCost({ provider: "stress", model: "priced" }, splitUsage),
+      ]),
+    )
+    expect(oracle).toEqual(Option.some(0.000072))
+    expect(within[0]).toMatchObject({ passed: true, message: "100 tokens; $0.000072" })
+    expect(beyond[0]?.passed).toBe(false)
+  }),
+)
+
+it.effect("reports unknown USD only when catalog pricing is unavailable", () =>
+  Effect.gen(function* () {
+    const plainUsage = Response.Usage.make({ inputTokens: { total: 10 }, outputTokens: { total: 5 } })
+    const unknownModel = yield* score(usageTrajectory("openai", "not-in-catalog", plainUsage), [usageUnder({ usd: 1 })])
+    const unpriced = yield* provideScoped(
+      layerTest([{ provider: "stress", model: "unpriced", contextWindow: 1, maxOutput: 1, logprobs: false }]),
+      score(usageTrajectory("stress", "unpriced", plainUsage), [usageUnder({ usd: 1 })]),
+    )
+    expect(unknownModel[0]).toMatchObject({
+      passed: false,
+      message: "USD is unknown because model identity or catalog pricing is unavailable",
+    })
+    expect(unpriced[0]).toMatchObject({
+      passed: false,
+      message: "USD is unknown because model identity or catalog pricing is unavailable",
+    })
+  }),
+)
+
+it.effect("prices failed-attempt provider usage with the bundled catalog", () =>
+  Effect.gen(function* () {
+    const base = usageTrajectory("openai", "gpt-4o-mini", usage)
+    const failed: Trajectory = {
+      ...base,
+      turns: [
+        {
+          ...base.turns[0]!,
+          usageFacts: [
+            {
+              _tag: "Failed",
+              runId: "run:eval",
+              turn: 0,
+              purpose: "conversation",
+              modelCallId: "call-1",
+              modelAttemptId: "attempt-1",
+              attempt: 0,
+              provider: "openai",
+              model: "gpt-4o-mini",
+              category: "transport",
+              usageAt: 1,
+              providerUsage: { inputTokens: 10_000_000, outputTokens: 5_000_000 },
+            },
+          ],
+        },
+      ],
+    }
+    const [pass, fail] = yield* score(failed, [usageUnder({ tokens: 15_000_000, usd: 4.5 }), usageUnder({ usd: 4.4 })])
+    expect(pass).toMatchObject({ passed: true, message: "15000000 tokens; $4.500000" })
     expect(fail?.passed).toBe(false)
   }),
 )
