@@ -149,6 +149,7 @@ describe("child origin encoding", () => {
       "child-admit:%:key",
       "child-admit:a%:b",
       "child-admit:a%ZZ:b",
+      "child-admit:%:b#0:c",
       "child-admit:a:#0:%E0%A4",
       "child-admit:a:#0:b%",
       "child-admit:%uD8:b",
@@ -158,6 +159,29 @@ describe("child origin encoding", () => {
       expect(ChildAdmission.admissionOf(value)).toBeUndefined()
       expect(ChildAdmission.originOf(value)).toBeUndefined()
     }
+  })
+
+  standalone("returns undefined for ordinal markers the encoder never writes", () => {
+    for (const value of [
+      "child-admit:a:#:b",
+      "child-admit:a:#-1:b",
+      "child-admit:a:# 0:b",
+      "child-admit:a:#0x10:b",
+      "child-admit:a:#1e0:b",
+      "child-admit:a:#9007199254740992:b",
+    ]) {
+      expect(ChildAdmission.admissionOf(value)).toBeUndefined()
+      expect(ChildAdmission.originOf(value)).toBeUndefined()
+    }
+    expect(
+      ChildAdmission.originOf(
+        ChildAdmission.invocationIdFor({
+          toolCallId: "a",
+          key: "b",
+          origin: { operationKey: "op", ordinal: Number.MAX_SAFE_INTEGER },
+        }),
+      ),
+    ).toEqual({ operationKey: "op", ordinal: Number.MAX_SAFE_INTEGER })
   })
 
   standalone("keeps the published controls decoding", () => {

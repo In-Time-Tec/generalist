@@ -149,6 +149,9 @@ export interface ChildOrigin {
  */
 const codeUnitEscape = /%u([0-9A-F]{4})/
 
+/** Canonical non-negative integer text the encoder emits for an ordinal. */
+const ordinalPattern = /^(0|[1-9][0-9]*)$/
+
 /** Percent-encode one invocation-id field, escaping code units percent-encoding cannot carry. */
 const encodeField = (value: string): string => {
   let encoded = ""
@@ -194,8 +197,9 @@ const decodeField = (value: string): string | undefined => {
  * means correlation survives replay, restart, and reload with no event-schema change and no
  * reconstruction from cell source.
  *
- * Every string encodes, including an empty operation key and unpaired surrogates. The codec is
- * total: `admissionOf` reads back exactly the identity this function was given.
+ * Every string encodes, including an empty operation key and unpaired surrogates. For a
+ * non-negative safe-integer ordinal, the one the host's durable child sequence assigns,
+ * `admissionOf` reads back exactly the identity this function was given.
  */
 export const invocationIdFor = (input: {
   readonly toolCallId: string
@@ -233,8 +237,10 @@ export const admissionOf = (invocationId: string): ChildAdmissionIdentity | unde
   const marker = parts[2]!
   const separator = marker.lastIndexOf("#")
   if (separator < 0) return undefined
-  const ordinal = Number(marker.slice(separator + 1))
-  if (!Number.isSafeInteger(ordinal) || ordinal < 0) return undefined
+  const ordinalText = marker.slice(separator + 1)
+  if (!ordinalPattern.test(ordinalText)) return undefined
+  const ordinal = Number(ordinalText)
+  if (!Number.isSafeInteger(ordinal)) return undefined
   const toolCallId = decodeField(parts[1]!)
   const key = decodeField(parts[3]!)
   const operationKey = decodeField(marker.slice(0, separator))
