@@ -9,6 +9,7 @@ import {
   Lease,
   LeaseMillis,
   Resource,
+  ResourceBinding,
   type ResourceIdentity,
 } from "./kernel-resource-authority.js"
 
@@ -155,10 +156,13 @@ export const makeMemoryResourceAuthority: Effect.Effect<MemoryResourceAuthority>
               if (resource.state === "paused" && existing?.activeCell !== undefined) {
                 return Effect.fail(rejected(claim.sessionId, "cell-active", "an active cell prevents idle pause"))
               }
+              // The store owns activeCell and cleanupFailure: project only the binding fields
+              // so a Resource-shaped request cannot smuggle them past the contract.
+              const projected = ResourceBinding.make(resource)
               const withActive =
                 existing?.activeCell === undefined
-                  ? Resource.make(resource)
-                  : Resource.make({ ...resource, activeCell: existing.activeCell })
+                  ? Resource.make(projected)
+                  : Resource.make({ ...projected, activeCell: existing.activeCell })
               const bound =
                 existing?.cleanupFailure === undefined
                   ? withActive
