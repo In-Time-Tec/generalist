@@ -1,8 +1,38 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
 import { RunBudget } from "../../../src/index.js"
 
+const schemaError = (build: () => void): boolean => {
+  try {
+    build()
+    return false
+  } catch (error) {
+    return Schema.isSchemaError(error)
+  }
+}
+
 describe("RunBudget", () => {
+  it("rejects a NaN duration instead of silently zeroing or ignoring it", () => {
+    expect(schemaError(() => RunBudget.make({ duration: Number.NaN }))).toBe(true)
+
+    const budget = RunBudget.make({ tokens: 1, duration: 1_000 })
+    expect(schemaError(() => RunBudget.extend(budget, { duration: Number.NaN }))).toBe(true)
+    expect(budget.allocation.duration).toBe(1_000)
+  })
+
+  it("keeps the malformed-duration controls rejected and valid durations accepted", () => {
+    const budget = RunBudget.make({ tokens: 1, duration: 1_000 })
+    for (const duration of [Number.POSITIVE_INFINITY, -1]) {
+      expect(schemaError(() => RunBudget.make({ duration }))).toBe(true)
+      expect(schemaError(() => RunBudget.extend(budget, { duration }))).toBe(true)
+    }
+    expect(budget.allocation.duration).toBe(1_000)
+    expect(RunBudget.make({ duration: 0 }).allocation.duration).toBe(0)
+    expect(RunBudget.make({ duration: 1_000 }).allocation.duration).toBe(1_000)
+    expect(RunBudget.make({ duration: "1 second" }).allocation.duration).toBe(1_000)
+    expect(RunBudget.extend(budget, { duration: 500 }).allocation.duration).toBe(1_500)
+  })
+
   it("constructs the current five-dimensional contract", () => {
     expect(RunBudget.make({ tokens: 10, usd: 2, duration: "3 seconds", toolCalls: 4, children: 5 })).toEqual({
       allocation: { tokens: 10, usd: 2, duration: 3_000, toolCalls: 4, children: 5 },

@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
-import { Effect, Layer, Schema, Stream } from "effect"
+import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Approvals, Hooks, Permissions } from "../../../../src/index.js"
+import { Agent, Approvals, Hooks, Permissions, ToolExecutor, ToolOutput } from "../../../../src/index.js"
 import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
 import { provideScoped } from "../../../runtime/execution/scoped-provide.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
@@ -196,4 +196,143 @@ it.live("replays a blocked and approved tool batch once after object storage reo
 
 it.live("resumes two approval-gated calls one after another", () =>
   approvalBatchScenario({ label: "sequential-approval-batch-replay", blockFirst: false }),
+)
+
+const resolvedBatchScenario = (input: { readonly label: string }) =>
+  Effect.gen(function* () {
+    const storage = makeObjectStorage()
+    const payload = "z".repeat(60 * 1024)
+    const waitTool = Tool.make("wait_call", { parameters: Schema.Struct({}), success: Schema.String })
+    const toolkit = Toolkit.make(waitTool)
+    const agent = Agent.make({ name: input.label, toolkit })
+    const puts: Array<string> = []
+    let modelCalls = 0
+    const model = Layer.effect(
+      LanguageModel.LanguageModel,
+      LanguageModel.make({
+        generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+        streamText: () => {
+          modelCalls += 1
+          return Stream.fromIterable<Response.StreamPartEncoded>(
+            modelCalls === 1
+              ? [
+                  Response.makePart("tool-call", {
+                    id: "wait-call",
+                    name: "wait_call",
+                    params: {},
+                    providerExecuted: false,
+                  }),
+                  finish("tool-calls"),
+                ]
+              : [Response.makePart("text-delta", { id: "done", delta: "model completed" }), finish("stop")],
+          )
+        },
+      }),
+    )
+    const environment = Layer.mergeAll(
+      Permissions.layerAllowAll,
+      Approvals.layerAutoApprove,
+      model,
+      toolkit.toLayer({ wait_call: () => Effect.die("ToolExecutor owns this call") }),
+      ToolExecutor.layerTest({
+        execute: () => Effect.succeed({ _tag: "Suspend" as const, token: "wait-token" }),
+      }),
+      ToolOutput.layerTest({
+        put: (toolCallId) => {
+          puts.push(toolCallId)
+          return Effect.succeed(Option.some(`mem:${puts.length}`))
+        },
+      }),
+    )
+    const resolver = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
+    const runtimeLayer = (workerId: string) =>
+      Layer.merge(
+        objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, workerId }, storage).pipe(
+          Layer.provide(resolver),
+        ),
+        environment,
+      )
+    const startOptions = {
+      sessionId: `session:${input.label}`,
+      idempotencyKey: input.label,
+    }
+
+    const suspended = yield* provideScoped(
+      runtimeLayer(objectWorkerId),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(agent)
+        const handle = yield* runtime.start(agent, "run the resolved batch", startOptions)
+        yield* host.execute(
+          yield* store.claimExecution({
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+            commandId: `resolved-batch:${input.label}:seed`,
+          }),
+        )
+        expect((yield* runtime.inspect(handle.runId)).status).toBe("waiting")
+        return { runId: handle.runId }
+      }),
+    )
+
+    yield* provideScoped(
+      runtimeLayer(`${objectWorkerId}:${input.label}:reopen`),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(agent)
+        const handle = yield* runtime.start(agent, "run the resolved batch", startOptions)
+        expect(handle.runId).toBe(suspended.runId)
+        const waiting = yield* runtime.inspect(suspended.runId)
+        expect(waiting.status).toBe("waiting")
+        yield* runtime.respond({
+          runId: suspended.runId,
+          waitId: waiting.waits[0]!.waitId,
+          resolution: { _tag: "ToolResult", result: payload, encodedResult: payload },
+        })
+        yield* host
+          .execute(
+            yield* store.claimExecution({
+              runId: suspended.runId,
+              ownerId: `${objectWorkerId}:${input.label}:reopen`,
+              commandId: `resolved-batch:${input.label}:resume`,
+            }),
+          )
+          .pipe(Effect.timeout("5 seconds"))
+        expect(yield* handle.await.pipe(Effect.timeout("5 seconds"))).toBe("model completed")
+        expect(puts).toEqual(["wait-call"])
+      }),
+    )
+
+    // A fresh Layer exact retry observes the committed bounded outcome and must not spill again.
+    yield* provideScoped(
+      runtimeLayer(`${objectWorkerId}:${input.label}:replay`),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        yield* runtime.register(agent)
+        const handle = yield* runtime.start(agent, "run the resolved batch", startOptions)
+        expect(handle.runId).toBe(suspended.runId)
+        expect((yield* runtime.inspect(suspended.runId)).status).toBe("succeeded")
+        const completions = (yield* runtime.history({ runId: suspended.runId, limit: 100 })).filter(
+          (event) => event._tag === "ToolExecutionCompleted",
+        )
+        expect(completions).toHaveLength(1)
+        const completed = completions[0]
+        if (completed?._tag !== "ToolExecutionCompleted") return yield* Effect.die("tool completion missing")
+        expect(completed.result.result).toMatchObject({
+          inline: { truncated: true, bytes: 60 * 1024 + 2, maxBytes: 50 * 1024 },
+          outputPaths: ["mem:1"],
+        })
+        expect(puts).toEqual(["wait-call"])
+      }),
+    )
+
+    expect(modelCalls).toBe(2)
+  })
+
+it.live("bounds and spills a host ToolResult resolution once across object storage reopen", () =>
+  resolvedBatchScenario({ label: "resolved-output-batch-replay" }),
 )

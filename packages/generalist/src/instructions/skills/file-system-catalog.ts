@@ -82,7 +82,11 @@ const discoverRoot = (
       .pipe(Effect.mapError((error) => mapPlatformError(rootPath, error)))
     const skills: Array<Skill> = []
     for (const skillFile of entries.filter((entry) => path.basename(entry) === "SKILL.md").toSorted()) {
-      skills.push(yield* loadSkill(fs, path, path.join(rootPath, skillFile), skillFile, frontmatterMaxBytes))
+      const file = path.join(rootPath, skillFile)
+      const info = yield* fs.stat(file).pipe(Effect.mapError((error) => mapPlatformError(file, error)))
+      // Only a regular file can be a SKILL.md document; skip directories and other non-file entries.
+      if (info.type !== "File") continue
+      skills.push(yield* loadSkill(fs, path, file, skillFile, frontmatterMaxBytes))
     }
     return skills
   })

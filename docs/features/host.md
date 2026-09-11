@@ -101,7 +101,7 @@ const program = Effect.gen(function* () {
 
 `ToolIdentity` is required for independent Tool registration. Change `implementation` when handler or executor behavior changes, and change `policy` when permission rules, approval services, a function-valued approval predicate, or the executor's replay-policy selector changes. Boolean `needsApproval` settings also enter the pinned identity automatically. These are deployment identities, not secrets or serialized closures; a new deployment must retain the code and policy for unfinished old pins.
 
-`start` returns after canonical admission, before the handler settles. `result` is the decoded number `5`; the retained input and result use the Tool's encoded schemas. Repeating an identical `commandId` returns the same Run and result without redispatch. Reusing it with different input fails with a canonical `input-conflict`. Keep the command identity after ambiguous admission outcomes.
+`start` returns after canonical admission, before the handler settles. `result` is the decoded number `5`; the retained input and result use the Tool's encoded schemas. Repeating an identical `commandId` returns the same Run and result without redispatch. Reusing it with different input fails with `IdempotencyConflict`. Keep the command identity after ambiguous admission outcomes.
 
 The handle exposes `id`, `inspect`, replay-then-live `events`, `await`, and `cancel(commandId, reason?)`. It has no Agent `send`, fork, or rewind controls. A declared Tool failure is decoded through its failure schema and returned by `await` as `{ _tag: "ToolRunFailure", failure }`. Approval decisions and unknown-effect resolution use the existing Host approval and operator methods.
 

@@ -60,6 +60,10 @@ export const make = (options: Options) => {
     const manifestName = encodedPath(options.manifestName ?? "skills.json")
     const repository = `${base}/repos/${encodeURIComponent(options.owner)}/${encodeURIComponent(options.repo)}/contents`
     const rootUrl = `${repository}/${root.length === 0 ? "" : `${root}/`}`
+    // Bodies resolve beside the manifest, matching the HTTP and S3 catalogs. `resolveRelative` is not
+    // reused because relative URL resolution drops the pinned `?ref` query.
+    const manifestDirectory = manifestName.slice(0, manifestName.lastIndexOf("/") + 1)
+    const bodyBaseUrl = `${rootUrl}${manifestDirectory}`
     const manifestUrl = `${rootUrl}${manifestName}?ref=${encodeURIComponent(options.ref)}`
     const headers = {
       accept: "application/vnd.github.raw+json",
@@ -73,7 +77,7 @@ export const make = (options: Options) => {
       bodyHeaders: headers,
       resolveSkillUrl: (skillPath) =>
         validateSkillPath(source, skillPath).pipe(
-          Effect.map((safePath) => `${rootUrl}${encodedPath(safePath)}?ref=${encodeURIComponent(options.ref)}`),
+          Effect.map((safePath) => `${bodyBaseUrl}${encodedPath(safePath)}?ref=${encodeURIComponent(options.ref)}`),
         ),
     })
   })

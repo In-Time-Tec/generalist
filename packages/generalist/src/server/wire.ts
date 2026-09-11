@@ -13,7 +13,7 @@ export const CursorFromString = Schema.String.check(Schema.isPattern(/^-?\d+$/))
 export const ClientCommand = Schema.Struct({
   _tag: Schema.tag("Cancel"),
   runId: Schema.String,
-  commandId: Schema.String,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   reason: Schema.optionalKey(Schema.String),
 })
 export type ClientCommand = typeof ClientCommand.Type

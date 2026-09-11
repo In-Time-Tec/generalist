@@ -219,6 +219,35 @@ it.effect("suspends when elapsed duration is exhausted before provider dispatch"
   ),
 )
 
+it.effect("rejects malformed budget extensions with RunBudgetInvalid", () =>
+  provideScoped(
+    runtimeLayer(textModel),
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      yield* runtime.register(agent)
+      const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ duration: "1 minute" }) })
+      for (const duration of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+        const failure = yield* runtime
+          .extendBudget({
+            commandId: `budget:malformed:${String(duration)}`,
+            runId: handle.runId,
+            delta: { duration },
+          })
+          .pipe(Effect.flip)
+        expect(failure).toMatchObject({ _tag: "generalist/core/RunBudgetInvalid" })
+      }
+      expect(yield* runtime.inspect(handle.runId)).toMatchObject({ budget: { duration: 60_000 } })
+      // Failed extensions are not journaled: a later valid extension adds exactly its own delta.
+      yield* runtime.extendBudget({
+        commandId: "budget:valid-after-malformed",
+        runId: handle.runId,
+        delta: { duration: 500 },
+      })
+      expect(yield* runtime.inspect(handle.runId)).toMatchObject({ budget: { duration: 60_500 } })
+    }),
+  ),
+)
+
 it.effect("one tool-call extension pays for exactly one handler execution", () => {
   let calls = 0
   let modelCalls = 0
