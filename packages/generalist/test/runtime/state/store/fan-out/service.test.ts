@@ -2,7 +2,6 @@ import { expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Errors, Runtime, RunStore, RunTree } from "../../../../../src/runtime/index.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../execution/object.js"
-import { DurabilityFailure } from "../../../../../src/durability/errors.js"
 import {
   assistantAddress,
   assistantRef,
@@ -103,9 +102,14 @@ layer(objectLayer)("Runtime fan-out", (it) => {
       expect((yield* runtime.inspectFanOut(receipt.fanOutId)).members.map((member) => member.ordinal)).toEqual([
         0, 1, 2,
       ])
+      const conflictTarget = {
+        parentRunId: input.parentRunId,
+        idempotencyKey: input.idempotencyKey,
+        existingFanOutId: receipt.fanOutId,
+      }
       const conflict = yield* runtime.fanOut({ ...input, members: input.members.toReversed() }).pipe(Effect.flip)
-      expect(conflict).toBeInstanceOf(DurabilityFailure)
-      expect(conflict).toMatchObject({ reason: "input-conflict" })
+      expect(conflict).toBeInstanceOf(Errors.FanOutConflict)
+      expect(conflict).toMatchObject(conflictTarget)
       const changedMembers = [...input.members]
       changedMembers[0] = { ...changedMembers[0]!, selection: "analyst" }
       const changedBinding = yield* runtime
@@ -114,16 +118,19 @@ layer(objectLayer)("Runtime fan-out", (it) => {
           members: changedMembers,
         })
         .pipe(Effect.flip)
-      expect(changedBinding).toBeInstanceOf(DurabilityFailure)
-      expect(changedBinding).toMatchObject({ reason: "input-conflict" })
+      expect(changedBinding).toBeInstanceOf(Errors.FanOutConflict)
+      expect(changedBinding).toMatchObject(conflictTarget)
       const changedMetadata = [...input.members]
       changedMetadata[0] = {
         ...changedMetadata[0]!,
         metadata: { routing: { priority: 1, region: "local" } },
       }
       const metadataConflict = yield* runtime.fanOut({ ...input, members: changedMetadata }).pipe(Effect.flip)
-      expect(metadataConflict).toBeInstanceOf(DurabilityFailure)
-      expect(metadataConflict).toMatchObject({ reason: "input-conflict" })
+      expect(metadataConflict).toBeInstanceOf(Errors.FanOutConflict)
+      expect(metadataConflict).toMatchObject(conflictTarget)
+      const countConflict = yield* runtime.fanOut({ ...input, members: input.members.slice(0, 2) }).pipe(Effect.flip)
+      expect(countConflict).toBeInstanceOf(Errors.FanOutConflict)
+      expect(countConflict).toMatchObject(conflictTarget)
     }),
   )
 
@@ -296,8 +303,12 @@ layer(objectLayer)("Runtime fan-out", (it) => {
       const changed = yield* runtime
         .fanOut({ ...input, members: [{ ...input.members[0]!, prompt: "changed" }] })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.FanOutConflict)
+      expect(changed).toMatchObject({
+        parentRunId: parent.runId,
+        idempotencyKey: input.idempotencyKey,
+        existingFanOutId: receipt.fanOutId,
+      })
       expect(
         yield* runtime.fanOut({ ...input, idempotencyKey: "new-after-terminal" }).pipe(Effect.flip),
       ).toBeInstanceOf(Errors.RunTerminal)
@@ -520,8 +531,12 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
             members: changedMembers,
           })
           .pipe(Effect.flip)
-        expect(changed).toBeInstanceOf(DurabilityFailure)
-        expect(changed).toMatchObject({ reason: "input-conflict" })
+        expect(changed).toBeInstanceOf(Errors.FanOutConflict)
+        expect(changed).toMatchObject({
+          parentRunId: parent.runId,
+          idempotencyKey: input.idempotencyKey,
+          existingFanOutId: receipt.fanOutId,
+        })
         return { ...receipt, parentRunId: parent.runId }
       }),
     )

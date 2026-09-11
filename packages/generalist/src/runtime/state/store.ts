@@ -14,6 +14,7 @@ import {
   ApprovalMismatch,
   AckInvalid,
   CursorExpired,
+  FanOutConflict,
   IllegalOperatorAction,
   IdempotencyConflict,
   ResponseConflict,
@@ -748,6 +749,26 @@ const makeStoreServices = (options: Options) =>
           Effect.andThen(
             modifyState(commands.admitFanOut, [input], (state, [preparedInput]) => admitFanOut(state, preparedInput)),
           ),
+          Effect.catchTag("generalist/durability/DurabilityFailure", (error) => {
+            if (error.reason !== "input-conflict") return Effect.fail(error)
+            return readState.pipe(
+              Effect.flatMap((state) => {
+                const existing = [...state.fanOuts.values()].find(
+                  (fanOut) =>
+                    fanOut.parentRunId === input.parentRunId && fanOut.idempotencyKey === input.idempotencyKey,
+                )
+                return Effect.fail(
+                  existing === undefined
+                    ? error
+                    : FanOutConflict.make({
+                        parentRunId: input.parentRunId,
+                        idempotencyKey: input.idempotencyKey,
+                        existingFanOutId: existing.fanOutId,
+                      }),
+                )
+              }),
+            )
+          }),
         ),
       inspectFanOut: (fanOutId) => readState.pipe(Effect.flatMap((state) => inspectFanOut(state, fanOutId))),
       reserveProgramOperation: (input) =>
