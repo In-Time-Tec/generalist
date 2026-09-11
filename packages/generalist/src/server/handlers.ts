@@ -15,6 +15,35 @@ const protect =
 const mapError = (operation: string) => Effect.mapError((error: Error) => apiError({ operation, error }))
 const mapHostError = (operation: string) => Effect.mapError((error: Error) => hostApiError({ operation, error }))
 
+const headerEncoder = new TextEncoder()
+const hexByte = (byte: number) => byte.toString(16).toUpperCase().padStart(2, "0")
+
+// Bun rejects NUL, CR, LF, and every code point above U+00FF in a field value.
+// The remaining C0 controls and U+007F are accepted, so only these are encoded.
+const rejectedHeaderPoint = (point: number) => point > 0xff || point === 0x00 || point === 0x0a || point === 0x0d
+
+/**
+ * Encodes a stored header value so a web `Response` can carry it.
+ *
+ * Stored media references are canonical and unvalidated, so a Host can persist
+ * a filename or media type whose bytes throw while the response is converted to
+ * a web `Response`, leaving the request unresolved. Percent-encode only the code
+ * points the native `Headers` implementation rejects so every accepted value,
+ * including non-ASCII names, is echoed unchanged.
+ */
+const encodeHeaderValue = (value: string): string => {
+  let out = ""
+  for (const character of value) {
+    const point = character.codePointAt(0)
+    if (point === undefined || !rejectedHeaderPoint(point)) {
+      out += character
+      continue
+    }
+    for (const byte of headerEncoder.encode(character)) out += `%${hexByte(byte)}`
+  }
+  return out
+}
+
 const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "sessions", (handlers) =>
     handlers.handleAll({
@@ -275,8 +304,8 @@ const attachmentsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, p
               HttpApiSchema.withHeaders({
                 body: data,
                 headers: {
-                  "content-type": ref.mediaType,
-                  ...(ref.filename === undefined ? undefined : { "x-filename": ref.filename }),
+                  "content-type": encodeHeaderValue(ref.mediaType),
+                  ...(ref.filename === undefined ? undefined : { "x-filename": encodeHeaderValue(ref.filename) }),
                 },
               }),
             ),
