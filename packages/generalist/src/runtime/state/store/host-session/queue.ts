@@ -131,6 +131,11 @@ const validateQueue = (state: RuntimeState, sessionId: string, queue: ReadonlyAr
     }
   })
 
+// A message and a submit accepted under separate command-identity namespaces can
+// share one caller command id. Promotion keys must still identify one accepted
+// entry so each pending input can start its own Run.
+const promotionKind = (pending: PendingInput) => (pending.from === undefined ? "submit" : "message")
+
 const promoteChild = ({
   state,
   sessionId,
@@ -156,19 +161,20 @@ const promoteChild = ({
         pending.selection.executableRef.active,
     )?.selection
     if (selection === undefined) return state
+    const promotionId = `session-message:${promotionKind(pending)}:${pending.id}`
     const result = yield* admitSpawn(
       { ...state, hostSessions },
       {
         parentRunId: sponsor.runId,
-        invocationId: `session-message:${pending.id}`,
+        invocationId: promotionId,
         selection,
         prompt: pending.prompt,
         sessionId,
         message: makeMessage({
-          id: `session-message:${pending.id}`,
+          id: promotionId,
           to: makeAddress(`spawn:${sponsor.runId}`),
           sessionId,
-          idempotencyKey: `session-message:${pending.id}`,
+          idempotencyKey: promotionId,
           correlationId: pending.id,
           prompt: pending.prompt,
         }),
@@ -262,15 +268,16 @@ export const promote = ({ state, sessionId }: { readonly state: RuntimeState; re
       ),
     )
     if (firstExhausted(capGrant(grant.budget, yield* retainedBudget({ state, sessionId }))) !== undefined) return state
+    const promotionId = `session-input:${promotionKind(pending)}:${pending.id}`
     const [receipt, admitted] = yield* admitStart(
       { ...state, hostSessions },
       {
         ...pending.selection,
         message: makeMessage({
-          id: `session-input:${pending.id}`,
+          id: promotionId,
           to: makeAddress("runtime:session-input"),
           sessionId,
-          idempotencyKey: `session-input:${pending.id}`,
+          idempotencyKey: promotionId,
           correlationId: pending.id,
           metadata: {},
           prompt: pending.prompt,
@@ -400,12 +407,14 @@ export const update = ({ state, input }: { readonly state: RuntimeState; readonl
     yield* validatePayload({ value: input, boundary: "Session queue mutation" })
     const stored = yield* sessionFor(state, input.sessionId)
     if (stored.session.lifecycle === "closed") return yield* rejectClosed(input.sessionId)
-    // Address exactly the validated entry: distinct command-identity namespaces can
+    // Address exactly the observed entry: distinct command-identity namespaces can
     // legitimately accept two instructions that share one caller id string, and a
     // mutation must never replace or remove the other accepted entry.
-    const index = stored.session.queue.findIndex((entry) => entry.id === input.id)
+    const index = stored.session.queue.findIndex(
+      (entry) => entry.id === input.id && entry.revision === input.expectedRevision,
+    )
     const item = index === -1 ? undefined : stored.session.queue[index]
-    if (item === undefined || item.revision !== input.expectedRevision)
+    if (item === undefined)
       return yield* SessionQueueConflict.make({
         sessionId: input.sessionId,
         reason: "revision",
