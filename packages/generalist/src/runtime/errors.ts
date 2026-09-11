@@ -244,7 +244,7 @@ export class SteeringConflict extends ActionableTaggedError<SteeringConflict>()(
 export class WaitNotOpen extends ActionableTaggedError<WaitNotOpen>()("generalist/runtime/WaitNotOpen", {
   runId: Schema.String,
   waitId: Schema.String,
-  hint: errorHint("Inspect the Run's open waits and respond to one that is still unresolved."),
+  hint: errorHint("Inspect the Run's open waits and resolve one that is still unresolved."),
 }) {}
 
 export class ResponseConflict extends ActionableTaggedError<ResponseConflict>()("generalist/runtime/ResponseConflict", {

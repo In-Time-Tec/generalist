@@ -223,6 +223,28 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
     }),
   )
 
+  it.effect("fails a signal under a new command identity once the wait is closed", () =>
+    Effect.gen(function* () {
+      const { runtime, runId } = yield* admitWaitWithClaimedChild("wait:closed-signal")
+      yield* runtime.signal({
+        commandId: `${runId}:control:signal:first`,
+        runId,
+        name: "wait:closed-signal",
+      })
+      expect((yield* runtime.inspect(runId)).status).toBe("running")
+
+      const late = yield* runtime
+        .signal({
+          commandId: `${runId}:control:signal:late`,
+          runId,
+          name: "wait:closed-signal",
+        })
+        .pipe(Effect.flip)
+      expect(late).toBeInstanceOf(Errors.WaitNotOpen)
+      expect(late).toMatchObject({ runId, waitId: "wait:closed-signal" })
+    }),
+  )
+
   it.effect("preserves a typed approval request and response in Run and tree replay", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -337,6 +359,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         })
         .pipe(Effect.flip)
       expect(signal).toBeInstanceOf(Errors.WaitNotOpen)
+      expect(signal).toMatchObject({ runId, waitId: "wait:cancelled" })
       const resume = yield* store
         .resume({
           commandId: `${runId}:control:resume:cancelled`,
@@ -346,7 +369,31 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         })
         .pipe(Effect.flip)
       expect(resume).toBeInstanceOf(Errors.WaitNotOpen)
-      expect((yield* runtime.inspect(runId)).status).toBe("cancelling")
+
+      // A cancelling Run can be reclaimed for cancellation work that registers a fresh wait.
+      // The signal then fails through the cancellation-requested disjunct, not the closed-wait one.
+      const reclaimed = yield* store.claimExecution({
+        commandId: `${runId}:control:cancel-reclaim`,
+        runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.suspend({
+        ...reclaimed,
+        waits: [openWait({ waitId: "wait:cancelled-again", reason: "signal" })],
+        suspension: suspension({ waitId: "wait:cancelled-again" }),
+      })
+      const cancellationSignal = yield* runtime
+        .signal({
+          commandId: "runtime-memory-store-control-test-ts-signal-6",
+          runId,
+          name: "wait:cancelled-again",
+        })
+        .pipe(Effect.flip)
+      expect(cancellationSignal).toBeInstanceOf(Errors.WaitNotOpen)
+      expect(cancellationSignal).toMatchObject({ runId, waitId: "wait:cancelled-again" })
+      const cancelled = yield* runtime.inspect(runId)
+      expect(cancelled.status).toBe("waiting")
+      expect(cancelled.waits).toEqual([expect.objectContaining({ waitId: "wait:cancelled-again", status: "open" })])
     }),
   )
 
