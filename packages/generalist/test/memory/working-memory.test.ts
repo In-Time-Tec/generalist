@@ -4,7 +4,7 @@ import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Memory, Session } from "../../src/index.js"
 import { expectTypeOf } from "vitest"
 import { WorkingMemory } from "../../src/memory/index"
-import * as TestModel from "../../src/testing/model/service.js"
+import { layer as testModelLayer, text } from "../../src/testing/model/service.js"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 const otherKey: Memory.Key = { agent: "memory-agent", subject: "subject-b" }
@@ -566,7 +566,7 @@ layer(Layer.empty)((it) => {
 const repeatedSessionKey: Memory.Key = { agent: "memory-agent", subject: "repeated-session" }
 const repeatedSessionId = "repeated-session"
 
-layer(Layer.mergeAll(TestModel.layer([TestModel.text("pong"), TestModel.text("pong")]), Session.layerMemory))(
+layer(Layer.mergeAll(testModelLayer([text("pong"), text("pong")]), Session.layerMemory))(
   "WorkingMemory session retention",
   (it) => {
     it.effect("retains an identical repeated Agent+Session exchange instead of collapsing it", () =>
