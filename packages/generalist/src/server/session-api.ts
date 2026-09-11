@@ -14,9 +14,17 @@ import {
 import { ConversationEntry } from "../runtime/session/conversation.js"
 import { apiErrors } from "./errors.js"
 
+/**
+ * A client-chosen Session id must be non-empty for canonical storage and short
+ * enough for every id-addressed route to capture it; the HTTP router drops path
+ * parameters longer than its 100-character default, which would persist a
+ * Session that no declared route can reach.
+ */
+const sessionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(100))
+
 const createSession = HttpApiEndpoint.post("create", "/sessions", {
   payload: Schema.Struct({
-    id: Schema.optionalKey(Schema.String),
+    id: Schema.optionalKey(sessionId),
     title: Schema.optionalKey(Schema.String),
     agent: Schema.optionalKey(Schema.String),
   }),
