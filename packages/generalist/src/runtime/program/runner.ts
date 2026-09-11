@@ -61,7 +61,7 @@ export const make = (input: {
   const operationIdentity = (authoredOperation: string): string =>
     branch === undefined
       ? authoredOperation
-      : (branch.replay[authoredOperation] ??
+      : ((Object.hasOwn(branch.replay, authoredOperation) ? branch.replay[authoredOperation] : undefined) ??
         `b${identityDigest({ namespace: branch.namespace, authoredOperation }).slice(0, 63)}`)
   // Immutable command receipts are not the current dispatch state.
   const acceptedOperation = (operation: string) =>
