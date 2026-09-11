@@ -222,4 +222,48 @@ layer(services)("Server authorization", (it) => {
       }),
     )
   }
+
+  it.effect("authorizes child inspection against the parent Run in the path", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const child = Agent.make({ name: "child-auth-child" })
+        const parent = Agent.make({ name: "child-auth-parent", children: [child.name] })
+        const host = yield* Host.make({ revision: "local", agents: { [parent.name]: parent, [child.name]: child } })
+        const session = yield* host.sessions.create({ id: "child-auth-session" })
+        const parentRun = yield* host.runs.start(session.id, parent, "parent")
+        const admitted = yield* host.runs.admitChild(parentRun.id, child.name, "child", { commandId: "child-admit" })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("test-token")),
+              principal: { id: "child-reader", tenantId: "test", role: "spectator" },
+            }),
+            authorization: {
+              tenantId: "test",
+              authorize: ({ resource }) => Effect.succeed(resource.type === "run" && resource.id === admitted.runId),
+            },
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose))
+        const request = (path: string) =>
+          Effect.promise(() =>
+            app.handler(
+              new Request(`http://generalist.test${path}?tenantId=test`, {
+                headers: { authorization: "Bearer test-token" },
+              }),
+            ),
+          )
+        const parentRead = yield* request(`/runs/${parentRun.id}`)
+        const listChildren = yield* request(`/runs/${parentRun.id}/children`)
+        const childEntry = yield* request(`/runs/${parentRun.id}/children/${admitted.runId}`)
+        const childRun = yield* request(`/runs/${admitted.runId}`)
+        expect(parentRead.status).toBe(403)
+        expect(listChildren.status).toBe(403)
+        expect(childEntry.status).toBe(403)
+        expect(childRun.status).toBe(200)
+      }),
+    ),
+  )
 })
