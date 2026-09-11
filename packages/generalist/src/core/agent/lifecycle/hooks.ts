@@ -5,6 +5,7 @@ import {
   Continue,
   chainPin,
   Decision,
+  DecisionByEvent,
   HookFailed,
   Hooks,
   type Checkpoint as HookCheckpoint,
@@ -67,7 +68,7 @@ const invoke = <Input>(
     Effect.flatMap((decision) =>
       decision === undefined
         ? Effect.succeed<HookDecision>(Continue())
-        : Schema.decodeEffect(Decision)(decision).pipe(
+        : Schema.decodeEffect(DecisionByEvent[declaration.event])(decision).pipe(
             Effect.mapError((cause) =>
               HookFailed.make({
                 event: declaration.event,
