@@ -83,8 +83,13 @@ const collectCandidates = (value: PolicyParameters, visiting: Set<object>, out: 
     visiting.add(array.value)
     const collected = array.value.map((element) => collectCandidates(element, visiting, out))
     visiting.delete(array.value)
+    // Keep the direct-leaf join: exact patterns matched it before recursive joins were added.
+    const directLeaves = array.value.flatMap((element) => Option.toArray(textLeaf(element)))
+    const direct = directLeaves.length > 0 ? directLeaves.join(" ") : undefined
+    if (direct !== undefined) out.push(direct)
     const leaves = collected.flatMap((element) => element.leaves)
-    if (leaves.length > 0) out.push(leaves.join(" "))
+    const joined = leaves.join(" ")
+    if (leaves.length > 0 && joined !== direct) out.push(joined)
     return { complete: collected.every((element) => element.complete), leaves }
   }
   const record = Schema.decodeUnknownOption(unknownRecord)(value)
