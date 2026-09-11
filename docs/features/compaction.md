@@ -66,7 +66,7 @@ const mine = Compaction.make({
 
 Every `Strategy` field has one owner:
 
-- `shouldCompact({ tokens, contextWindow })` is the proactive decision. `contextWindow` already excludes reserved response headroom. Reactive provider overflow always forces an attempt, regardless of this result.
+- `shouldCompact({ tokens, contextWindow })` is the proactive decision. `contextWindow` already excludes reserved response headroom. A configured `reserveTokens` at or above `contextWindow` is rejected by `RunOptions.compaction`, `Compaction.make`/`Compaction.layer` options, and pinned `CompactionIdentity` manifests; an omitted reserve falls back to zero when the 16,384-token default would exceed a smaller resolved window. Reactive provider overflow always forces an attempt, regardless of this result.
 - `cut(prompt, keepRecentTokens)` receives the current Session projection and returns `Option.none()` when there is no useful cut. A `Plan` contains `keep` (verbatim prefix), `compact` (summary input), and `recent` (verbatim suffix), all as Effect AI `Prompt` values.
 - `summarize(plan, request)` returns checkpoint text. It receives the full request, including IDs, turn, normalized usage, overflow state, current history and input prompt, and any tool-output byte bound. Failures remain typed as `CompactionError`; the Effect requires `LanguageModel` only when the implementation uses one.
 - `toolOutputMaxBytes`, when set, bounds successful tool results before semantic compaction. The service can return after this lossless step when the prompt fits.

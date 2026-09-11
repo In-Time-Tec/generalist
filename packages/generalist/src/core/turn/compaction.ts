@@ -20,6 +20,7 @@ import {
   Result,
   type Service,
   type Usage,
+  usableReserveTokens,
 } from "./compaction-service.js"
 
 export { Compaction, CompactionError, defaultKeepRecentTokens, Result, withLifecycle } from "./compaction-service.js"
@@ -85,8 +86,10 @@ export interface StrategyPart {
 
 /** Options for the default compaction implementation. */
 export interface DefaultOptions {
+  /** Response headroom; must be less than contextWindow when both are set. */
   readonly reserveTokens?: number
   readonly keepRecentTokens?: number
+  /** Fallback window when a Request reports no finite context window. */
   readonly contextWindow?: number
   readonly summaryModel?: Layer.Layer<LanguageModel.LanguageModel>
   readonly summaryPrompt?: string
@@ -131,6 +134,11 @@ const serialized = (value: Prompt.Prompt["content"]): string => {
 const safeNonNegativeInteger = (name: string, value: number): number => {
   if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a non-negative safe integer`)
   return value
+}
+
+const validateReserve = (contextWindow: number | undefined, reserveTokens: number | undefined): void => {
+  if (contextWindow !== undefined && reserveTokens !== undefined && reserveTokens >= contextWindow)
+    throw new TypeError("Compaction.reserveTokens must be less than contextWindow")
 }
 
 const markdownList = (items: ReadonlyArray<string>): string =>
@@ -222,14 +230,19 @@ const summaryPrompt = (template: string, prompt: Prompt.Prompt): Prompt.Prompt =
 const compactedHistory = (summary: string, plan: Plan): Prompt.Prompt =>
   Prompt.concat(Prompt.concat(plan.keep, Prompt.fromMessages([checkpointMessage(summary)])), plan.recent)
 
-const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => ({
-  contextTokens: Number.isFinite(usage.contextTokens) ? usage.contextTokens : 0,
-  contextWindow: Number.isFinite(usage.contextWindow)
+const normalizeUsage = (usage: Usage, options: DefaultOptions): Usage => {
+  const contextWindow = Number.isFinite(usage.contextWindow)
     ? usage.contextWindow
-    : (options.contextWindow ?? Number.POSITIVE_INFINITY),
-  reserveTokens:
-    options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : defaultReserveTokens),
-})
+    : (options.contextWindow ?? Number.POSITIVE_INFINITY)
+  return {
+    contextTokens: Number.isFinite(usage.contextTokens) ? usage.contextTokens : 0,
+    contextWindow,
+    reserveTokens: usableReserveTokens(
+      contextWindow,
+      options.reserveTokens ?? (Number.isFinite(usage.reserveTokens) ? usage.reserveTokens : defaultReserveTokens),
+    ),
+  }
+}
 
 const strategyInput = (usage: Usage): Parameters<Strategy["shouldCompact"]>[0] => ({
   tokens: usage.contextTokens,
@@ -355,6 +368,7 @@ export const make: {
 } = Function.dual(
   (args) => args.length !== 1 || "shouldCompact" in args[0],
   (compactionStrategy: Strategy, options: DefaultOptions = {}): Service => {
+    validateReserve(options.contextWindow, options.reserveTokens)
     const thresholds = makeThresholdState()
     const thresholdId = (input: Request) => input.runId ?? input.sessionId
     return {

@@ -1066,6 +1066,80 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ] as const
   })
 
+  ItLayer.make(it, "fails before model calls when compaction reserveTokens does not fit contextWindow", () => {
+    let modelCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          modelCalls += 1
+          return Stream.make(textDelta("unexpected"))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "invalid-reserve-window-agent" })
+        for (const compaction of [
+          { contextWindow: 10_000, reserveTokens: 10_000 },
+          { contextWindow: 10_000, reserveTokens: 10_001 },
+          { contextWindow: 1, reserveTokens: 16_384 },
+        ]) {
+          const failure = yield* Effect.flip(
+            Stream.runDrain(
+              Agent.stream(agent, "hello", {
+                compaction,
+              }),
+            ),
+          )
+          expect(failure._tag === "generalist/core/AgentError" && failure.message).toBe(
+            "RunOptions.compaction.reserveTokens must be less than contextWindow",
+          )
+        }
+        expect(modelCalls).toBe(0)
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "summarizes at most once for a small context window with an over-window default reserve", () => {
+    const runs = 4
+    const contextWindow = 10_000
+    let mainCalls = 0
+    let summaryCalls = 0
+    return [
+      Layer.mergeAll(
+        modelLayer(
+          () => {
+            mainCalls += 1
+            return Stream.make(textDelta(`answer ${mainCalls}`))
+          },
+          () => {
+            summaryCalls += 1
+            return Effect.succeed([{ type: "text", text: `summary ${summaryCalls}` }])
+          },
+        ),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        layerMemory,
+        Compaction.layer({ contextWindow, keepRecentTokens: 1 }),
+        ModelMiddleware.layerIdentity,
+      ),
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "small-window-compaction-agent" })
+        for (let index = 0; index < runs; index += 1) {
+          yield* Stream.runDrain(
+            Agent.stream(agent, `input ${index} ${"x".repeat(12_000)}`, {
+              sessionId: "small-window-default-reserve",
+              compaction: { contextWindow },
+            }),
+          )
+        }
+        expect(mainCalls).toBe(runs)
+        expect(summaryCalls).toBeLessThanOrEqual(1)
+      }),
+    ] as const
+  })
+
   ItLayer.make(
     it,
     "runs an agent turn and emits loop events",

@@ -1260,6 +1260,24 @@ describe("Compaction", () => {
     expect(() => Compaction.keepRecent({ tokens: -1 })).toThrow(TypeError)
   })
 
+  it("rejects a compaction reserve at or above its configured context window", () => {
+    expect(() => Compaction.layer({ contextWindow: 10_000, reserveTokens: 10_000 })).toThrow(
+      "Compaction.reserveTokens must be less than contextWindow",
+    )
+    expect(() => Compaction.layer({ contextWindow: 10_000, reserveTokens: 16_384 })).toThrow(TypeError)
+    expect(() =>
+      Compaction.make(Compaction.defaultStrategy(), { contextWindow: 10_000, reserveTokens: 10_000 }),
+    ).toThrow(TypeError)
+    expect(() => Compaction.layer({ contextWindow: 10_000, reserveTokens: 9_999 })).not.toThrow()
+  })
+
+  it("falls back to zero reserve when a configured reserve exceeds the resolved window", () => {
+    const service = Compaction.make(Compaction.defaultStrategy(), { reserveTokens: 100 })
+    expect(
+      service.willCompact?.({ usage: { contextTokens: 5, contextWindow: 10, reserveTokens: 0 }, overflow: false }),
+    ).toBe(false)
+  })
+
   it("exports the structured summary schema", () => {
     const decoded = Schema.decodeSync(Compaction.AgentSummary)({
       goal: "goal",
