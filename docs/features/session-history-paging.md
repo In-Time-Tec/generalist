@@ -61,7 +61,7 @@ SessionHistory.page([e0, e1, e2, e3, e4, e5],
 - `firstEntryId` and `lastEntryId` exist only when the page is nonempty.
 - `hasBefore` and `hasAfter` report whether entries remain on the older and newer sides; a whole-log page sets both to `false`.
 - A limit larger than the available window returns that entire window.
-- Limits are truncated to integers and clamped to zero; a zero limit returns no entries or entry-ID cursors.
+- Limits are truncated to integers and clamped to zero; a zero limit returns no entries or entry-ID cursors. `NaN` and negative infinity are treated as zero, and positive infinity leaves the selected window unbounded.
 - Missing cursors are returned in `unknownCursors`; the property is absent when every supplied cursor exists.
 - An unknown `before` cursor falls back to the newest page, while an unknown `after` cursor falls back to the oldest page. Callers must use `unknownCursors` rather than treat either fallback as adjacent to the missing entry.
 - Paging reads the exact entry log, not `Session.buildContext`'s model projection.
