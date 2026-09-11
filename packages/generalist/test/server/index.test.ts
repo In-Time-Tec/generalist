@@ -321,6 +321,29 @@ layer(services)("Server", (it) => {
             })
             .pipe(Effect.flip),
         ).toMatchObject({ _tag: "generalist/server/RequestFailed" })
+        const handlerRequest = (path: string, init?: RequestInit) =>
+          Effect.promise(() => app.handler(new Request(`http://generalist.test${path}`, init)))
+        const unknownInspect = yield* handlerRequest(`/tools/not-registered/runs/${parentRun.id}`, {
+          headers: { authorization: "Bearer secret" },
+        })
+        expect(unknownInspect.status).toBe(404)
+        expect(yield* Effect.promise(() => unknownInspect.json())).toMatchObject({
+          _tag: "generalist/host/ToolNotRegistered",
+          name: "not-registered",
+        })
+        const unknownStart = yield* handlerRequest(`/runs/${parentRun.id}/tools/not-registered`, {
+          method: "POST",
+          headers: { authorization: "Bearer secret", "content-type": "application/json" },
+          body: JSON.stringify({ commandId: "server-contract:unknown-tool", input: {} }),
+        })
+        expect(unknownStart.status).toBe(404)
+        expect(yield* Effect.promise(() => unknownStart.json())).toMatchObject({
+          _tag: "generalist/host/ToolNotRegistered",
+          name: "not-registered",
+        })
+        expect(
+          yield* client.tools.inspect({ runId: parentRun.id, name: "not-registered" }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/host/ToolNotRegistered" })
         expect(
           yield* client.tools.start({
             runId: parentRun.id,

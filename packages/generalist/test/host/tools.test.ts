@@ -511,6 +511,14 @@ it.effect("rejects unregistered tools and supports cancellation without Agent co
     expect((yield* host.tools.start(fail, {}).pipe(Effect.flip))._tag).toBe(
       "generalist/runtime/ExecutableRegistrationInvalid",
     )
+    expect(yield* host.tools.getByName("not-registered", "run-1").pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/host/ToolNotRegistered",
+      name: "not-registered",
+    })
+    expect(yield* host.tools.startByName("not-registered", {}).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/host/ToolNotRegistered",
+      name: "not-registered",
+    })
     const run = yield* host.tools.start(checks, { count: 1 })
     yield* run.cancel("cancel-1", "stop")
     expect(yield* run.await.pipe(Effect.flip)).toMatchObject({ _tag: "RunCancelled" })

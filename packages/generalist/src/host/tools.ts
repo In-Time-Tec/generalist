@@ -8,7 +8,7 @@ import type {
   ToolRunHandle,
   ToolStartOptions,
 } from "../runtime/service.js"
-import { ExecutableRegistrationInvalid } from "../runtime/errors.js"
+import { ToolNotRegistered } from "./errors.js"
 
 export type HostToolRun<Output, Failure> = Omit<ToolRunHandle<Output, Failure>, "runId"> & {
   readonly id: ToolRunHandle<Output, Failure>["runId"]
@@ -35,13 +35,15 @@ export interface Tools {
     runId: string,
   ) => Effect.Effect<
     HostToolRun<unknown, unknown>,
-    import("../runtime/service.js").GetRunError | import("../runtime/errors.js").ExecutableRegistrationInvalid
+    | import("../runtime/service.js").GetRunError
+    | import("../runtime/errors.js").ExecutableRegistrationInvalid
+    | ToolNotRegistered
   >
   readonly startByName: (
     name: string,
     input: Schema.Json,
     options?: ToolStartOptions,
-  ) => Effect.Effect<HostToolRun<unknown, unknown>, StartExecutionError | InspectError>
+  ) => Effect.Effect<HostToolRun<unknown, unknown>, StartExecutionError | InspectError | ToolNotRegistered>
 }
 
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Host construction is an internal composition seam.
@@ -52,15 +54,13 @@ export const make = (runtime: Runtime, registered: ReadonlyMap<string, Tool.Any>
   getByName: (name, id) =>
     Effect.gen(function* () {
       const tool = registered.get(name)
-      if (tool === undefined)
-        return yield* ExecutableRegistrationInvalid.make({ message: `Tool ${name} is not registered` })
+      if (tool === undefined) return yield* ToolNotRegistered.make({ name })
       return yield* runtime.getTool(tool, id).pipe(Effect.map(({ runId, ...handle }) => ({ id: runId, ...handle })))
     }),
   startByName: (name, input, options) =>
     Effect.gen(function* () {
       const tool = registered.get(name)
-      if (tool === undefined)
-        return yield* ExecutableRegistrationInvalid.make({ message: `Tool ${name} is not registered` })
+      if (tool === undefined) return yield* ToolNotRegistered.make({ name })
       return yield* runtime
         .startToolEncoded(tool, input, options)
         .pipe(Effect.map(({ runId, ...handle }) => ({ id: runId, ...handle })))

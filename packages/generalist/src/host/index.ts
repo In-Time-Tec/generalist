@@ -99,6 +99,7 @@ export {
   AgentRegistryKeyMismatch,
   PluginNameConflict,
   PluginToolConflict,
+  ToolNotRegistered,
 } from "./errors.js"
 export {
   HostEvent,

@@ -17,6 +17,12 @@ export class AgentNotRegistered extends ActionableTaggedError<AgentNotRegistered
   },
 ) {}
 
+/** A Host Tool lookup used a Tool name that was not configured on this host. */
+export class ToolNotRegistered extends ActionableTaggedError<ToolNotRegistered>()("generalist/host/ToolNotRegistered", {
+  name: Schema.String,
+  hint: errorHint("Pass a Tool name from the registry supplied to Host.make."),
+}) {}
+
 /** The record key and Agent.name must identify the same registered Agent. */
 export class AgentRegistryKeyMismatch extends ActionableTaggedError<AgentRegistryKeyMismatch>()(
   "generalist/host/AgentRegistryKeyMismatch",

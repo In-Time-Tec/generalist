@@ -11487,9 +11487,16 @@
             }
           },
           "404": {
-            "description": "generalist/runtime/RunNotFound",
+            "description": "generalist/runtime/RunNotFound | generalist/host/ToolNotRegistered",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_ToolNotRegisteredEncoded" }
+                  ]
+                }
+              }
             }
           },
           "409": {
@@ -11554,9 +11561,16 @@
             }
           },
           "404": {
-            "description": "generalist/runtime/RunNotFound",
+            "description": "generalist/runtime/RunNotFound | generalist/host/ToolNotRegistered",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_ToolNotRegisteredEncoded" }
+                  ]
+                }
+              }
             }
           },
           "409": {
@@ -11609,9 +11623,16 @@
             }
           },
           "404": {
-            "description": "generalist/runtime/RunNotFound",
+            "description": "generalist/runtime/RunNotFound | generalist/host/ToolNotRegistered",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_ToolNotRegisteredEncoded" }
+                  ]
+                }
+              }
             }
           },
           "409": {
@@ -11676,9 +11697,16 @@
             }
           },
           "404": {
-            "description": "generalist/runtime/RunNotFound",
+            "description": "generalist/runtime/RunNotFound | generalist/host/ToolNotRegistered",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_ToolNotRegisteredEncoded" }
+                  ]
+                }
+              }
             }
           },
           "409": {
@@ -13913,9 +13941,16 @@
             }
           },
           "404": {
-            "description": "generalist/runtime/RunNotFound",
+            "description": "generalist/runtime/RunNotFound | generalist/host/ToolNotRegistered",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" } }
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
+                    { "$ref": "#/components/schemas/generalist_host_ToolNotRegisteredEncoded" }
+                  ]
+                }
+              }
             }
           },
           "409": {
@@ -17618,6 +17653,16 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "token", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_host_ToolNotRegisteredEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/host/ToolNotRegistered"] },
+          "name": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "name", "hint"],
         "additionalProperties": false
       },
       "generalist_server_InvalidCursorEncoded": {

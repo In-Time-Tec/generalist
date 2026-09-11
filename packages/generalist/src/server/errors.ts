@@ -3,7 +3,7 @@ import { HttpApiSchema } from "effect/unstable/httpapi"
 import { Invalid as BudgetInvalid } from "../core/durable/run-budget.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { BlobNotFound, BlobStoreError, BlobTooLarge } from "../blob-store/index.js"
-import { AgentInputInvalid, AgentNotRegistered } from "../host/errors.js"
+import { AgentInputInvalid, AgentNotRegistered, ToolNotRegistered } from "../host/errors.js"
 import { SessionQueueConflict } from "../runtime/session/queue.js"
 import { SessionPageInvalid } from "../runtime/session/page.js"
 import {
@@ -149,6 +149,7 @@ export const hostTransportErrors = [
   RequestFailed,
   RunNotFound.pipe(notFound),
   RunKindUnsupported.pipe(badRequest),
+  ToolNotRegistered.pipe(notFound),
 ] as const
 const hostTransportError = Schema.Union(hostTransportErrors)
 export type HostTransportError = typeof hostTransportError.Type
@@ -210,6 +211,8 @@ export const apiError = (options: ApiErrorOptions): EndpointError =>
     : RequestFailed.make({ operation: options.operation, message: options.error.message })
 
 export const hostApiError = (options: ApiErrorOptions): HostTransportError => {
+  // `apiError` only preserves tags it knows; keep declared host transport tags such as ToolNotRegistered intact.
+  if (Schema.is(hostTransportError)(options.error)) return options.error
   const error = apiError(options)
   return Schema.is(hostTransportError)(error)
     ? error
