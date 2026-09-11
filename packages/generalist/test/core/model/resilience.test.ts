@@ -28,6 +28,10 @@ const textDelta = (delta: string) => Response.makePart("text-delta", { id: "text
 const responseMetadata = (id: string) =>
   Response.makePart("response-metadata", { id, modelId: "m", timestamp: undefined, request: undefined })
 
+const textStart = () => Response.makePart("text-start", { id: "text" })
+
+const reasoningStart = () => Response.makePart("reasoning-start", { id: "reasoning" })
+
 const makeResilience = (input?: Partial<ModelResilience.Policy>): ModelResilience.Policy =>
   Effect.runSync(ModelResilience.make(input))
 
@@ -341,6 +345,50 @@ describe("ModelResilience", () => {
 
       expect(calls).toBe(2)
       expect(parts.map((part) => part.type)).toEqual(["text-delta"])
+    })
+  })
+
+  it.effect("retries after a lifecycle-only text-start marker and withholds the discarded prefix", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return calls === 1
+            ? Stream.concat(Stream.make(responseMetadata("discarded"), textStart()), Stream.fail(transientError))
+            : Stream.make(responseMetadata("recovered"), textStart(), textDelta("recovered"))
+        },
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "text-start then fail" }))
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "text-start", "text-delta"])
+      expect(parts[0]?.type === "response-metadata" && parts[0].id).toBe("recovered")
+    })
+  })
+
+  it.effect("retries after a lifecycle-only reasoning-start marker and withholds the discarded prefix", () => {
+    let calls = 0
+    const wrapped = ModelResilience.apply(
+      languageModel({
+        streamText: () => {
+          calls += 1
+          return calls === 1
+            ? Stream.concat(Stream.make(responseMetadata("discarded"), reasoningStart()), Stream.fail(transientError))
+            : Stream.make(responseMetadata("recovered"), reasoningStart(), textDelta("recovered"))
+        },
+      }),
+      retryOnce,
+    )
+    return Effect.gen(function* () {
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "reasoning-start then fail" }))
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["response-metadata", "reasoning-start", "text-delta"])
+      expect(parts[0]?.type === "response-metadata" && parts[0].id).toBe("recovered")
     })
   })
 

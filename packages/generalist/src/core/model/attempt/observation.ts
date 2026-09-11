@@ -107,10 +107,10 @@ export const singleFailure = (cause: Cause.Cause<unknown>): Option.Option<unknow
 
 export const firstOutputKind = (part: Response.AnyPart): FirstOutputKind | undefined => {
   switch (part.type) {
-    case "reasoning-start":
     case "reasoning-delta":
+      return part.delta.length === 0 ? undefined : "reasoning"
     case "reasoning":
-      return "reasoning"
+      return part.text.length === 0 ? undefined : "reasoning"
     case "text-delta":
       return part.delta.length === 0 ? undefined : "text"
     case "text":
