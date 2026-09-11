@@ -2,7 +2,7 @@ import { Effect, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { AgentError, AgentSuspended, type Event } from "../event.js"
 import type { RunError, ToolSchedulingPolicy } from "../service.js"
-import { resolvedToolResult } from "../suspension.js"
+import { duplicateWaitId, resolvedToolResult } from "../suspension.js"
 import { checkpoint as driverCheckpoint, updateToolBatch } from "../../durable/driver/run.js"
 import type { DriverInterpreter } from "../../durable/driver/interpreter.js"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
@@ -141,6 +141,8 @@ export const resumeBatch = <R, R2>(input: {
           (wait) => resolutionFor(input.resolutions, wait.waitId) === undefined,
         )
         if (unresolvedWaits.length > 0) {
+          const duplicate = duplicateWaitId(unresolvedWaits)
+          if (duplicate !== undefined) return yield* duplicate
           return yield* AgentSuspended.make({ checkpoint: driverState.toolBatch, waits: unresolvedWaits })
         }
       }),
