@@ -140,6 +140,17 @@ describe("Overview.format", () => {
     expect(text).not.toContain("p003")
   })
 
+  it("uses the default refinement bound", () => {
+    const capped = Overview.format(withRefinements(6))
+    expect(capped).toContain("recent refinements: 6 (showing 5)")
+    expect(capped).toContain("p005")
+    expect(capped).not.toContain("p000")
+
+    const under = Overview.format(withRefinements(3))
+    expect(under.split("\n")).toContain("recent refinements: 3")
+    expect(under.split("\n").filter((line) => line.includes(": Create:memory/"))).toHaveLength(3)
+  })
+
   it("collapses whitespace in content and titles", () => {
     const state = State.make({
       scope,
@@ -174,8 +185,26 @@ describe("Overview.format", () => {
     expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
   })
 
+  it("emits no refinement lines at a zero bound", () => {
+    const text = Overview.format(withRefinements(3), { maxEntriesPerKind: 0, maxRefinements: 0 })
+    expect(text).toContain("recent refinements: 3 (showing 0)")
+    expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
+  })
+
+  it("emits no refinement lines at a NaN bound", () => {
+    const text = Overview.format(withRefinements(3), { maxEntriesPerKind: 0, maxRefinements: Number.NaN })
+    expect(text).toContain("recent refinements: 3 (showing 0)")
+    expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
+  })
+
   it("treats negative bounds as zero", () => {
-    const text = Overview.format(large, { maxEntriesPerKind: -5, maxRefinements: -5 })
+    const state = State.make({
+      scope,
+      entries: State.allEntries(large),
+      refinements: withRefinements(3).refinements,
+    })
+    const text = Overview.format(state, { maxEntriesPerKind: -5, maxRefinements: -5 })
+    expect(text).toContain("recent refinements: 3 (showing 0)")
     expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
   })
 
