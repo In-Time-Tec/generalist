@@ -6,6 +6,7 @@ import {
   byteIntegrity,
   caseEquivalentKeys,
   freshReads,
+  keySpellings,
   listing,
 } from "../../src/testing/durability/index.js"
 
@@ -37,6 +38,7 @@ export const objectConformance = <E, R>(connect: Effect.Effect<Service, E, R>) =
     yield* freshReads(conformance)
     yield* caseEquivalentKeys(conformance)
     yield* byteIntegrity(conformance)
+    yield* keySpellings(conformance)
     yield* listing(conformance)
   })
 

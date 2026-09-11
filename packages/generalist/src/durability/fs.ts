@@ -36,12 +36,34 @@ const failure = (operation: string, key: string, reason: ObjectStoreFailure["rea
   ObjectStoreFailure.make({ operation, key, reason, message })
 
 const checkKey = (operation: string, key: string): void => {
-  if (key.length === 0 || /(?:^|\/)\.{1,2}(?:\/|$)/.test(key)) {
+  if (
+    key.length === 0 ||
+    key.startsWith("/") ||
+    key.endsWith("/") ||
+    key.includes("//") ||
+    /(?:^|\/)\.{1,2}(?:\/|$)/.test(key)
+  ) {
     throw failure(
       operation,
       key,
       "invalid-response",
-      "Object keys must be nonempty and contain no dot-only path segments.",
+      "Object keys must be nonempty, must not begin or end with '/', and must contain no empty or dot-only path segments.",
+    )
+  }
+}
+
+/**
+ * A listing prefix is a key-space path, not a key: the empty prefix and a trailing
+ * separator are valid, but empty or dot-only segments would let path mapping invent
+ * a spelling that was never created.
+ */
+const checkPrefix = (prefix: string): void => {
+  if (prefix.startsWith("/") || prefix.includes("//") || /(?:^|\/)\.{1,2}(?:\/|$)/.test(prefix)) {
+    throw failure(
+      "list",
+      prefix,
+      "invalid-response",
+      "Listing prefixes must not begin with '/', and must contain no empty or dot-only path segments.",
     )
   }
 }
@@ -341,6 +363,10 @@ export const make = (
         prefix,
         timeoutMs,
         Effect.gen(function* () {
+          yield* Effect.try({
+            try: () => checkPrefix(prefix),
+            catch: (cause) => mapError("list", prefix, cause),
+          })
           const floor = yield* resolveFloor(prefix, listOptions)
           const dirPart = prefix.slice(0, prefix.lastIndexOf("/") + 1)
           const walkRoot =

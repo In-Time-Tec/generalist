@@ -254,6 +254,109 @@ export const byteIntegrity = <E, R>(options: ConformanceOptions<E, R>) =>
     )
   })
 
+/**
+ * Keys that differ only by empty path segments must never alias: a transport either
+ * rejects every such spelling with a typed invalid response, or stores each spelling
+ * as a distinct key that reads and lists back exactly as created. @experimental
+ */
+export const keySpellings = <E, R>(options: ConformanceOptions<E, R>) =>
+  Effect.gen(function* () {
+    const client = yield* options.connect
+    const cases = [
+      {
+        dir: `${options.prefix}/spellings/doubled/`,
+        spelling: `${options.prefix}/spellings/doubled/alpha//beta`,
+        normalized: `${options.prefix}/spellings/doubled/alpha/beta`,
+        spellingDir: undefined,
+      },
+      {
+        dir: `${options.prefix}/spellings/trailing/`,
+        spelling: `${options.prefix}/spellings/trailing/gamma/`,
+        normalized: `${options.prefix}/spellings/trailing/gamma`,
+        spellingDir: undefined,
+      },
+      {
+        dir: `${options.prefix}/spellings/leading/`,
+        spelling: `/${options.prefix}/spellings/leading/delta`,
+        normalized: `${options.prefix}/spellings/leading/delta`,
+        spellingDir: `/${options.prefix}/spellings/leading/`,
+      },
+    ] as const
+    for (const { dir, spelling, normalized, spellingDir } of cases) {
+      const first = yield* Effect.result(client.create(spelling, Uint8Array.of(1)))
+      if (Result.isFailure(first)) {
+        yield* check(
+          first.failure.reason === "invalid-response",
+          "keySpellings",
+          "An empty-segment key spelling was rejected without a typed invalid response",
+        )
+        yield* check(
+          (yield* client.read(normalized, { maxBytes: 1 })) === undefined,
+          "keySpellings",
+          "A rejected empty-segment spelling left state at its normalized key",
+        )
+        yield* check(
+          (yield* client.create(normalized, Uint8Array.of(2))) === "created",
+          "keySpellings",
+          "A normalized key could not be created after its empty-segment spelling was rejected",
+        )
+        const aliasRead = yield* Effect.result(client.read(spelling, { maxBytes: 1 }))
+        yield* check(
+          Result.isFailure(aliasRead) && aliasRead.failure.reason === "invalid-response",
+          "keySpellings",
+          "A rejected empty-segment spelling read its normalized key",
+        )
+        const rejectedPage = yield* client.list(dir)
+        yield* check(
+          rejectedPage.keys.length === 1 && rejectedPage.keys[0] === normalized,
+          "keySpellings",
+          "Listing did not echo exactly the created spelling after rejecting its empty-segment variant",
+        )
+        continue
+      }
+      yield* check(first.success === "created", "keySpellings", "A fresh empty-segment spelling could not be created")
+      yield* check(
+        (yield* client.read(normalized, { maxBytes: 1 })) === undefined,
+        "keySpellings",
+        "An empty-segment spelling aliased its normalized key on read",
+      )
+      yield* check(
+        (yield* client.create(normalized, Uint8Array.of(2))) === "created",
+        "keySpellings",
+        "A normalized key conflicted with a distinct empty-segment spelling",
+      )
+      yield* check(
+        equalBytes((yield* client.read(spelling, { maxBytes: 1 }))?.bytes, Uint8Array.of(1)) &&
+          equalBytes((yield* client.read(normalized, { maxBytes: 1 }))?.bytes, Uint8Array.of(2)),
+        "keySpellings",
+        "Distinct empty-segment and normalized spellings did not keep distinct bytes",
+      )
+      yield* check(
+        (yield* client.create(spelling, Uint8Array.of(3))) === "conflict",
+        "keySpellings",
+        "A distinct empty-segment spelling lost its conditional-create conflict",
+      )
+      const preservedPage = yield* client.list(dir)
+      const preservedExpected = spellingDir === undefined ? [spelling, normalized] : [normalized]
+      yield* check(
+        preservedPage.keys.length === preservedExpected.length &&
+          preservedExpected.every((key) => preservedPage.keys.includes(key)),
+        "keySpellings",
+        spellingDir === undefined
+          ? "Listing did not echo both created empty-segment and normalized spellings"
+          : "Listing invented or omitted a spelling while preserving a leading separator",
+      )
+      if (spellingDir !== undefined) {
+        const spellingPage = yield* client.list(spellingDir)
+        yield* check(
+          spellingPage.keys.length === 1 && spellingPage.keys[0] === spelling,
+          "keySpellings",
+          "Listing did not echo the created leading-separator spelling",
+        )
+      }
+    }
+  })
+
 /** Pass initialization configured with unsupported conditional-create semantics. @experimental */
 export const unsupportedPreconditions = <A, R>(initialize: Effect.Effect<A, ObjectStoreFailure, R>) =>
   Effect.gen(function* () {
