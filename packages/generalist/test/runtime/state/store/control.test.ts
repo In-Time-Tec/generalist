@@ -53,7 +53,7 @@ const admitWaitWithClaimedChild = (waitId: string) =>
     })
     yield* store.suspend({
       ...parentClaim,
-      waits: [openWait({ waitId, reason: "signal" })],
+      waits: [openWait({ waitId })],
       suspension: suspension({ waitId }),
     })
     return { runtime, store, runId: parent.runId }
@@ -174,6 +174,52 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
     }),
   )
 
+  it.effect("rejects a resolution kind the wait reason cannot accept and leaves the wait open", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const driver = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:respond-kind",
+        idempotencyKey: "respond-kind",
+        prompt: textPrompt("hello"),
+      })
+      yield* driver.suspend({
+        ...(yield* driver.claimExecution({
+          commandId: "runtime-state-store-control-test-ts-claim-11",
+          runId: receipt.runId,
+          ownerId: objectWorkerId,
+        })),
+        runId: receipt.runId,
+        waits: [openWait({ waitId: "wait:kind" })],
+        suspension: suspension({ waitId: "wait:kind" }),
+      })
+      const mismatch = yield* runtime
+        .respond({ runId: receipt.runId, waitId: "wait:kind", resolution: { _tag: "Approved" } })
+        .pipe(Effect.flip)
+      expect(mismatch).toBeInstanceOf(Errors.ResponseKindMismatch)
+      expect(mismatch).toMatchObject({
+        runId: receipt.runId,
+        waitId: "wait:kind",
+        reason: "ToolWait",
+        resolution: "Approved",
+      })
+      const inspection = yield* runtime.inspect(receipt.runId)
+      expect(inspection.status).toBe("waiting")
+      expect(inspection.waits).toEqual([expect.objectContaining({ waitId: "wait:kind", status: "open" })])
+      expect(
+        (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter((event) => event._tag === "RunResumed"),
+      ).toHaveLength(0)
+
+      yield* runtime.respond({
+        runId: receipt.runId,
+        waitId: "wait:kind",
+        resolution: { _tag: "ToolResult", result: "accepted", encodedResult: "accepted" },
+      })
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([])
+    }),
+  )
+
   it.effect("does not commit a signal issued before its wait is registered", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -242,6 +288,58 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
         .pipe(Effect.flip)
       expect(late).toBeInstanceOf(Errors.WaitNotOpen)
       expect(late).toMatchObject({ runId, waitId: "wait:closed-signal" })
+    }),
+  )
+
+  it.effect("rejects a tool result for an approval wait and preserves the approval repair path", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const receipt = yield* runtime.send({
+        to: assistantAddress,
+        sessionId: "session:approval-kind",
+        idempotencyKey: "approval-kind",
+        prompt: textPrompt("approve the operation"),
+      })
+      const claim = yield* store.claimExecution({
+        commandId: "runtime-state-store-control-test-ts-claim-12",
+        runId: receipt.runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.suspend({
+        ...claim,
+        runId: receipt.runId,
+        waits: [openWait({ waitId: "approval:kind", reason: "approval" })],
+        suspension: suspension({ waitId: "approval:kind", reason: "approval" }),
+      })
+      const mismatch = yield* runtime
+        .respond({
+          runId: receipt.runId,
+          waitId: "approval:kind",
+          resolution: { _tag: "ToolResult", result: "wrong", encodedResult: "wrong" },
+        })
+        .pipe(Effect.flip)
+      expect(mismatch).toBeInstanceOf(Errors.ResponseKindMismatch)
+      expect(mismatch).toMatchObject({
+        runId: receipt.runId,
+        waitId: "approval:kind",
+        reason: "Approval",
+        resolution: "ToolResult",
+      })
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([
+        expect.objectContaining({ waitId: "approval:kind", status: "open" }),
+      ])
+
+      yield* runtime.respondApproval({
+        runId: receipt.runId,
+        approvalId: "approval:kind",
+        commandId: "runtime-state-store-control-test-ts-approve-kind",
+        decision: { _tag: "Approved" },
+      })
+      expect((yield* runtime.inspect(receipt.runId)).waits).toEqual([])
+      expect(
+        (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter((event) => event._tag === "RunResumed"),
+      ).toHaveLength(1)
     }),
   )
 

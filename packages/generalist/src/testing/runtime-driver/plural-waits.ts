@@ -2,7 +2,7 @@ import { expect } from "@effect/vitest"
 import { Effect } from "effect"
 import { AgentSuspended } from "../../core/agent/event.js"
 import type { Address } from "../../runtime/address.js"
-import { RuntimeUnavailable } from "../../runtime/errors.js"
+import { ResponseKindMismatch, RuntimeUnavailable } from "../../runtime/errors.js"
 import type { RuntimeCapability, Services } from "./contract.js"
 
 export const toolSuspension = (waitIds: readonly [string, ...Array<string>]): AgentSuspended => {
@@ -62,6 +62,23 @@ export const pluralWaitsConformance = (input: {
     const suspension = toolSuspension([waitIds[0]!, waitIds[1]!, waitIds[2]!])
     yield* input.services.store.suspend({ ...claim, waits, suspension })
     expect((yield* input.services.runtime.inspect(receipt.runId)).waits.map((wait) => wait.waitId)).toEqual(waitIds)
+
+    const mismatch = yield* input.services.runtime
+      .respond({ runId: receipt.runId, waitId: waitIds[0]!, resolution: { _tag: "Approved" } })
+      .pipe(Effect.flip)
+    expect(mismatch).toBeInstanceOf(ResponseKindMismatch)
+    expect(mismatch).toMatchObject({
+      runId: receipt.runId,
+      waitId: waitIds[0],
+      reason: "ToolWait",
+      resolution: "Approved",
+    })
+    expect((yield* input.services.runtime.inspect(receipt.runId)).waits.map((wait) => wait.waitId)).toEqual(waitIds)
+    expect(
+      (yield* input.services.runtime.history({ runId: receipt.runId, limit: 100 })).filter(
+        (event) => event._tag === "RunResumed",
+      ),
+    ).toHaveLength(0)
 
     const firstResolution = { _tag: "ToolResult" as const, result: "first", encodedResult: "first" }
     const thirdResolution = { _tag: "ToolResult" as const, result: "third", encodedResult: "third" }

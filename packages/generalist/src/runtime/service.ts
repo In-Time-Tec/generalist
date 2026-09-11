@@ -18,6 +18,7 @@ import type {
   RunIdConflict,
   SteeringConflict,
   ResponseConflict,
+  ResponseKindMismatch,
   ApprovalStale,
   ApprovalMismatch,
   RunNotFound,
@@ -484,6 +485,7 @@ export type RespondError =
   | RunNotFound
   | WaitNotOpen
   | ResponseConflict
+  | ResponseKindMismatch
   | RunTerminal
   | RuntimeUnavailable
   | DurabilityFailure

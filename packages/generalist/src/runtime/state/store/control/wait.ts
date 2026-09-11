@@ -1,15 +1,22 @@
 import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../../observation.js"
 import { Effect, Function, Option } from "effect"
-import { ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../../errors.js"
+import {
+  ResponseConflict,
+  ResponseKindMismatch,
+  RunNotFound,
+  RunTerminal,
+  RuntimeUnavailable,
+  WaitNotOpen,
+} from "../../../errors.js"
 import type { RespondInput, SignalInput as SignalCommand } from "../../../service.js"
 import type { RunWait, WaitResolution } from "../../../run/wait.js"
-import { classifyResponse } from "../../../run/wait-internal.js"
+import { acceptsResponseKind, classifyResponse } from "../../../run/wait-internal.js"
 import { appendLifecycle, rejectIfTerminal, resumedEvent } from "../../append.js"
 import { waitMapKey, type RuntimeState, type StoredRun } from "../../projection.js"
 
 type RespondResult = Effect.Effect<
   RuntimeState,
-  RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable,
+  RunNotFound | WaitNotOpen | ResponseConflict | ResponseKindMismatch | RunTerminal | RuntimeUnavailable,
   PreparedObservation
 >
 type SignalResult = Effect.Effect<
@@ -64,6 +71,22 @@ export const closeWait: {
   return { state: { ...state, waits }, affected: 1 }
 })
 
+const classifyTransition = (
+  state: RuntimeState,
+  runId: string,
+  waitId: string,
+  resolution: WaitResolution,
+): Effect.Effect<RuntimeState, ResponseConflict | WaitNotOpen> =>
+  Effect.gen(function* () {
+    const current = state.waits.get(waitMapKey(runId, waitId))
+    const outcome = classifyResponse(current, resolution)
+    if (outcome === "duplicate-identical") return state
+    if (outcome === "duplicate-conflict") {
+      return yield* ResponseConflict.make({ runId, waitId })
+    }
+    return yield* WaitNotOpen.make({ runId, waitId })
+  })
+
 export const respond: {
   (input: RespondInput): (state: RuntimeState) => RespondResult
   (state: RuntimeState, input: RespondInput): RespondResult
@@ -81,6 +104,14 @@ export const respond: {
     if (run.cancellationRequested || classification !== "open") {
       return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
     }
+    if (prior !== undefined && !acceptsResponseKind(prior.reason, input.resolution)) {
+      return yield* ResponseKindMismatch.make({
+        runId: run.runId,
+        waitId: input.waitId,
+        reason: prior.reason._tag,
+        resolution: input.resolution._tag,
+      })
+    }
     const closedAt = yield* preparedOccurredAt
     const resolution: WaitResolution = input.resolution
     const transitioned = closeWait(state, {
@@ -92,13 +123,7 @@ export const respond: {
       closedAt,
     })
     if (transitioned.affected !== 1) {
-      const current = transitioned.state.waits.get(waitMapKey(run.runId, input.waitId))
-      const outcome = classifyResponse(current, resolution)
-      if (outcome === "duplicate-identical") return transitioned.state
-      if (outcome === "duplicate-conflict") {
-        return yield* ResponseConflict.make({ runId: run.runId, waitId: input.waitId })
-      }
-      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.waitId })
+      return yield* classifyTransition(transitioned.state, run.runId, input.waitId, resolution)
     }
     const programOperations = new Map(state.programOperations)
     for (const [key, operation] of programOperations) {

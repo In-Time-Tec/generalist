@@ -253,6 +253,18 @@ export class ResponseConflict extends ActionableTaggedError<ResponseConflict>()(
   hint: errorHint("Reuse the original wait response or submit a response for a different open wait."),
 }) {}
 
+/** A generic response kind cannot resolve the open wait's immutable reason. */
+export class ResponseKindMismatch extends ActionableTaggedError<ResponseKindMismatch>()(
+  "generalist/runtime/ResponseKindMismatch",
+  {
+    runId: Schema.String,
+    waitId: Schema.String,
+    reason: Schema.Literals(["ToolWait", "Approval", "Signal", "Timer", "External", "AwaitEvent"]),
+    resolution: Schema.Literals(["Approved", "Denied", "ToolResult"]),
+    hint: errorHint("Match the response kind to the wait reason or use the control that owns that wait."),
+  },
+) {}
+
 /** The approval no longer names an unresolved request. */
 export class ApprovalStale extends ActionableTaggedError<ApprovalStale>()("generalist/runtime/ApprovalStale", {
   runId: Schema.String,
