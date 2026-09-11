@@ -45,7 +45,9 @@ export class Permissions extends Context.Service<Permissions, Service>()("genera
 
 const escapeRegExp = (value: string): string => value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
 
-const glob = (pattern: string): RegExp => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`)
+// `s` keeps `*` matching every character. Without it a trailing line terminator
+// slips past an anchored pattern and turns a deny rule into a fallback decision.
+const glob = (pattern: string): RegExp => new RegExp(`^${pattern.split("*").map(escapeRegExp).join(".*")}$`, "s")
 
 interface Projection {
   readonly candidates: ReadonlyArray<string>

@@ -10,6 +10,14 @@ const request = {
   turn: 1,
 }
 
+const lineTerminatedCommands = [
+  "rm -rf /\n",
+  "rm -rf /\r",
+  "rm -rf /\n# harmless",
+  "rm -rf /\u2028rm -rf /tmp",
+  "rm -rf /\u2029",
+]
+
 describe("Permissions", () => {
   it("matches tool names and projected parameter globs", () => {
     expect(Permissions.matches("bash", "bash", { command: "rm -rf .cache" })).toBe(true)
@@ -17,6 +25,34 @@ describe("Permissions", () => {
     expect(Permissions.matches("bash:rm *", "bash", { command: "rm -rf .cache" })).toBe(true)
     expect(Permissions.matches("bash:*secret*", "bash", { args: ["cat", "secret.txt"] })).toBe(true)
     expect(Permissions.matches("bash:rm *", "bash", { command: "ls" })).toBe(false)
+  })
+
+  it("matches wildcards across line terminators so anchored deny rules hold", () => {
+    const ruleset: Permissions.Ruleset = {
+      rules: [{ pattern: "bash:rm -rf*", level: "deny" }],
+      fallback: "allow",
+    }
+
+    for (const command of lineTerminatedCommands) {
+      expect(Permissions.matches("bash:rm -rf*", "bash", { command })).toBe(true)
+      expect(Permissions.evaluate(ruleset, "bash", { command })).toBe("deny")
+    }
+
+    expect(Permissions.matches("bash:rm -rf*", "bash", { command: "rm -rf /" })).toBe(true)
+    expect(Permissions.evaluate(ruleset, "bash", { command: "rm -rf /" })).toBe("deny")
+    expect(Permissions.matches("bash:rm -rf*", "bash", { command: "echo rm -rf /" })).toBe(false)
+    expect(Permissions.evaluate(ruleset, "bash", { command: "echo rm -rf /" })).toBe("allow")
+    expect(Permissions.evaluate(ruleset, "bash", { command: "ls -la" })).toBe("allow")
+  })
+
+  it("still asks for unmatched calls, including line-terminated ones", () => {
+    const ruleset: Permissions.Ruleset = {
+      rules: [{ pattern: "bash:rm -rf*", level: "deny" }],
+      fallback: "ask",
+    }
+
+    expect(Permissions.evaluate(ruleset, "bash", { command: "ls -la\n" })).toBe("ask")
+    expect(Permissions.evaluate(ruleset, "write", {})).toBe("ask")
   })
 
   it("matches deny patterns against nested commands and fails closed for unprojectable params", () => {
@@ -128,6 +164,33 @@ describe("Permissions", () => {
       )
 
       expect(decision).toEqual({ _tag: "Deny", reason: "static deny" })
+    }),
+  )
+
+  it.effect("applies a remembered wildcard deny to line-terminated arguments", () =>
+    Effect.gen(function* () {
+      for (const [index, command] of lineTerminatedCommands.entries()) {
+        const lineTerminatedRequest = {
+          call: Response.makePart("tool-call", {
+            id: `line-terminator-${index}`,
+            name: "bash",
+            params: { command },
+            providerExecuted: false,
+          }),
+          agentName: "agent",
+          turn: 1,
+        }
+        const decision = yield* Permissions.evaluateWithRules(
+          { evaluate: () => Effect.succeed({ _tag: "Allow" }) },
+          {
+            rules: Effect.succeed([{ pattern: "bash:rm -rf*", level: "deny" }]),
+            remember: () => Effect.void,
+          },
+          lineTerminatedRequest,
+        )
+
+        expect(decision).toEqual({ _tag: "Deny" })
+      }
     }),
   )
 

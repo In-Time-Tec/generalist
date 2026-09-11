@@ -11054,7 +11054,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "commandId": { "type": "string" }, "reason": { "type": "string" } },
+                "properties": { "commandId": { "type": "string", "minLength": 1 }, "reason": { "type": "string" } },
                 "required": ["commandId"],
                 "additionalProperties": false
               }

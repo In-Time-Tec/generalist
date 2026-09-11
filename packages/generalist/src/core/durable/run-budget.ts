@@ -1,4 +1,4 @@
-import { Duration, Effect, Function, Schema, type Types } from "effect"
+import { Duration, Effect, Function, Predicate, Schema, type Types } from "effect"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 const Amount = Schema.Finite.check(
@@ -72,11 +72,18 @@ export class Invalid extends ActionableTaggedError<Invalid>()("generalist/core/R
 
 const dimensions: ReadonlyArray<Dimension> = ["tokens", "usd", "duration", "toolCalls", "children"]
 
+/**
+ * `Duration.toMillis` normalizes `NaN` to zero before `BudgetLimits` can validate it, so non-finite
+ * numeric durations are passed through unchanged and rejected like every other malformed limit.
+ */
+const durationMillis = (input: Duration.Input): number =>
+  Predicate.isNumber(input) && !Number.isFinite(input) ? input : Duration.toMillis(input)
+
 const normalize = (input: Input): BudgetLimits => {
   const limits: Record<string, number> = {}
   if (input.tokens !== undefined) limits.tokens = input.tokens
   if (input.usd !== undefined) limits.usd = input.usd
-  if (input.duration !== undefined) limits.duration = Duration.toMillis(input.duration)
+  if (input.duration !== undefined) limits.duration = durationMillis(input.duration)
   if (input.toolCalls !== undefined) limits.toolCalls = input.toolCalls
   if (input.children !== undefined) limits.children = input.children
   return Schema.decodeSync(BudgetLimits, { onExcessProperty: "error" })(limits)

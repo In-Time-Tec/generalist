@@ -3,7 +3,7 @@ import { Effect, Schema, Stream } from "effect"
 import { LanguageModel, Prompt } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
 import { make as makeAddress } from "../../runtime/address.js"
-import { DuplicateAgent, RunIdConflict, UnknownAgent } from "../../runtime/errors.js"
+import { DuplicateAgent, IdempotencyConflict, RunIdConflict, UnknownAgent } from "../../runtime/errors.js"
 import { durableIdentity } from "../../runtime/executable/registered-agent.js"
 import type { ExecutionResult } from "../../runtime/execution/state.js"
 import { make as makeMessage } from "../../runtime/messaging/message.js"
@@ -67,7 +67,42 @@ export const registerAdmission = <LayerError, ClaimsLayerError>(input: {
             prompt: "changed payload",
           })
           .pipe(Effect.flip)
-        expect(conflict).toMatchObject({ _tag: "generalist/durability/DurabilityFailure", reason: "input-conflict" })
+        expect(conflict).toBeInstanceOf(IdempotencyConflict)
+        expect(conflict).toMatchObject({
+          address: options.address,
+          sessionId: id.sessionId,
+          idempotencyKey: id.idempotencyKey,
+          existingRunId: first.runId,
+        })
+      }),
+    ),
+  )
+
+  it.effect("rejects divergent staged start admission with the declared idempotency conflict", () =>
+    provide(({ runtime }) =>
+      Effect.gen(function* () {
+        const id = identity(options.name, "admission-start-idempotency")
+        const agent = makeAgent({ name: `driver-${slug(options.name)}-admission-start` })
+        const model = yield* testModel
+        yield* runtime.register(agent).pipe(Effect.provideService(LanguageModel.LanguageModel, model))
+        const { executable, registrations } = durableIdentity(agent)
+        const startInput = {
+          executable,
+          registrations,
+          sessionId: id.sessionId,
+          idempotencyKey: id.idempotencyKey,
+          prompt: "same staged payload",
+        }
+        const first = yield* runtime.admit(startInput)
+        expect(yield* runtime.admit(startInput)).toEqual(first)
+        const conflict = yield* runtime.admit({ ...startInput, prompt: "changed staged payload" }).pipe(Effect.flip)
+        expect(conflict).toBeInstanceOf(IdempotencyConflict)
+        expect(conflict).toMatchObject({
+          address: makeAddress("runtime:start"),
+          sessionId: id.sessionId,
+          idempotencyKey: id.idempotencyKey,
+          existingRunId: first.runId,
+        })
       }),
     ),
   )

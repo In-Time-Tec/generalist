@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.6
+
+- Reject an empty `commandId` on `runs.cancel` at the HTTP and WebSocket boundaries. `POST /runs/{id}/cancel` now returns 400 instead of surfacing a durable state encoding failure as a 409 `RequestFailed`, and a WebSocket `Cancel` frame closes with 1003 `malformed-command` instead of 1011 `durability-failed`. The durable Runtime still rejects empty command identities for direct Host callers.
+
 ## 0.65.5
 
 - Add `generalist/durability/fs`, a local-directory object transport for the same durability engine. Objects are immutable files installed by atomic hard link after a synced temporary write; listings decode, sort, and page keys over bounded reads. It provides single-host canonical state for local agents and tests — a dedicated directory, POSIX hard-link semantics, and no reachability from a replacement host. `ObjectMaintenance` removal stays a separate Layer.

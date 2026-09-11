@@ -86,6 +86,7 @@ hosted body fetch
 - Skills with `disableModelInvocation: true` remain addressable but are not advertised or model-activatable.
 - Startup listings contain selected names and descriptions within a 2,048-token budget.
 - Filesystem frontmatter names must match their containing directory; nested `SKILL.md` files are valid.
+- Filesystem discovery skips a `SKILL.md` entry that is a directory or another non-file type; it is not a skill document.
 - Later filesystem roots and later composed catalogs win duplicate names.
 - Activation validates the complete next tool set before publishing the body and tools; new tools are available only on the following model request.
 - Without a `SkillCatalog`, or with no selected listings, the loop advertises neither skills nor `activate_skill`.

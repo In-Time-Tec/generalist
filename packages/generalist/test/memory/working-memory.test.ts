@@ -1,9 +1,10 @@
 import { expect, layer } from "@effect/vitest"
 import { Context, Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Memory } from "../../src/index.js"
+import { Agent, Memory, Session } from "../../src/index.js"
 import { expectTypeOf } from "vitest"
 import { WorkingMemory } from "../../src/memory/index"
+import { layer as testModelLayer, text as testModelText } from "../../src/testing/model/service.js"
 
 const key: Memory.Key = { agent: "memory-agent", subject: "subject-a" }
 const otherKey: Memory.Key = { agent: "memory-agent", subject: "subject-b" }
@@ -558,6 +559,86 @@ layer(Layer.empty)((it) => {
           ),
         ),
       )
+    }),
+  )
+})
+
+const repeatedSessionKey: Memory.Key = { agent: "memory-agent", subject: "repeated-session" }
+const repeatedSessionId = "repeated-session"
+
+layer(Layer.mergeAll(testModelLayer([testModelText("pong"), testModelText("pong")]), Session.layerMemory))(
+  "WorkingMemory session retention",
+  (it) => {
+    it.effect("retains an identical repeated Agent+Session exchange instead of collapsing it", () =>
+      Effect.gen(function* () {
+        const memory = yield* WorkingMemory.make({ maxMessages: 8 })
+        const agent = Agent.make({ name: repeatedSessionKey.agent })
+        const run = () =>
+          Agent.run(agent, "ping", { memory: { key: repeatedSessionKey }, sessionId: repeatedSessionId }).pipe(
+            Effect.provideService(Memory.Memory, Memory.Memory.of(memory)),
+          )
+
+        yield* run()
+        yield* run()
+
+        const recalled = yield* memory.recall({ key: repeatedSessionKey, turn: 0, prompt: prompt(user("ping")) })
+        const authority = yield* Effect.scoped(
+          Session.acquire(repeatedSessionId).pipe(
+            Effect.flatMap((store) => store.path()),
+            Effect.map(Session.buildMemoryContext),
+          ),
+        )
+
+        expect(authority.content).toHaveLength(4)
+        expect(recalled.map(itemText)).toEqual(["User: ping", "Assistant: pong", "User: ping", "Assistant: pong"])
+      }),
+    )
+  },
+)
+
+layer(Layer.empty)((it) => {
+  it.effect("does not duplicate an unchanged transcript on re-observation", () =>
+    Effect.gen(function* () {
+      const memory = yield* WorkingMemory.make({ maxMessages: 8 })
+      const exchange = prompt(user("ping"), assistant("pong"))
+
+      yield* memory.remember({ key, turn: 0, terminal: true, transcript: exchange, evidence: [] })
+      yield* memory.remember({ key, turn: 1, terminal: true, transcript: exchange, evidence: [] })
+
+      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("ping")) })
+
+      expect(recalled.map((item) => item.id)).toEqual(["working-1", "working-2"])
+      expect(recalled.map(itemText)).toEqual(["User: ping", "Assistant: pong"])
+    }),
+  )
+
+  it.effect("appends a distinct assistant answer to the repeated exchange", () =>
+    Effect.gen(function* () {
+      const memory = yield* WorkingMemory.make({ maxMessages: 8 })
+
+      yield* memory.remember({
+        key,
+        turn: 0,
+        terminal: true,
+        transcript: prompt(user("ping"), assistant("pong")),
+        evidence: [],
+      })
+      yield* memory.remember({
+        key,
+        turn: 1,
+        terminal: true,
+        transcript: prompt(user("ping"), assistant("different pong")),
+        evidence: [],
+      })
+
+      const recalled = yield* memory.recall({ key, turn: 0, prompt: prompt(user("ping")) })
+
+      expect(recalled.map(itemText)).toEqual([
+        "User: ping",
+        "Assistant: pong",
+        "User: ping",
+        "Assistant: different pong",
+      ])
     }),
   )
 })

@@ -84,6 +84,26 @@ const normalize = (prompt: Prompt.Prompt): ReadonlyArray<IncomingItem> =>
 const sameItem = (left: IncomingItem, right: IncomingItem): boolean =>
   left.role === right.role && left.text === right.text
 
+/**
+ * Append cursor for a cumulative transcript. `counter` counts every message
+ * appended so far, so a Session-backed `remember` that projects a longer
+ * transcript continues at that offset once the retained tail still matches the
+ * incoming history there. An unchanged transcript returns `counter` and appends
+ * nothing, while an identical repeated exchange appends its newest copy instead
+ * of collapsing it into the earlier one.
+ */
+const cursorStart = (state: KeyState, incoming: ReadonlyArray<IncomingItem>): number | undefined => {
+  const { recent, counter } = state
+  if (recent.length === 0 || counter < recent.length || counter > incoming.length) return undefined
+  const start = counter - recent.length
+  for (let index = 0; index < recent.length; index += 1) {
+    const stored = recent[index]
+    const next = incoming[start + index]
+    if (stored === undefined || next === undefined || !sameItem(stored, next)) return undefined
+  }
+  return counter
+}
+
 const appendStart = (recent: ReadonlyArray<StoredItem>, incoming: ReadonlyArray<IncomingItem>): number => {
   if (recent.length === 0) return 0
   for (let start = Math.max(0, incoming.length - recent.length); start >= 0; start -= 1) {
@@ -203,7 +223,7 @@ const makeImpl = (options: Options): Effect.Effect<MemoryService, never, Languag
             const existing = HashMap.get(current, id).pipe((option) =>
               option._tag === "Some" ? option.value : emptyState,
             )
-            const start = appendStart(existing.recent, incoming)
+            const start = cursorStart(existing, incoming) ?? appendStart(existing.recent, incoming)
             const appended = incoming.slice(start)
             if (appended.length === 0) return current
             let counter = existing.counter

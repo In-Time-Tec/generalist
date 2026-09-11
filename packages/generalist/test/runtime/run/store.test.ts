@@ -1,6 +1,5 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { DurabilityFailure } from "../../../src/durability/errors.js"
 import { Errors, Runtime } from "../../../src/runtime/index.js"
 import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 
@@ -41,8 +40,13 @@ layer(objectLayer)("Runtime idempotency", (it) => {
           prompt: textPrompt("changed"),
         })
         .pipe(Effect.flip)
-      expect(error).toBeInstanceOf(DurabilityFailure)
-      expect(error).toMatchObject({ reason: "input-conflict" })
+      expect(error).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(error).toMatchObject({
+        address: assistantAddress,
+        sessionId: "session:1",
+        idempotencyKey: "same",
+        existingRunId: first.runId,
+      })
       expect(
         (yield* runtime.history({ runId: first.runId, cursor: -1, limit: 20 })).filter(
           (event) => event._tag === "RunAccepted",
@@ -98,8 +102,13 @@ layer(objectLayer)("Runtime idempotency", (it) => {
           prompt: textPrompt("hello"),
         })
         .pipe(Effect.flip)
-      expect(keyConflict).toBeInstanceOf(DurabilityFailure)
-      expect(keyConflict).toMatchObject({ reason: "input-conflict" })
+      expect(keyConflict).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(keyConflict).toMatchObject({
+        address: assistantAddress,
+        sessionId: "session:caller-id",
+        idempotencyKey: "first",
+        existingRunId: first.runId,
+      })
       const idConflict = yield* runtime
         .send({
           runId: "run:caller:1",
