@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the direct Program runner keeps operation reservation and capability accounting in one ownership path. */
 import {
   Clock,
   Context,
@@ -198,19 +199,36 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
           })
     }
 
-    const reserveOperation = (operation: string, identity: Parameters<typeof digest>[0]) =>
-      Ref.modify(state, (current) => {
-        const actual = digest(identity)
-        const expected = current.operations.get(operation)
-        if (expected !== undefined)
-          return [
-            expected === actual ? undefined : ProgramReplayDivergence.make({ operation, expected, actual }),
-            current,
-          ] as const
-        const operations = new Map(current.operations)
-        operations.set(operation, actual)
-        return [undefined, { ...current, operations }] as const
-      }).pipe(Effect.flatMap((failure) => (failure === undefined ? Effect.void : Effect.fail(failure))))
+    const reserveOperation = (
+      operation: string,
+      identity: Parameters<typeof digest>[0],
+      boundary: ProgramSchemaFailure["boundary"],
+      capability?: string,
+    ): Effect.Effect<void, ProgramReplayDivergence | ProgramSchemaFailure> =>
+      Effect.gen(function* () {
+        // The synchronous canonical digest throws for JSON-invalid values such as
+        // undefined, functions, NaN, BigInt, and nested undefined; that throw must
+        // surface as ProgramSchemaFailure instead of an untyped defect.
+        const actual = yield* Effect.try({
+          try: () => digest(identity),
+          catch: (error) =>
+            capability === undefined
+              ? ProgramSchemaFailure.make({ boundary, message: String(error) })
+              : ProgramSchemaFailure.make({ boundary, capability, message: String(error) }),
+        })
+        const failure = yield* Ref.modify(state, (current) => {
+          const expected = current.operations.get(operation)
+          if (expected !== undefined)
+            return [
+              expected === actual ? undefined : ProgramReplayDivergence.make({ operation, expected, actual }),
+              current,
+            ] as const
+          const operations = new Map(current.operations)
+          operations.set(operation, actual)
+          return [undefined, { ...current, operations }] as const
+        })
+        if (failure !== undefined) return yield* failure
+      })
 
     const reserve = (dimension: "toolCalls" | "agentRuns" | "tokens" | "logBytes", amount: number) =>
       Ref.modify(state, (current) => {
@@ -281,7 +299,12 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const input = yield* Schema.decodeEffect(ToolCall, { onExcessProperty: "error" })(raw).pipe(
           Effect.mapError(schemaFailure("tool-input", undefined)),
         )
-        yield* reserveOperation(input.operation, { kind: "tool", name: input.tool, input: input.input })
+        yield* reserveOperation(
+          input.operation,
+          { kind: "tool", name: input.tool, input: input.input },
+          "tool-input",
+          input.tool,
+        )
         yield* reserve("toolCalls", 1)
         const binding = tools.get(input.tool)
         if (binding === undefined) return yield* ProgramCapabilityMissing.make({ capability: input.tool })
@@ -315,7 +338,12 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const input = yield* Schema.decodeEffect(StepCall, { onExcessProperty: "error" })(raw).pipe(
           Effect.mapError(schemaFailure("step-input", undefined)),
         )
-        yield* reserveOperation(input.operation, { kind: "step", name: input.step, input: input.input })
+        yield* reserveOperation(
+          input.operation,
+          { kind: "step", name: input.step, input: input.input },
+          "step-input",
+          input.step,
+        )
         const binding = steps.get(input.step)
         if (binding === undefined) return yield* ProgramCapabilityMissing.make({ capability: input.step })
         const invocation = yield* binding
@@ -348,7 +376,12 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const input = yield* Schema.decodeEffect(AgentRun, { onExcessProperty: "error" })(raw).pipe(
           Effect.mapError(schemaFailure("agent-input", undefined)),
         )
-        yield* reserveOperation(input.operation, { kind: "agent", selection: input.selection, input: input.input })
+        yield* reserveOperation(
+          input.operation,
+          { kind: "agent", selection: input.selection, input: input.input },
+          "agent-input",
+          input.selection,
+        )
         yield* reserve("agentRuns", 1)
         return yield* executeAgent(input.operation, input.selection, input.input)
       })
@@ -367,11 +400,16 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const input = yield* Schema.decodeEffect(AgentMap, { onExcessProperty: "error" })(raw).pipe(
           Effect.mapError(schemaFailure("agent-input", undefined)),
         )
-        yield* reserveOperation(input.operation, {
-          kind: "agent-map",
-          selection: input.selection,
-          members: input.members,
-        })
+        yield* reserveOperation(
+          input.operation,
+          {
+            kind: "agent-map",
+            selection: input.selection,
+            members: input.members,
+          },
+          "agent-input",
+          input.selection,
+        )
         const members = yield* orderedMembers(input.operation, input.members)
         yield* reserve("agentRuns", members.length)
         return yield* Effect.forEach(
@@ -389,7 +427,12 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const input = yield* Schema.decodeEffect(AgentFanOut, { onExcessProperty: "error" })(raw).pipe(
           Effect.mapError(schemaFailure("agent-input", undefined)),
         )
-        yield* reserveOperation(input.operation, { kind: "agent-fan-out", members: input.members })
+        yield* reserveOperation(
+          input.operation,
+          { kind: "agent-fan-out", members: input.members },
+          "agent-input",
+          undefined,
+        )
         const members = yield* orderedMembers(input.operation, input.members)
         yield* reserve("agentRuns", members.length)
         return yield* Effect.forEach(
@@ -407,7 +450,7 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const input = yield* Schema.decodeEffect(Log, { onExcessProperty: "error" })(raw).pipe(
           Effect.mapError(schemaFailure("program-output", undefined)),
         )
-        yield* reserveOperation(input.operation, { kind: "log", ...input })
+        yield* reserveOperation(input.operation, { kind: "log", ...input }, "program-output", "log")
         const bytes = yield* encodedBytes({ level: input.level, message: input.message, data: input.data })
         yield* reserve("logBytes", bytes)
       })
