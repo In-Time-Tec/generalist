@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.65.7
+
+- Price `Eval.usageUnder` USD checks with the `ModelCatalog` cost computation. Cached usage with undeclared cache rates now falls back to the input rate instead of reporting unknown USD, and a declared `inputTokens.uncached` is priced as declared rather than derived from `total` minus `cacheRead`. Token budgets are unchanged.
+
 ## 0.65.6
 
 - Reject an empty `commandId` on `runs.cancel` at the HTTP and WebSocket boundaries. `POST /runs/{id}/cancel` now returns 400 instead of surfacing a durable state encoding failure as a 409 `RequestFailed`, and a WebSocket `Cancel` frame closes with 1003 `malformed-command` instead of 1011 `durability-failed`. The durable Runtime still rejects empty command identities for direct Host callers.
