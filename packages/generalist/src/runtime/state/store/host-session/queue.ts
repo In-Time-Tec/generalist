@@ -400,7 +400,11 @@ export const update = ({ state, input }: { readonly state: RuntimeState; readonl
     yield* validatePayload({ value: input, boundary: "Session queue mutation" })
     const stored = yield* sessionFor(state, input.sessionId)
     if (stored.session.lifecycle === "closed") return yield* rejectClosed(input.sessionId)
-    const item = stored.session.queue.find((entry) => entry.id === input.id)
+    // Address exactly the validated entry: distinct command-identity namespaces can
+    // legitimately accept two instructions that share one caller id string, and a
+    // mutation must never replace or remove the other accepted entry.
+    const index = stored.session.queue.findIndex((entry) => entry.id === input.id)
+    const item = index === -1 ? undefined : stored.session.queue[index]
     if (item === undefined || item.revision !== input.expectedRevision)
       return yield* SessionQueueConflict.make({
         sessionId: input.sessionId,
@@ -434,8 +438,8 @@ export const update = ({ state, input }: { readonly state: RuntimeState; readonl
               }),
             ),
           )
-    const queue = stored.session.queue.flatMap((entry) => {
-      if (entry.id !== item.id) return [entry]
+    const queue = stored.session.queue.flatMap((entry, position) => {
+      if (position !== index) return [entry]
       return replacement === undefined ? [] : [replacement]
     })
     yield* validateQueue(state, input.sessionId, queue)

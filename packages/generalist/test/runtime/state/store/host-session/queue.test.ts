@@ -8,9 +8,9 @@ import { make as address } from "../../../../../src/runtime/address.js"
 import { Prompt } from "effect/unstable/ai"
 import { activate, layerRunStore } from "../../../../../src/durability/index.js"
 import { ObjectStore } from "../../../../../src/durability/object-store.js"
-import { RunStore } from "../../../../../src/runtime/run/store.js"
+import { RunStore, type Service as RunStoreService } from "../../../../../src/runtime/run/store.js"
 import { make as makeSimulator, type Client } from "../../../../../src/testing/durability/index.js"
-import { alternateAssistantRef, assistantRef, registrationsFor } from "../../../execution/fixtures.js"
+import { alternateAssistantRef, assistantAddress, assistantRef, registrationsFor } from "../../../execution/fixtures.js"
 import { programExecutable } from "../../../program/fixture.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
 
@@ -581,6 +581,172 @@ it.effect("conserves sponsor allocations across fresh-host sibling and continuat
       yield* fresh.messageSessionInput({ ...followup, commandId: "followup-again" })
       expect((yield* fresh.hostSession("child")).queue.map((entry) => entry.id)).toEqual(["followup-again"])
       expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
+    }),
+  ).pipe(Effect.scoped),
+)
+
+const settle = (
+  store: RunStoreService,
+  run: { readonly runId: string; readonly sessionId: string; readonly ownerId: string; readonly commandId: string },
+) =>
+  Effect.gen(function* () {
+    const claim = yield* store.claimExecution({
+      runId: run.runId,
+      ownerId: run.ownerId,
+      commandId: `${run.commandId}:claim`,
+    })
+    yield* store.complete({
+      ...claim,
+      commandId: `${run.commandId}:complete`,
+      result: { text: "done", output: "done", turns: 1, session: { sessionId: run.sessionId, leafId: null } },
+    })
+  })
+
+const collide = {
+  sessionId: "session:queue:colliding-command-ids",
+  lane: {
+    id: "lane",
+    to: assistantAddress,
+    sessionId: "session:queue:colliding-command-ids",
+    idempotencyKey: "lane",
+    correlationId: "lane",
+    prompt: Prompt.make("lane"),
+    metadata: {},
+  },
+  message: {
+    sessionId: "session:queue:colliding-command-ids",
+    commandId: "collide",
+    prompt: Prompt.make("shared-id message"),
+    from: { user: "operator" } as const,
+  },
+  submit: {
+    sessionId: "session:queue:colliding-command-ids",
+    commandId: "collide",
+    prompt: Prompt.make("shared-id submit"),
+  },
+}
+
+const pendingEntries = (
+  queue: ReadonlyArray<{ readonly id: string; readonly revision: number; readonly from?: unknown }>,
+) => queue.map((entry) => ({ id: entry.id, revision: entry.revision, retained: entry.from !== undefined }))
+
+it.effect("keeps the second accepted input when one removal addresses colliding command ids", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const store = yield* open(yield* bucket.connect, "collide-host")
+      yield* store.createHostSession({ id: collide.sessionId, selection })
+      yield* store.submitSessionInput({
+        sessionId: collide.sessionId,
+        commandId: "cmd-active",
+        prompt: Prompt.make("active"),
+      })
+      const active = (yield* store.hostSession(collide.sessionId)).activeRunId!
+      // A direct lane Run queues behind the active conversational Run, so
+      // terminalizing the conversation retains steering instead of promoting it.
+      const lane = yield* store.admitStart({
+        ...selection,
+        message: collide.lane,
+        initialChildren: [],
+        initialFanOuts: [],
+      })
+      // Distinct command-identity namespaces accept the same caller id string.
+      expect(yield* store.messageSessionInput(collide.message)).toEqual({ id: "collide", revision: 1 })
+      expect(yield* store.submitSessionInput(collide.submit)).toEqual({ id: "collide", revision: 1 })
+      // Cancelling the active Run terminalizes it with the steering message
+      // unconsumed, so retention prepends it as a second pending entry.
+      yield* store.cancel({ runId: active, commandId: "cancel-active", reason: "colliding command ids" })
+      const before = yield* store.hostSession(collide.sessionId)
+      expect(pendingEntries(before.queue)).toEqual([
+        { id: "collide", revision: 1, retained: true },
+        { id: "collide", revision: 1, retained: false },
+      ])
+      expect(before.activeRunId).toBe(lane.runId)
+      // One revision-addressed removal must address exactly one accepted entry.
+      expect(
+        yield* store.removeSessionInput({
+          sessionId: collide.sessionId,
+          commandId: "remove-collide",
+          id: "collide",
+          expectedRevision: 1,
+        }),
+      ).toEqual({ id: "collide", revision: 2 })
+      expect(pendingEntries((yield* store.hostSession(collide.sessionId)).queue)).toEqual([
+        { id: "collide", revision: 1, retained: false },
+      ])
+      // The surviving accepted input later promotes into exactly one Run.
+      yield* settle(store, {
+        runId: lane.runId,
+        sessionId: collide.sessionId,
+        ownerId: "collide-host",
+        commandId: "lane",
+      })
+      const after = yield* store.hostSession(collide.sessionId)
+      expect(yield* store.hostSessionRuns(collide.sessionId)).toHaveLength(3)
+      expect(yield* store.loadExecution(after.activeRunId!)).toMatchObject({
+        message: { prompt: Prompt.make("shared-id submit") },
+      })
+    }),
+  ).pipe(Effect.scoped),
+)
+
+it.effect("preserves every accepted input when message and submit command ids differ", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const bucket = yield* makeSimulator()
+      const store = yield* open(yield* bucket.connect, "distinct-host")
+      yield* store.createHostSession({ id: collide.sessionId, selection })
+      yield* store.submitSessionInput({
+        sessionId: collide.sessionId,
+        commandId: "cmd-active",
+        prompt: Prompt.make("active"),
+      })
+      const active = (yield* store.hostSession(collide.sessionId)).activeRunId!
+      const lane = yield* store.admitStart({
+        ...selection,
+        message: { ...collide.lane, idempotencyKey: "distinct-lane", correlationId: "distinct-lane" },
+        initialChildren: [],
+        initialFanOuts: [],
+      })
+      expect(yield* store.messageSessionInput({ ...collide.message, commandId: "msg-distinct" })).toEqual({
+        id: "msg-distinct",
+        revision: 1,
+      })
+      expect(yield* store.submitSessionInput({ ...collide.submit, commandId: "cmd-distinct" })).toEqual({
+        id: "cmd-distinct",
+        revision: 1,
+      })
+      yield* store.cancel({ runId: active, commandId: "cancel-active", reason: "distinct command ids" })
+      const before = yield* store.hostSession(collide.sessionId)
+      expect(pendingEntries(before.queue)).toEqual([
+        { id: "msg-distinct", revision: 1, retained: true },
+        { id: "cmd-distinct", revision: 1, retained: false },
+      ])
+      expect(before.activeRunId).toBe(lane.runId)
+      expect(
+        yield* store.removeSessionInput({
+          sessionId: collide.sessionId,
+          commandId: "remove-distinct",
+          id: "msg-distinct",
+          expectedRevision: 1,
+        }),
+      ).toEqual({ id: "msg-distinct", revision: 2 })
+      expect(pendingEntries((yield* store.hostSession(collide.sessionId)).queue)).toEqual([
+        { id: "cmd-distinct", revision: 1, retained: false },
+      ])
+      yield* settle(store, {
+        runId: lane.runId,
+        sessionId: collide.sessionId,
+        ownerId: "distinct-host",
+        commandId: "distinct-lane",
+      })
+      const after = yield* store.hostSession(collide.sessionId)
+      expect(yield* store.hostSessionRuns(collide.sessionId)).toHaveLength(3)
+      expect(yield* store.loadExecution(after.activeRunId!)).toMatchObject({
+        message: { prompt: Prompt.make("shared-id submit") },
+      })
     }),
   ).pipe(Effect.scoped),
 )
