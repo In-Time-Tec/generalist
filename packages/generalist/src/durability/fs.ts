@@ -52,6 +52,14 @@ const platformError = Schema.instanceOf(PlatformError.PlatformError)
 const isAbsent = (cause: PlatformError.PlatformError): boolean =>
   cause.reason._tag === "NotFound" || cause.reason._tag === "BadResource"
 
+/**
+ * A file occupying a path segment surfaces as `AlreadyExists` from a recursive
+ * directory create and as `BadResource` from a deeper path; both are the same
+ * deterministic key/hierarchy condition.
+ */
+const occupiesSegment = (cause: PlatformError.PlatformError): boolean =>
+  cause.reason._tag === "BadResource" || cause.reason._tag === "AlreadyExists"
+
 const mapError = (operation: string, key: string, cause: unknown): ObjectStoreFailure => {
   if (Schema.is(ObjectStoreFailure)(cause)) return cause
   const tag = Schema.is(platformError)(cause) ? cause.reason._tag : undefined
@@ -315,7 +323,7 @@ export const make = (
         }).pipe(
           Effect.catchTag("PlatformError", (cause) =>
             Effect.fail(
-              cause.reason._tag === "BadResource"
+              occupiesSegment(cause)
                 ? failure("create", key, "invalid-response", "A stored object occupies a segment of this key")
                 : mapError("create", key, cause),
             ),
