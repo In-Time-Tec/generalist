@@ -5,6 +5,7 @@ import {
   atomicCreates,
   byteIntegrity,
   caseEquivalentKeys,
+  createOutcomeEvidence,
   freshReads,
   keySpellings,
   listing,
@@ -35,6 +36,7 @@ export const objectConformance = <E, R>(connect: Effect.Effect<Service, E, R>) =
   Effect.gen(function* () {
     const conformance = { connect, prefix: "local-conformance" }
     yield* atomicCreates(conformance)
+    yield* createOutcomeEvidence(conformance)
     yield* freshReads(conformance)
     yield* caseEquivalentKeys(conformance)
     yield* byteIntegrity(conformance)

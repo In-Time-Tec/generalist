@@ -330,7 +330,19 @@ export const make = (
           const target = yield* keyToPath("create", key)
           const parent = path.dirname(target)
           const tmp = path.join(parent, `.tmp-${yield* crypto.randomUUIDv4}`)
-          yield* fs.makeDirectory(parent, { recursive: true })
+          // A file occupying a key segment is a layout error, never a conflict: recursive mkdir
+          // reports it as AlreadyExists (or BadResource for an intermediate file segment).
+          yield* fs
+            .makeDirectory(parent, { recursive: true })
+            .pipe(
+              Effect.catchTag("PlatformError", (cause) =>
+                cause.reason._tag === "AlreadyExists" || cause.reason._tag === "BadResource"
+                  ? Effect.fail(
+                      failure("create", key, "invalid-response", "A stored object occupies a segment of this key"),
+                    )
+                  : Effect.fail(mapError("create", key, cause)),
+              ),
+            )
           yield* Effect.scoped(
             Effect.gen(function* () {
               const file = yield* fs.open(tmp, { flag: "wx", mode: 0o666 })
@@ -338,14 +350,35 @@ export const make = (
               yield* file.sync
             }),
           )
-          const outcome = yield* fs.link(tmp, target).pipe(
-            Effect.as("created" as const),
-            Effect.catchTag("PlatformError", (cause) =>
-              cause.reason._tag === "AlreadyExists" ? Effect.succeed("conflict" as const) : Effect.fail(cause),
-            ),
-          )
-          yield* fs.remove(tmp, { force: true }).pipe(Effect.ignore)
-          return outcome
+          // A `conflict` is only legal when a direct read observes stored bytes. A directory
+          // occupying the target (or a non-file entry) is a transport-layout error, not a conflict.
+          const resolveAlreadyExists = (
+            cause: PlatformError.PlatformError,
+          ): Effect.Effect<"conflict", ObjectStoreFailure | PlatformError.PlatformError> =>
+            cause.reason._tag !== "AlreadyExists"
+              ? Effect.fail(cause)
+              : fs.stat(target).pipe(
+                  Effect.catchTag("PlatformError", (statCause) => Effect.fail(mapError("create", key, statCause))),
+                  Effect.flatMap((info) =>
+                    info.type === "File"
+                      ? Effect.succeed("conflict" as const)
+                      : Effect.fail(
+                          failure(
+                            "create",
+                            key,
+                            "invalid-response",
+                            "A directory occupies this key, so no object can be stored there",
+                          ),
+                        ),
+                  ),
+                )
+          return yield* fs
+            .link(tmp, target)
+            .pipe(
+              Effect.as("created" as const),
+              Effect.catchTag("PlatformError", resolveAlreadyExists),
+              Effect.ensuring(fs.remove(tmp, { force: true }).pipe(Effect.ignore)),
+            )
         }).pipe(
           Effect.catchTag("PlatformError", (cause) =>
             Effect.fail(

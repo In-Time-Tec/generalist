@@ -302,6 +302,7 @@ export const make = (
 export {
   ObjectStoreConformanceFailure,
   atomicCreates,
+  createOutcomeEvidence,
   freshReads,
   caseEquivalentKeys,
   listing,
