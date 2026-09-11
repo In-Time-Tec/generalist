@@ -218,7 +218,12 @@ export const narrowChild: {
   ): Effect.Effect<{ readonly parent: RunBudget; readonly child: RunBudget }, Invalid>
 } = Function.dual(3, (parent: RunBudget, child: RunBudget, narrower: BudgetLimits) =>
   Effect.gen(function* () {
-    const next = make(narrower)
+    const valid = yield* Schema.decodeEffect(BudgetLimits, { onExcessProperty: "error" })(narrower).pipe(
+      Effect.mapError((error) =>
+        Invalid.make({ message: error.message, hint: "Use finite non-negative budget values" }),
+      ),
+    )
+    const next = make(valid)
     for (const dimension of dimensions) {
       const requested = next.allocation[dimension]
       const current = child.allocation[dimension]
