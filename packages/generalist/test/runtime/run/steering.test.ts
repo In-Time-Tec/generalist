@@ -6,6 +6,7 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, DurableDriver, Steering, ToolExecutor } from "../../../src/index.js"
 import { closedTestAgent, testExecutable } from "./identity.js"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
+import { maximumEventBytes } from "../../../src/runtime/execution/payload/index.js"
 import { Address, RunExecutor, Errors, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
 import {
   assistant,
@@ -336,6 +337,55 @@ const backend = "object" as const
             ownerId: objectWorkerId,
           })
           expect(yield* store.readSteering(byteClaim)).toEqual([])
+        }),
+      )
+
+      test.effect(`${backend} rejects a message over the per-event payload bound without mutation`, () =>
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const store = yield* RunStore.RunStore
+          const receipt = yield* runtime.send({
+            to: assistantAddress,
+            sessionId: `steering-payload-bound:${backend}`,
+            idempotencyKey: "run",
+            prompt: "start",
+          })
+          const control = yield* steer(runtime, receipt.runId, "control", "admitted")
+
+          const underBudget = Prompt.make("x".repeat(257 * 1024))
+          const underBudgetBytes = Steering.promptBytes(underBudget)
+          expect(underBudgetBytes).toBeLessThan(Steering.defaultMaxPendingBytes)
+          const oversized = yield* steer(runtime, receipt.runId, "payload-cap", underBudget).pipe(Effect.flip)
+          expect(oversized).toBeInstanceOf(Steering.MessageTooLarge)
+          expect(oversized).toMatchObject({
+            _tag: "generalist/core/MessageTooLarge",
+            runId: receipt.runId,
+            queue: "steering",
+            bytes: underBudgetBytes,
+            limit: maximumEventBytes,
+          })
+
+          // The Inbox event encodes journal fields beyond the prompt, so the effective bound is
+          // the event payload. A prompt just under that bound must still fail typed, not generic.
+          const nearBound = Prompt.make("x".repeat(maximumEventBytes - 128))
+          const nearBoundBytes = Steering.promptBytes(nearBound)
+          expect(nearBoundBytes).toBeLessThan(maximumEventBytes)
+          const near = yield* steer(runtime, receipt.runId, "near-bound", nearBound).pipe(Effect.flip)
+          expect(near).toBeInstanceOf(Steering.MessageTooLarge)
+          expect(near).toMatchObject({ bytes: nearBoundBytes, limit: maximumEventBytes })
+
+          expect(
+            (yield* store.pendingSteering({ runId: receipt.runId, limit: 10 })).map((entry) => entry.entryId),
+          ).toEqual([control.entryId])
+          expect(
+            (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter((event) => event._tag === "Inbox"),
+          ).toHaveLength(1)
+
+          const accepted = yield* steer(runtime, receipt.runId, "post", "still admitted")
+          expect(accepted.sequence).toBe(control.sequence + 1)
+          expect(
+            (yield* runtime.history({ runId: receipt.runId, limit: 100 })).filter((event) => event._tag === "Inbox"),
+          ).toHaveLength(2)
         }),
       )
     },

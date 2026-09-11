@@ -21,7 +21,7 @@ import {
 import { MessageReceipt } from "./mailbox.js"
 import type { Metadata } from "./message.js"
 import type { Service as RunStoreService } from "../run/store.js"
-import { InboxFull } from "../../core/turn/steering.js"
+import { InboxFull, MessageTooLarge } from "../../core/turn/steering.js"
 import type { AdmissionPolicy, SteeringEntry } from "../run/steering.js"
 
 /** One authorization question about one exact sender and target. */
@@ -94,6 +94,7 @@ export const SendMessageError = Schema.Union([
   NoSnapshot,
   CursorExpired,
   InboxFull,
+  MessageTooLarge,
   RunTerminal,
   RunNotFound,
   RuntimeUnavailable,

@@ -66,6 +66,12 @@ yield * Agent.send(run, "Stop the active tool", "interrupt")
 
 Each process-local lane defaults to 64 entries and both share a 1 MiB prompt bound. Process loss discards these lanes. Durable Runtime inboxes use the same finite defaults and retain entries until atomic model-operation consumption or terminal disposition.
 
+## Bounds
+
+One Run admits at most 64 pending inbox entries and 1 MiB of encoded pending prompts (`Steering.defaultMaxPendingBytes`) across steering policies. A send that would exceed the aggregate byte bound fails with `InboxFull { dimension: "bytes", limit: 1_048_576 }` and appends nothing.
+
+Each message must also fit the durable per-event payload bound of 256 KiB: the encoded `Inbox` journal event, including its journal fields, must stay within `262144` bytes. A message that overflows it fails with `MessageTooLarge { bytes, limit: 262144 }`, where `bytes` is the encoded prompt size, and leaves the inbox unchanged. Aggregate capacity is therefore the only `InboxFull` case; a single oversize message is always `MessageTooLarge`.
+
 ## Model-callable tools
 
 `Steering.toolkit()` returns Effect AI tools named `send_to_child`, `send_to_parent`, and `list_inbox`. Include `Steering.layer` with the Agent's tool handlers. Runtime supplies authoritative current-Run identity and messaging; child and parent sends still pass through family authorization and the unified inbox.

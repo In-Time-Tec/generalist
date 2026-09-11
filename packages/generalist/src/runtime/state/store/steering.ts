@@ -1,9 +1,16 @@
 import type { PreparedObservation } from "../observation.js"
 import { Effect, Function, Option } from "effect"
-import { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from "../../../core/turn/steering.js"
+import {
+  InboxFull,
+  MessageTooLarge,
+  defaultCapacity,
+  defaultMaxPendingBytes,
+  promptBytes,
+} from "../../../core/turn/steering.js"
 import { RunBusy, RunNotFound, RunTerminal, RuntimeUnavailable, SteeringConflict } from "../../errors.js"
 import type { AdmitSteeringInput, ExecutionClaim, SteeringAdmission } from "../../run/store.js"
-import { appendLifecycle, rejectIfTerminal } from "../append.js"
+import { appendLifecycle, prepareLifecycle, rejectIfTerminal } from "../append.js"
+import { maximumEventBytes } from "../../execution/payload/index.js"
 import type { RuntimeState, StoredRun } from "../projection.js"
 import { requireAgentOrProgram } from "../../executable/manifest-internal.js"
 import { reconcileRunWaits } from "./control/run-wait.js"
@@ -27,6 +34,7 @@ export const admitSteering: {
     | RuntimeUnavailable
     | SteeringConflict
     | InboxFull
+    | MessageTooLarge
     | import("../../errors.js").RunKindUnsupported,
     PreparedObservation
   >
@@ -41,6 +49,7 @@ export const admitSteering: {
     | RuntimeUnavailable
     | SteeringConflict
     | InboxFull
+    | MessageTooLarge
     | import("../../errors.js").RunKindUnsupported,
     PreparedObservation
   >
@@ -96,6 +105,30 @@ export const admitSteering: {
       ...(input.sessionCommandId === undefined ? undefined : { sessionCommandId: input.sessionCommandId }),
       ...(input.addressed === undefined ? undefined : { addressed: input.addressed }),
     }
+    const inboxEvent = {
+      _tag: "Inbox" as const,
+      entryId: entry.entryId,
+      inboxSequence: entry.sequence,
+      idempotencyKey: entry.idempotencyKey,
+      digest: entry.digest,
+      message: entry.prompt,
+      policy: entry.policy,
+      from: entry.from,
+      ...(entry.sessionCommandId === undefined ? undefined : { sessionCommandId: entry.sessionCommandId }),
+      ...(entry.addressed === undefined ? undefined : { addressed: entry.addressed }),
+    }
+    // `requireRun` resolved this Run above and admission uses an immutable state snapshot, so the
+    // only reachable failure here is the per-event payload bound that `prepareLifecycle` enforces.
+    yield* prepareLifecycle(state, run.runId, inboxEvent).pipe(
+      Effect.mapError(() =>
+        MessageTooLarge.make({
+          runId: run.runId,
+          queue: "steering",
+          bytes: promptBytes(input.prompt),
+          limit: maximumEventBytes,
+        }),
+      ),
+    )
     const runs = new Map(state.runs)
     runs.set(run.runId, {
       ...run,
@@ -104,18 +137,7 @@ export const admitSteering: {
     const [, accepted] = yield* appendLifecycle(
       { ...state, nextSteeringCounter: state.nextSteeringCounter + 1, runs },
       run.runId,
-      {
-        _tag: "Inbox",
-        entryId: entry.entryId,
-        inboxSequence: entry.sequence,
-        idempotencyKey: entry.idempotencyKey,
-        digest: entry.digest,
-        message: entry.prompt,
-        policy: entry.policy,
-        from: entry.from,
-        ...(entry.sessionCommandId === undefined ? undefined : { sessionCommandId: entry.sessionCommandId }),
-        ...(entry.addressed === undefined ? undefined : { addressed: entry.addressed }),
-      },
+      inboxEvent,
     )
     return [
       { receipt: { entryId: entry.entryId, sequence: entry.sequence }, duplicate: false },

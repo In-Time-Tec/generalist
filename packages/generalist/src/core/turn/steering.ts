@@ -60,6 +60,21 @@ export class InboxFull extends ActionableTaggedError<InboxFull>()("generalist/co
   hint: errorHint("Drain the queue, reduce the prompt, or increase the finite inbox bound before retrying."),
 }) {}
 
+/**
+ * One durable steering message does not fit the per-message event payload bound.
+ *
+ * `bytes` is the encoded prompt size that was charged against the aggregate inbox byte bound;
+ * `limit` is the durable per-event payload bound that rejected the journal append. Aggregate
+ * capacity remains `InboxFull` with dimension `"bytes"`.
+ */
+export class MessageTooLarge extends ActionableTaggedError<MessageTooLarge>()("generalist/core/MessageTooLarge", {
+  runId: Schema.String,
+  queue: Schema.Literals(["steering", "followUp"]),
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+  hint: errorHint("Send a smaller prompt or store large data externally and pass a bounded reference."),
+}) {}
+
 /** A producer attempted to address a Run after its inbox closed. */
 export class RunClosed extends ActionableTaggedError<RunClosed>()("generalist/core/RunClosed", {
   runId: Schema.String,

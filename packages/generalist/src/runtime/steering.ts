@@ -10,6 +10,7 @@ export {
   AdmissionPolicy,
   ExecutionContinuation,
   InboxFull,
+  MessageTooLarge,
   MessageSource,
   SteeringEntry,
   SteeringReceipt,
