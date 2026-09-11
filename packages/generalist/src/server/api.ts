@@ -1,4 +1,4 @@
-import { Schema, SchemaTransformation } from "effect"
+import { Predicate, Schema, SchemaTransformation, type JsonSchema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Ref as MediaRef } from "../media/ref.js"
@@ -300,6 +300,69 @@ type Groups =
   | typeof operator
 type AuthenticatedGroups = HttpApiGroup.AddMiddleware<Groups, Authentication>
 
+interface OpenApiMediaType {
+  readonly schema?: JsonSchema.JsonSchema
+}
+
+interface OpenApiOperation {
+  readonly requestBody?: {
+    readonly content?: Record<string, OpenApiMediaType | undefined>
+  }
+}
+
+interface OpenApiPathItem {
+  readonly get?: OpenApiOperation
+  readonly put?: OpenApiOperation
+  readonly post?: OpenApiOperation
+  readonly delete?: OpenApiOperation
+  readonly options?: OpenApiOperation
+  readonly head?: OpenApiOperation
+  readonly patch?: OpenApiOperation
+  readonly trace?: OpenApiOperation
+}
+
+interface OpenApiDocument {
+  readonly paths?: Record<string, OpenApiPathItem>
+  readonly components?: { readonly schemas?: Record<string, JsonSchema.JsonSchema> }
+}
+
+const requestMethods = ["get", "post", "put", "patch", "delete", "options", "head", "trace"] as const
+
+/**
+ * The server decodes request schemas with Effect Schema's default
+ * `onExcessProperty: "ignore"`, so an unexpected request key never fails
+ * decoding. Remove the stricter annotation from every schema a request body
+ * reaches, including component schemas a body references, so generated clients
+ * and the runtime describe the same property policy. Response schemas keep the
+ * annotation because the Host controls their shape.
+ */
+export const acceptAdditionalRequestProperties = <Document extends OpenApiDocument>(document: Document): Document => {
+  const visited = new Set<JsonSchema.JsonSchema>()
+  const visit = (schema: JsonSchema.JsonSchema): void => {
+    if (visited.has(schema)) return
+    visited.add(schema)
+    if (schema.additionalProperties === false) delete schema.additionalProperties
+    if (Predicate.isString(schema.$ref)) {
+      const name = schema.$ref.slice(schema.$ref.lastIndexOf("/") + 1)
+      const target = document.components?.schemas?.[name]
+      if (target !== undefined) visit(target)
+    }
+    for (const value of Object.values(schema)) {
+      if (Array.isArray(value)) {
+        for (const item of value) if (Predicate.isObject(item)) visit(item)
+      } else if (Predicate.isObject(value)) visit(value)
+    }
+  }
+  for (const pathItem of Object.values(document.paths ?? {})) {
+    for (const method of requestMethods) {
+      for (const media of Object.values(pathItem[method]?.requestBody?.content ?? {})) {
+        if (media?.schema !== undefined) visit(media.schema)
+      }
+    }
+  }
+  return document
+}
+
 /** Schema-first public API. New ingress modules add one group to this value. */
 export const api: HttpApi.HttpApi<"generalist", AuthenticatedGroups> = HttpApi.make("generalist")
   .add(sessions, runs, tools, events, artifacts, approvals, attachments, operator)
@@ -309,5 +372,6 @@ export const api: HttpApi.HttpApi<"generalist", AuthenticatedGroups> = HttpApi.m
       title: "Generalist Server API",
       version: "1",
       description: "Product Sessions and durable Runs served by one Generalist Host.",
+      transform: acceptAdditionalRequestProperties,
     }),
   )
