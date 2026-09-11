@@ -124,6 +124,94 @@ describe("SessionHistory.page", () => {
   )
 })
 
+describe("SessionHistory.page with a non-finite limit", () => {
+  const entry = (id: string): Session.Entry => ({
+    _tag: "Message",
+    id,
+    parentId: null,
+    message: Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: id })] }),
+  })
+  const path = ["e0", "e1", "e2", "e3", "e4", "e5"].map(entry)
+
+  const clampedLimits = [Number.NaN, Number.NEGATIVE_INFINITY]
+  const cursors: ReadonlyArray<Pick<SessionHistory.HistoryPageInput, "before" | "after">> = [
+    {},
+    { before: "e0" },
+    { before: "e3" },
+    { before: "e5" },
+    { after: "e0" },
+    { after: "e2" },
+    { after: "e5" },
+    { before: "e5", after: "e0" },
+    { before: "e3", after: "e2" },
+    { before: "e0", after: "e5" },
+    { before: "missing" },
+    { after: "missing" },
+    { before: "missing", after: "missing" },
+  ]
+
+  it("treats NaN and negative infinity as the documented zero clamp for every cursor", () => {
+    for (const limit of clampedLimits) {
+      for (const cursor of cursors) {
+        const input = { limit, ...cursor }
+        expect(SessionHistory.page(path, input)).toEqual(SessionHistory.page(path, { ...input, limit: 0 }))
+      }
+    }
+  })
+
+  it("pins the empty page a NaN limit returns for the whole log", () => {
+    const page = SessionHistory.page(path, { limit: Number.NaN })
+    expect(page.entries).toEqual([])
+    expect(page.firstEntryId).toBeUndefined()
+    expect(page.lastEntryId).toBeUndefined()
+    expect(page.hasBefore).toBe(true)
+    expect(page.hasAfter).toBe(false)
+  })
+
+  it("reports continuation flags that match the entries a NaN limit returns", () => {
+    const older = SessionHistory.page(path, { limit: Number.NaN, before: "e3" })
+    expect(older.entries).toEqual([])
+    expect(older.firstEntryId).toBeUndefined()
+    expect(older.lastEntryId).toBeUndefined()
+    expect(older.hasBefore).toBe(true)
+    expect(older.hasAfter).toBe(true)
+
+    const newer = SessionHistory.page(path, { limit: Number.NaN, after: "e2" })
+    expect(newer.entries).toEqual([])
+    expect(newer.hasBefore).toBe(true)
+    expect(newer.hasAfter).toBe(true)
+  })
+
+  it("clamps a non-finite limit on empty and single-entry paths", () => {
+    const candidates: ReadonlyArray<ReadonlyArray<Session.Entry>> = [[], path.slice(0, 1)]
+    for (const candidate of candidates) {
+      for (const limit of clampedLimits) {
+        for (const cursor of [{}, { before: "e0" }, { after: "e0" }]) {
+          const input = { limit, ...cursor }
+          expect(SessionHistory.page(candidate, input)).toEqual(SessionHistory.page(candidate, { ...input, limit: 0 }))
+        }
+      }
+    }
+  })
+
+  it("reads the whole selected window for positive infinity", () => {
+    const newest = SessionHistory.page(path, { limit: Number.POSITIVE_INFINITY })
+    expect(newest.entries.map((value) => value.id)).toEqual(path.map((value) => value.id))
+    expect(newest.hasBefore).toBe(false)
+    expect(newest.hasAfter).toBe(false)
+
+    const older = SessionHistory.page(path, { limit: Number.POSITIVE_INFINITY, before: "e3" })
+    expect(older.entries.map((value) => value.id)).toEqual(["e0", "e1", "e2"])
+    expect(older.hasBefore).toBe(false)
+    expect(older.hasAfter).toBe(true)
+
+    const newer = SessionHistory.page(path, { limit: Number.POSITIVE_INFINITY, after: "e2" })
+    expect(newer.entries.map((value) => value.id)).toEqual(["e3", "e4", "e5"])
+    expect(newer.hasBefore).toBe(true)
+    expect(newer.hasAfter).toBe(false)
+  })
+})
+
 describe("Session history behind a compaction checkpoint", () => {
   const compacted = withSession(
     Effect.scoped(
