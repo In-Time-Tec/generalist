@@ -232,9 +232,19 @@ const validatedStream = <R>(
             : Effect.succeed<ReadonlyArray<Response.StreamPart<Record<string, Tool.Any>>>>([])
         }
         if (released) {
-          return part.type === "tool-call"
-            ? decodeToolCall(original, part).pipe(Effect.map((decoded) => [decoded]))
-            : Effect.succeed([part])
+          if (part.type !== "tool-call") return Effect.succeed([part])
+          // Mirror the buffered branch: keep the attempt open through the
+          // terminal `finish` so its usage survives the rejected call, and let
+          // the top-of-pipeline guard discard everything after the failure.
+          return decodeToolCall(original, part).pipe(
+            Effect.map((decoded) => [decoded]),
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                invalidToolName = error.toolName
+                return []
+              }),
+            ),
+          )
         }
         if (isBuffered(part)) {
           return Effect.sync(() => {

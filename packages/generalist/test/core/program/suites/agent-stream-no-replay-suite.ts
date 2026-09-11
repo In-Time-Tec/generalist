@@ -212,6 +212,11 @@ describe("agent model stream replay safety", () => {
             .map((event) => event.reason),
           label,
         ).toEqual(["invalid-tool-call-correction"])
+        const failedAttempt = Array.from(events).find((event) => event._tag === "ModelAttemptFailed")
+        expect(failedAttempt?._tag === "ModelAttemptFailed" && failedAttempt.providerUsage, label).toEqual({
+          inputTokens: 7,
+          outputTokens: 3,
+        })
       }
     }),
   )
