@@ -335,10 +335,14 @@ const streamInternalImpl = <
       const withInterpreter = <A, E, RInner>(effect: Effect.Effect<A, E, RInner>) =>
         effect.pipe(Effect.provideContext(interpreterServices))
       if (validatedResume !== undefined) yield* withInterpreter(setToolBatch(validatedResume.checkpoint))
-      const gateRetry =
-        options.resume === undefined && recoveredToolCheckpoint === undefined && options.turnStart === undefined
-          ? recoveredGateRetry({ agent, checkpoint: options.driverCheckpoint })
-          : undefined
+      // A resume, a recovered tool checkpoint, or an explicit later turn all continue an existing
+      // transcript. Recall runs once per run: a continuing segment must not reschedule
+      // `memory:recall:0` under a different enclosing command input.
+      const continuingTranscript =
+        options.resume !== undefined || recoveredToolCheckpoint !== undefined || options.turnStart !== undefined
+      const gateRetry = continuingTranscript
+        ? undefined
+        : recoveredGateRetry({ agent, checkpoint: options.driverCheckpoint })
       const pendingMemory = yield* pendingRemember({
         checkpoint: options.driverCheckpoint,
         turnStart: options.turnStart,
@@ -360,7 +364,7 @@ const streamInternalImpl = <
           }).pipe(withInterpreter)
         }
         if (gateRetry !== undefined) return Effect.succeed(gateRetry.prompt)
-        if (options.resume === undefined && recoveredToolCheckpoint === undefined) {
+        if (!continuingTranscript) {
           return recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
         }
         return Effect.succeed(baseInitialPrompt)
