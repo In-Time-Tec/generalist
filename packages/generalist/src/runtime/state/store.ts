@@ -15,6 +15,7 @@ import {
   AckInvalid,
   CursorExpired,
   FanOutConflict,
+  ForkSequenceInvalid,
   IllegalOperatorAction,
   IdempotencyConflict,
   ResponseConflict,
@@ -184,6 +185,20 @@ const makeStoreServices = (options: Options) =>
           Effect.andThen(transition(state, prepared)),
         ),
       )
+    /**
+     * `modifyState` encodes its input into the durable command journal, so a non-integer
+     * sequence must fail before admission. `ForkSequenceInvalid` is the documented failure
+     * for a requested sequence outside the committed journal and stays total for every `number`.
+     */
+    const requireIntegerSequence = (runId: string, sequence: number) =>
+      Number.isSafeInteger(sequence)
+        ? Effect.void
+        : Effect.gen(function* () {
+            const state = yield* readState
+            const run = state.runs.get(runId)
+            if (run === undefined) return yield* RunNotFound.make({ runId })
+            return yield* ForkSequenceInvalid.make({ runId, sequence, lastSequence: run.lastSequence })
+          })
     const runStore = RunStore.of({
       configureDelegationPolicy: (policy) =>
         modifyState(commands.configureDelegationPolicy, [policy], (state, [prepared]) =>
@@ -405,11 +420,16 @@ const makeStoreServices = (options: Options) =>
         readState.pipe(Effect.flatMap((state) => settlementNotifications(state, input))),
       inspect: (runId) => readState.pipe(Effect.flatMap((state) => inspectRun(state, runId))),
       fork: (input) =>
-        validatePayload({ value: input, boundary: "fork substitution" }).pipe(
+        requireIntegerSequence(input.runId, input.atSequence).pipe(
+          Effect.andThen(validatePayload({ value: input, boundary: "fork substitution" })),
           Effect.andThen(modifyState(commands.fork, [input], (state, [preparedInput]) => fork(state, preparedInput))),
         ),
       rewind: (input) =>
-        modifyState(commands.rewind, [input], (state, [preparedInput]) => rewind(state, preparedInput)),
+        requireIntegerSequence(input.runId, input.toSequence).pipe(
+          Effect.andThen(
+            modifyState(commands.rewind, [input], (state, [preparedInput]) => rewind(state, preparedInput)),
+          ),
+        ),
       snapshot: (runId) =>
         readState.pipe(
           Effect.flatMap((state) =>

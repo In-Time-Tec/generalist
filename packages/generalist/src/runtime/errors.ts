@@ -137,7 +137,9 @@ export class ForkSequenceInvalid extends ActionableTaggedError<ForkSequenceInval
   "generalist/runtime/ForkSequenceInvalid",
   {
     runId: Schema.String,
-    sequence: Schema.Int,
+    // A caller can request any `number`, so the failure must be able to report it.
+    // oxlint-disable-next-line effecttsgo/schema-number
+    sequence: Schema.Number,
     lastSequence: Schema.Int,
     hint: errorHint("Choose a sequence from the Run's committed journal."),
   },
