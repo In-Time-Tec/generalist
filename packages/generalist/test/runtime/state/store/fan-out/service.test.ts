@@ -131,6 +131,17 @@ layer(objectLayer)("Runtime fan-out", (it) => {
       const countConflict = yield* runtime.fanOut({ ...input, members: input.members.slice(0, 2) }).pipe(Effect.flip)
       expect(countConflict).toBeInstanceOf(Errors.FanOutConflict)
       expect(countConflict).toMatchObject(conflictTarget)
+      const changedForKey = [...input.members]
+      changedForKey[0] = { ...changedForKey[0]!, prompt: "changed under a new key" }
+      const accepted = yield* runtime.fanOut({
+        ...input,
+        idempotencyKey: `${input.idempotencyKey}:new`,
+        members: changedForKey,
+      })
+      expect(accepted.fanOutId).not.toBe(receipt.fanOutId)
+      expect((yield* runtime.inspectFanOut(accepted.fanOutId)).members[0]!.prompt).toEqual(
+        textPrompt("changed under a new key"),
+      )
     }),
   )
 
@@ -548,6 +559,26 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
         const before = yield* runtime.inspectFanOut(admitted.fanOutId)
         expect(before.members.map((member) => member.status)).toEqual(["running", "pending", "pending"])
         expect(before.members.map((member) => member.readiness)).toEqual(["ready", "queued", "queued"])
+        const changedAfterReopen = yield* runtime
+          .fanOut({
+            parentRunId: admitted.parentRunId,
+            idempotencyKey: "reviews",
+            members: [0, 1, 2].map((ordinal) => ({
+              key: `review-${ordinal}`,
+              selection: ordinal === 0 ? "analyst" : "researcher",
+              prompt: `review-${ordinal}`,
+            })),
+            concurrency: 1,
+            join: { _tag: "Quorum", required: 2 },
+            remainder: "abandon",
+          })
+          .pipe(Effect.flip)
+        expect(changedAfterReopen).toBeInstanceOf(Errors.FanOutConflict)
+        expect(changedAfterReopen).toMatchObject({
+          parentRunId: admitted.parentRunId,
+          idempotencyKey: "reviews",
+          existingFanOutId: admitted.fanOutId,
+        })
         const first = yield* store.claimExecution({
           commandId: "runtime-sql-store-fan-out-service-test-ts-claim-1",
           runId: admitted.childRunIds[0]!,
