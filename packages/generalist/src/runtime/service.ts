@@ -492,7 +492,7 @@ export type RespondApprovalError =
   | ApprovalMismatch
   | RuntimeUnavailable
   | DurabilityFailure
-export type SignalError = RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure
+export type SignalError = RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable | DurabilityFailure
 export type CancelError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type RunSendError =
   | import("./errors.js").RunKindUnsupported

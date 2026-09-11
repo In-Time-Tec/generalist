@@ -12,7 +12,11 @@ type RespondResult = Effect.Effect<
   RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable,
   PreparedObservation
 >
-type SignalResult = Effect.Effect<RuntimeState, RunNotFound | RunTerminal | RuntimeUnavailable, PreparedObservation>
+type SignalResult = Effect.Effect<
+  RuntimeState,
+  RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable,
+  PreparedObservation
+>
 type SignalInput = Pick<SignalCommand, "runId" | "name" | "payload">
 
 const getRun = (state: RuntimeState, runId: string): Effect.Effect<StoredRun, RunNotFound | RuntimeUnavailable> => {
@@ -121,12 +125,16 @@ export const signal: {
     const terminal = rejectIfTerminal(run)
     if (Option.isSome(terminal)) return yield* RunTerminal.make({ runId: run.runId, status: terminal.value })
     const wait = state.waits.get(waitMapKey(run.runId, input.name))
-    if (run.cancellationRequested || wait?.status !== "open") return state
+    if (run.cancellationRequested || wait?.status !== "open") {
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.name })
+    }
     const waitId = wait.waitId
     const closedAt = yield* preparedOccurredAt
     const resolution: WaitResolution = { _tag: "Signal", name: input.name, payload: input.payload }
     const transitioned = closeWait(state, { runId: run.runId, waitId, status: "signaled", resolution, closedAt })
-    if (transitioned.affected !== 1) return state
+    if (transitioned.affected !== 1) {
+      return yield* WaitNotOpen.make({ runId: run.runId, waitId: input.name })
+    }
     const [, resumed] = yield* appendLifecycle(
       transitioned.state,
       run.runId,
