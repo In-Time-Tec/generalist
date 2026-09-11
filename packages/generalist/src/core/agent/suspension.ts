@@ -4,6 +4,7 @@ import type { AgentSuspended } from "./event.js"
 import {
   canonicalCall,
   waits as checkpointWaits,
+  type CanonicalToolCall,
   type ToolBatchCheckpoint,
   type ToolBatchResolution,
 } from "./tools/checkpoint.js"
@@ -24,21 +25,17 @@ export interface SuspensionCheckpoint extends ToolCheckpoint {
 
 export const canonicalSuspensionCall = canonicalCall
 
-const checkpointMessageIndex = (messages: ReadonlyArray<Prompt.Message>, checkpoint: ToolBatchCheckpoint): number =>
-  messages.findIndex((message) => {
-    if (message.role !== "assistant") return false
-    const calls = []
-    for (const part of message.content) {
-      if (part.type !== "tool-call" || part.providerExecuted) continue
-      const metadata = Schema.decodeOption(Response.ProviderMetadata)(part.options)
-      if (metadata._tag === "None") return false
-      calls.push(canonicalCall({ ...part, metadata: metadata.value }))
-    }
-    return Equal.equals(
-      calls,
-      checkpoint.calls.map((entry) => entry.call),
-    )
-  })
+const assistantCalls = (message: Prompt.Message): ReadonlyArray<CanonicalToolCall> | undefined => {
+  if (message.role !== "assistant") return undefined
+  const calls: Array<CanonicalToolCall> = []
+  for (const part of message.content) {
+    if (part.type !== "tool-call" || part.providerExecuted) continue
+    const metadata = Schema.decodeOption(Response.ProviderMetadata)(part.options)
+    if (metadata._tag === "None") return undefined
+    calls.push(canonicalCall({ ...part, metadata: metadata.value }))
+  }
+  return calls
+}
 
 const resultPartsAfter = (messages: ReadonlyArray<Prompt.Message>, messageIndex: number) => {
   const results = new Map<string, Prompt.ToolResultPart>()
@@ -51,47 +48,63 @@ const resultPartsAfter = (messages: ReadonlyArray<Prompt.Message>, messageIndex:
   return results
 }
 
+/** Project one candidate authored message against the checkpoint's call states and following results. */
+const projectedToolCheckpoint = (
+  messages: ReadonlyArray<Prompt.Message>,
+  messageIndex: number,
+  checkpoint: ToolBatchCheckpoint,
+): ToolCheckpoint | undefined => {
+  const projected = resultPartsAfter(messages, messageIndex)
+  let matched = 0
+  let projectionClosed = false
+  for (const entry of checkpoint.calls) {
+    const result = projected.get(`${entry.call.id}\0${entry.call.name}`)
+    if (result === undefined) {
+      projectionClosed = true
+      continue
+    }
+    if (
+      projectionClosed ||
+      entry.state._tag !== "Completed" ||
+      !Equal.equals(result, Schema.decodeSync(Prompt.ToolResultPart)(entry.state.result))
+    ) {
+      return undefined
+    }
+    matched += 1
+  }
+  if (matched !== projected.size) return undefined
+  return {
+    checkpoint,
+    messages: messages.slice(0, messageIndex),
+    projectedResults: new Set(projected.keys()),
+    toolCallBatch: checkpoint.calls.map((entry) =>
+      Response.makePart("tool-call", {
+        id: entry.call.id,
+        name: entry.call.name,
+        params: entry.call.params,
+        providerExecuted: entry.call.providerExecuted,
+        metadata: entry.call.metadata,
+      }),
+    ),
+  }
+}
+
 export const checkpointFromHistory: {
   (checkpoint: ToolBatchCheckpoint): (messages: ReadonlyArray<Prompt.Message>) => ToolCheckpoint | undefined
   (messages: ReadonlyArray<Prompt.Message>, checkpoint: ToolBatchCheckpoint): ToolCheckpoint | undefined
 } = Function.dual(
   2,
   (messages: ReadonlyArray<Prompt.Message>, checkpoint: ToolBatchCheckpoint): ToolCheckpoint | undefined => {
-    const messageIndex = checkpointMessageIndex(messages, checkpoint)
-    if (messageIndex < 0) return undefined
-    const projected = resultPartsAfter(messages, messageIndex)
-    let matched = 0
-    let projectionClosed = false
-    for (const entry of checkpoint.calls) {
-      const result = projected.get(`${entry.call.id}\0${entry.call.name}`)
-      if (result === undefined) {
-        projectionClosed = true
-        continue
-      }
-      if (
-        projectionClosed ||
-        entry.state._tag !== "Completed" ||
-        !Equal.equals(result, Schema.decodeSync(Prompt.ToolResultPart)(entry.state.result))
-      ) {
-        return undefined
-      }
-      matched += 1
+    const expected = checkpoint.calls.map((entry) => entry.call)
+    // A later model response may legally reuse canonical calls from an earlier one. Only an occurrence that
+    // projects cleanly against this checkpoint's states and results identifies the authored batch.
+    for (const [messageIndex, message] of messages.entries()) {
+      const calls = assistantCalls(message)
+      if (calls === undefined || !Equal.equals(calls, expected)) continue
+      const projected = projectedToolCheckpoint(messages, messageIndex, checkpoint)
+      if (projected !== undefined) return projected
     }
-    if (matched !== projected.size) return undefined
-    return {
-      checkpoint,
-      messages: messages.slice(0, messageIndex),
-      projectedResults: new Set(projected.keys()),
-      toolCallBatch: checkpoint.calls.map((entry) =>
-        Response.makePart("tool-call", {
-          id: entry.call.id,
-          name: entry.call.name,
-          params: entry.call.params,
-          providerExecuted: entry.call.providerExecuted,
-          metadata: entry.call.metadata,
-        }),
-      ),
-    }
+    return undefined
   },
 )
 
