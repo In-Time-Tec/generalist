@@ -56,6 +56,36 @@ describe("Overview.format", () => {
     expect(text).not.toContain("t".repeat(13))
   })
 
+  it("emits no title or content text when the matching bound is zero", () => {
+    const state = State.make({
+      scope,
+      entries: [entry({ id: "clamped", kind: "memory", title: "t".repeat(40), content: "c".repeat(40) })],
+    })
+    const segments = (options: Overview.OverviewOptions): { readonly title: string; readonly content: string } => {
+      const line =
+        Overview.format(state, options)
+          .split("\n")
+          .find((value) => value.startsWith("- clamped")) ?? ""
+      expect(line).not.toBe("")
+      const rest = line.slice(line.indexOf(": ") + 2)
+      const dash = rest.indexOf(" \u2014 ")
+      return dash === -1 ? { title: rest, content: "" } : { title: rest.slice(0, dash), content: rest.slice(dash + 3) }
+    }
+
+    expect(segments({ maxEntriesPerKind: 1, maxTitleLength: 0, maxContentLength: 0 })).toEqual({
+      title: "",
+      content: "",
+    })
+    expect(segments({ maxEntriesPerKind: 1, maxTitleLength: 0, maxContentLength: 30 })).toEqual({
+      title: "",
+      content: `${"c".repeat(29)}\u2026`,
+    })
+    expect(segments({ maxEntriesPerKind: 1, maxTitleLength: 12, maxContentLength: 0 })).toEqual({
+      title: `${"t".repeat(11)}\u2026`,
+      content: "",
+    })
+  })
+
   it("bounds total output regardless of state size", () => {
     const small = State.make({ scope, entries: many("memory", 1) })
     const options = { maxEntriesPerKind: 2, maxContentLength: 40, maxTitleLength: 20, maxRefinements: 2 }

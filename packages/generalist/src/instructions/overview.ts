@@ -27,7 +27,8 @@ const applyLimits = (options: OverviewOptions): Required<OverviewOptions> => ({
 
 const clamp = (text: string, limit: number): string => {
   const collapsed = text.replace(/\s+/g, " ").trim()
-  return collapsed.length <= limit ? collapsed : `${collapsed.slice(0, Math.max(0, limit - 1))}\u2026`
+  if (collapsed.length <= limit) return collapsed
+  return limit <= 0 ? "" : `${collapsed.slice(0, limit - 1)}\u2026`
 }
 
 const compareText = (left: string, right: string): number => {
