@@ -10,6 +10,14 @@ const request = {
   turn: 1,
 }
 
+const lineTerminatedCommands = [
+  "rm -rf /\n",
+  "rm -rf /\r",
+  "rm -rf /\n# harmless",
+  "rm -rf /\u2028rm -rf /tmp",
+  "rm -rf /\u2029",
+]
+
 describe("Permissions", () => {
   it("matches tool names and projected parameter globs", () => {
     expect(Permissions.matches("bash", "bash", { command: "rm -rf .cache" })).toBe(true)
@@ -24,15 +32,8 @@ describe("Permissions", () => {
       rules: [{ pattern: "bash:rm -rf*", level: "deny" }],
       fallback: "allow",
     }
-    const lineTerminated = [
-      "rm -rf /\n",
-      "rm -rf /\r",
-      "rm -rf /\n# harmless",
-      "rm -rf /\u2028rm -rf /tmp",
-      "rm -rf /\u2029",
-    ]
 
-    for (const command of lineTerminated) {
+    for (const command of lineTerminatedCommands) {
       expect(Permissions.matches("bash:rm -rf*", "bash", { command })).toBe(true)
       expect(Permissions.evaluate(ruleset, "bash", { command })).toBe("deny")
     }
@@ -44,13 +45,13 @@ describe("Permissions", () => {
     expect(Permissions.evaluate(ruleset, "bash", { command: "ls -la" })).toBe("allow")
   })
 
-  it("still asks for unmatched calls after a line-terminated deny", () => {
+  it("still asks for unmatched calls, including line-terminated ones", () => {
     const ruleset: Permissions.Ruleset = {
       rules: [{ pattern: "bash:rm -rf*", level: "deny" }],
       fallback: "ask",
     }
 
-    expect(Permissions.evaluate(ruleset, "bash", { command: "ls -la" })).toBe("ask")
+    expect(Permissions.evaluate(ruleset, "bash", { command: "ls -la\n" })).toBe("ask")
     expect(Permissions.evaluate(ruleset, "write", {})).toBe("ask")
   })
 
@@ -154,28 +155,30 @@ describe("Permissions", () => {
     }),
   )
 
-  it.effect("applies a remembered wildcard deny to a line-terminated argument", () =>
+  it.effect("applies a remembered wildcard deny to line-terminated arguments", () =>
     Effect.gen(function* () {
-      const lineTerminatedRequest = {
-        call: Response.makePart("tool-call", {
-          id: "line-terminator",
-          name: "bash",
-          params: { command: "rm -rf /\n" },
-          providerExecuted: false,
-        }),
-        agentName: "agent",
-        turn: 1,
-      }
-      const decision = yield* Permissions.evaluateWithRules(
-        { evaluate: () => Effect.succeed({ _tag: "Allow" }) },
-        {
-          rules: Effect.succeed([{ pattern: "bash:rm -rf*", level: "deny" }]),
-          remember: () => Effect.void,
-        },
-        lineTerminatedRequest,
-      )
+      for (const [index, command] of lineTerminatedCommands.entries()) {
+        const lineTerminatedRequest = {
+          call: Response.makePart("tool-call", {
+            id: `line-terminator-${index}`,
+            name: "bash",
+            params: { command },
+            providerExecuted: false,
+          }),
+          agentName: "agent",
+          turn: 1,
+        }
+        const decision = yield* Permissions.evaluateWithRules(
+          { evaluate: () => Effect.succeed({ _tag: "Allow" }) },
+          {
+            rules: Effect.succeed([{ pattern: "bash:rm -rf*", level: "deny" }]),
+            remember: () => Effect.void,
+          },
+          lineTerminatedRequest,
+        )
 
-      expect(decision).toEqual({ _tag: "Deny" })
+        expect(decision).toEqual({ _tag: "Deny" })
+      }
     }),
   )
 
