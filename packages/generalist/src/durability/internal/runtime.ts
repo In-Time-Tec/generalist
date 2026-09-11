@@ -245,6 +245,12 @@ export const make = (options: Options) =>
         // Decode the normalized wire value, so opaque input objects cannot mutate a prepared command by alias.
         const prepared = yield* decodeReceipt(encodedInput, definition.input)
         const commandId = `${definition.tag}:${definition.identity(prepared)}`
+        // The digest input is the projection re-encoded through the command codec, so derived facts
+        // do not make an exact retry of one stable command look like different input.
+        const digestInput =
+          definition.digestInput === undefined
+            ? encodedInput
+            : yield* encodeCommandValue(definition.digestInput(prepared), definition.input)
         return yield* Effect.gen(function* () {
           let observations: Observations | undefined
           const result = yield* journal.commitWithHead(
@@ -255,7 +261,7 @@ export const make = (options: Options) =>
                 tenant: options.tenant,
                 partition: options.partition,
                 command: definition.tag,
-                input: encodedInput,
+                input: digestInput,
               },
             },
             (persisted) =>

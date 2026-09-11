@@ -5,6 +5,15 @@ export interface Definition<Input, Receipt> {
   readonly tag: string
   readonly input: Schema.Codec<Input, unknown>
   readonly identity: (input: Input) => string
+  /**
+   * Stable projection of the typed input hashed as the journal input digest.
+   * Supply it only when the input carries derived facts (clock instants, host
+   * state) that must not make an exact retry look like different input; the
+   * transition still receives the full input, and only the projection is
+   * recorded as the command input digest. A different projection fails
+   * `input-conflict` before the transition, exactly like different input today.
+   */
+  readonly digestInput?: (input: Input) => Input
   readonly receipt: Schema.Codec<Receipt, unknown>
 }
 
