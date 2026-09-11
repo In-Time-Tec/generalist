@@ -66,6 +66,7 @@ describe("Overview.format", () => {
         Overview.format(state, options)
           .split("\n")
           .find((value) => value.startsWith("- clamped")) ?? ""
+      expect(line).not.toBe("")
       const rest = line.slice(line.indexOf(": ") + 2)
       const dash = rest.indexOf(" \u2014 ")
       return dash === -1 ? { title: rest, content: "" } : { title: rest.slice(0, dash), content: rest.slice(dash + 3) }
