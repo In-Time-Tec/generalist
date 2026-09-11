@@ -463,7 +463,8 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
               ),
             )
           : outcome
-      const hooked = yield* hookToolResult(agentName, turn, call, transformed)
+      const bounded = yield* boundOutcome(call, transformed)
+      const hooked = yield* hookToolResult(agentName, turn, call, bounded)
       if (hooked._tag === "Suspend") {
         return yield* AgentError.make({ message: `Resolved tool ${call.name} suspended again`, turn })
       }
