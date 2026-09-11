@@ -47,7 +47,7 @@ export const ChildStartPayload = Schema.Struct({
 export type ChildStartPayload = typeof ChildStartPayload.Type
 
 export const RunCancelPayload = Schema.Struct({
-  commandId: Schema.String,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
   reason: Schema.optionalKey(Schema.String),
 })
 export type RunCancelPayload = typeof RunCancelPayload.Type

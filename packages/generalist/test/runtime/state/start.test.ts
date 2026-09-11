@@ -5,7 +5,6 @@ import { Effect, Layer, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
 import { Address, Errors, ExecutableResolver, RunStore, Runtime } from "../../../src/runtime/index.js"
-import { DurabilityFailure } from "../../../src/durability/errors.js"
 import {
   alternateAssistant,
   alternateAssistantRef,
@@ -87,10 +86,15 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
         idempotencyKey: "same",
         prompt: textPrompt("hello"),
       }
-      yield* runtime.startExecution(base)
+      const first = yield* runtime.startExecution(base)
       const changedPrompt = yield* runtime.startExecution({ ...base, prompt: textPrompt("changed") }).pipe(Effect.flip)
-      expect(changedPrompt).toBeInstanceOf(DurabilityFailure)
-      expect(changedPrompt).toMatchObject({ reason: "input-conflict" })
+      expect(changedPrompt).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changedPrompt).toMatchObject({
+        address: Address.make("runtime:start"),
+        sessionId: "conflict-session",
+        idempotencyKey: "same",
+        existingRunId: first.runId,
+      })
       const changedExecutable = yield* runtime
         .startExecution({
           ...base,
@@ -98,13 +102,13 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
           registrations: registrationsFor(alternateAssistantRef),
         })
         .pipe(Effect.flip)
-      expect(changedExecutable).toBeInstanceOf(DurabilityFailure)
-      expect(changedExecutable).toMatchObject({ reason: "input-conflict" })
+      expect(changedExecutable).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changedExecutable).toMatchObject({ existingRunId: first.runId })
       const changedRegistrations = yield* runtime
         .startExecution({ ...base, registrations: registrationsFor(assistantRef, "changed") })
         .pipe(Effect.flip)
-      expect(changedRegistrations).toBeInstanceOf(DurabilityFailure)
-      expect(changedRegistrations).toMatchObject({ reason: "input-conflict" })
+      expect(changedRegistrations).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changedRegistrations).toMatchObject({ existingRunId: first.runId })
     }),
   )
 
@@ -125,8 +129,12 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
       const changed = yield* runtime
         .startExecution({ ...input, prompt: filePrompt(new Uint8Array([0, 1, 3, 255])) })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changed).toMatchObject({
+        sessionId: "file-session",
+        idempotencyKey: "file-key",
+        existingRunId: first.runId,
+      })
     }),
   )
 
@@ -258,6 +266,69 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
     }),
   )
 
+  it.effect("rejects a rewind on a root with admitted children without mutating the Run", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const store = yield* RunStore.RunStore
+      const started = yield* runtime.startExecution({
+        ...base,
+        sessionId: "rewind-initial-root",
+        idempotencyKey: "rewind-initial-root",
+        initialChildren: [
+          {
+            ...base.initialChildren[0]!,
+            invocationId: "rewind-initial-research",
+            idempotencyKey: "rewind-initial-research",
+            sessionId: "rewind-initial-child",
+          },
+        ],
+      })
+      const childRunId = started.childRunIds[0]!
+      const childClaim = yield* store.claimExecution({
+        commandId: `${childRunId}:rewind:claim`,
+        runId: childRunId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.complete({
+        commandId: `${childRunId}:rewind:complete`,
+        ...childClaim,
+        result: completedResult("researched"),
+      })
+      expect((yield* runtime.inspect(started.runId)).status).toBe("running")
+      const rootClaim = yield* store.claimExecution({
+        commandId: `${started.runId}:rewind:claim`,
+        runId: started.runId,
+        ownerId: objectWorkerId,
+      })
+      yield* store.complete({
+        commandId: `${started.runId}:rewind:complete`,
+        ...rootClaim,
+        result: completedResult("root done"),
+      })
+      const before = yield* runtime.inspect(started.runId)
+      const historyBefore = yield* runtime.history({ runId: started.runId, limit: 100 })
+      expect(before.status).toBe("succeeded")
+
+      const rewind = yield* runtime
+        .rewind(started.runId, { commandId: "rewind-initial-root", toSequence: 0 })
+        .pipe(Effect.flip)
+      expect(rewind).toBeInstanceOf(Errors.RuntimeUnavailable)
+      expect(rewind).toMatchObject({ message: `run ${started.runId} has initial children` })
+
+      const inspection = yield* runtime.inspect(started.runId)
+      expect(inspection).toEqual(before)
+      expect(inspection.status).toBe("succeeded")
+      expect(inspection.children).toHaveLength(1)
+      expect(yield* runtime.history({ runId: started.runId, limit: 100 })).toEqual(historyBefore)
+      expect(historyBefore.some((event) => event._tag === "RunRewound")).toBe(false)
+      expect(
+        yield* store
+          .claimExecution({ commandId: "rewind-initial-root-reclaim", runId: started.runId, ownerId: objectWorkerId })
+          .pipe(Effect.flip),
+      ).toMatchObject({ _tag: "generalist/runtime/RunTerminal", status: "succeeded" })
+    }),
+  )
+
   it.effect("rolls back all admission on an invalid selection and conflicts on changed source", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
@@ -281,15 +352,19 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
       expect(invalid).toBeInstanceOf(Errors.ChildSelectionMissing)
       expect(yield* runtime.list({ limit: 10 })).toEqual(before)
 
-      yield* runtime.startExecution(base)
+      const first = yield* runtime.startExecution(base)
       const changed = yield* runtime
         .startExecution({
           ...base,
           initialChildren: [{ ...base.initialChildren[0]!, prompt: textPrompt("changed") }],
         })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changed).toMatchObject({
+        sessionId: "initial-root",
+        idempotencyKey: "initial-root",
+        existingRunId: first.runId,
+      })
       expect((yield* runtime.treeCheckpoint((yield* runtime.startExecution(base)).runId)).inspection.runs).toHaveLength(
         3,
       )
@@ -385,8 +460,12 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
           ],
         })
         .pipe(Effect.flip)
-      expect(changed).toBeInstanceOf(DurabilityFailure)
-      expect(changed).toMatchObject({ reason: "input-conflict" })
+      expect(changed).toBeInstanceOf(Errors.IdempotencyConflict)
+      expect(changed).toMatchObject({
+        sessionId: "initial-fan-out-root",
+        idempotencyKey: "initial-fan-out-root",
+        existingRunId: first.runId,
+      })
     }),
   )
 

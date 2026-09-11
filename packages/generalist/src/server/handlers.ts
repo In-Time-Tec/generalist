@@ -155,7 +155,7 @@ const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: 
           host.runs.children(params.id).pipe(mapHostError("runs.listChildren")),
         ),
       inspectChild: ({ params }) =>
-        protect(policy)({ type: "run", id: params.childId }, "read", () =>
+        protect(policy)({ type: "run", id: params.id }, "read", () =>
           host.runs.inspectChild(params.id, params.childId).pipe(mapHostError("runs.inspectChild")),
         ),
     }),

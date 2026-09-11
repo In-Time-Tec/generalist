@@ -108,6 +108,59 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
       }),
     )
 
+    it.effect("rejects an empty cancel command identity as malformed before the Host is invoked", () =>
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "websocket-empty-command" })
+        const runtimeService = yield* RuntimeService.Runtime
+        const cancelInputs: Array<string> = []
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
+          Effect.provideService(
+            RuntimeService.Runtime,
+            RuntimeService.Runtime.of({
+              ...runtimeService,
+              cancel: (input) => {
+                cancelInputs.push(input.commandId)
+                return runtimeService.cancel(input)
+              },
+            }),
+          ),
+        )
+        const session = yield* host.sessions.create({ id: "session-empty-command" })
+        const run = yield* host.runs.start(session.id, agent, "wait")
+        const fake = yield* makeFakeSocket()
+        const events = yield* host.events.subscribe(session.id)
+        const fiber = yield* handle<{ readonly agent: typeof agent }>({
+          host,
+          authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+          sessionId: session.id,
+          request: request(fake.socket),
+          events,
+        }).pipe(
+          Effect.provideService(Server.CurrentPrincipal, { id: "controller", tenantId: "test", role: "controller" }),
+          Effect.forkChild,
+        )
+
+        const started = yield* Queue.take(fake.outbound)
+        if (Socket.isCloseEvent(started) || started instanceof Uint8Array)
+          return yield* Effect.die("expected RunStarted")
+        expect(yield* Server.eventCodec.decode(started)).toMatchObject({ _tag: "RunStarted", runId: run.id })
+
+        const malformed = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+          _tag: "Cancel",
+          runId: run.id,
+          commandId: "",
+          reason: "user stopped",
+        })
+        yield* Queue.offer(fake.inbound, malformed)
+        expect(yield* Queue.take(fake.outbound)).toMatchObject({ code: 1003, reason: "malformed-command" })
+        expect(cancelInputs).toEqual([])
+        expect(yield* host.runs.inspect(run.id)).toMatchObject({ status: "running" })
+
+        yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
+        yield* Fiber.join(fiber)
+      }),
+    )
+
     it.effect("streams only a storage-authorized memory preview for the current Session Run", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-preview-test" })

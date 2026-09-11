@@ -463,6 +463,52 @@ describe("hosted skill catalogs", () => {
     )
   })
 
+  it.effect("resolves nested GitHub manifest bodies beneath the manifest directory", () => {
+    const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
+    const commit = "a".repeat(40)
+    const githubManifest = `https://api.github.com/repos/acme/agent-skills/contents/skills/nested/skills.json?ref=${commit}`
+    const githubBody = `https://api.github.com/repos/acme/agent-skills/contents/skills/nested/remote/SKILL.md?ref=${commit}`
+    const httpManifestUrl = "https://skills.example/catalog/nested/skills.json"
+    const httpBodyUrl = "https://skills.example/catalog/nested/remote/SKILL.md"
+    const manifestDirectory = (raw: string): string => {
+      const pathname = new URL(raw).pathname
+      return pathname.slice(0, pathname.lastIndexOf("/") + 1)
+    }
+    return Effect.gen(function* () {
+      const github = yield* GitHubCatalog.make({
+        owner: "acme",
+        repo: "agent-skills",
+        ref: commit,
+        root: "skills",
+        manifestName: "nested/skills.json",
+      })
+      const http = yield* HttpCatalog.make({ manifestUrl: httpManifestUrl })
+
+      yield* (yield* github.get("remote"))!.instructions
+      yield* (yield* http.get("remote"))!.instructions
+
+      const recorded = requests.map((request) => request.url)
+      expect(recorded).toEqual([githubManifest, httpManifestUrl, githubBody, httpBodyUrl])
+      expect(new URL(recorded[2]!).pathname.startsWith(manifestDirectory(recorded[0]!))).toBe(true)
+      expect(new URL(recorded[3]!).pathname.startsWith(manifestDirectory(recorded[1]!))).toBe(true)
+    }).pipe(
+      provideTestLayer(
+        Layer.mergeAll(
+          cryptoLayer(),
+          httpLayer(
+            {
+              [githubManifest]: { body: manifest() },
+              [githubBody]: { body: document },
+              [httpManifestUrl]: { body: manifest() },
+              [httpBodyUrl]: { body: document },
+            },
+            requests,
+          ),
+        ),
+      ),
+    )
+  })
+
   it.effect("requires GitHub refs to be immutable commit ids", () =>
     Effect.gen(function* () {
       const failure = yield* Effect.flip(

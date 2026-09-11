@@ -157,12 +157,15 @@ export const awaitEvent: {
       return yield* AwaitEventInvalid.make({ reason: "invalid-timeout" })
     }
     const now = yield* Clock.currentTimeMillis
-    const deadline = DateTime.formatIso(DateTime.makeUnsafe(now + Duration.toMillis(duration.value)))
+    const deadline = DateTime.make(now + Duration.toMillis(duration.value))
+    if (Option.isNone(deadline)) {
+      return yield* AwaitEventInvalid.make({ reason: "invalid-timeout" })
+    }
     const token = context.operationKey ?? `${context.runId ?? context.sessionId}:${context.toolCallId ?? "await-event"}`
     return yield* Effect.die(
       AwaitEventSuspended.make({
         token,
-        awaitEvent: { filter, deadline },
+        awaitEvent: { filter, deadline: DateTime.formatIso(deadline.value) },
       }),
     )
   }),

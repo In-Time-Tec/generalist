@@ -106,7 +106,7 @@ terminal unstructured turn
 - Provider-executed calls are not run locally; declared tool failures remain schema-valid results; routing, schema, handler-boundary, placement, and authorization failures are typed `FrameworkFailure` values.
 - Provider `error` parts become typed `AiError` failed attempts before telemetry/replay accounting; released OpenAI, Anthropic, and OpenRouter registrations preserve known semantics.
 - Unknown custom payloads become bounded terminal `UnknownError`; custom `ModelResilience.resolve` may map known payloads before classification.
-- Default resilience retries rate-limit, internal, and transport failures twice, after 2 and 4 seconds, within 30 seconds.
+- Default resilience retries rate-limit, internal, and transport failures five times — six attempts total — on a 500 ms exponential schedule with ±20% jitter.
 - A supplied `ModelResilience` replaces defaults; `ModelResilience.none` disables retries; every accepted retry emits `ModelRetryScheduled` with category and delay.
 - A clean stream end without `finish` is `ModelStreamTruncated` with category `truncated-stream`; an idle deadline may produce `ModelStreamTimeout` with category `timeout`.
 - `streamIdleTimeout` is opt-in; there is no hidden deadline; withheld metadata and lifecycle start markers cannot block retry, but replayable output — non-empty text or reasoning content, open tool-call parameters, or a validated tool call — does because replay would duplicate it.

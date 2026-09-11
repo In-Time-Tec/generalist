@@ -1,9 +1,27 @@
+import { layer as bunServicesLayer } from "@effect/platform-bun/BunServices"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, FileSystem, Layer, Path, PlatformError, Stream } from "effect"
+import { Effect, FileSystem, Layer, Option, Path, PlatformError, Stream } from "effect"
 import { SkillCatalog } from "generalist"
 import { FileSystemCatalog } from "../../../src/instructions/skills/index"
 
 const encoder = new TextEncoder()
+
+const testFileInfo = (type: FileSystem.File.Type): FileSystem.File.Info => ({
+  type,
+  mtime: Option.none(),
+  atime: Option.none(),
+  birthtime: Option.none(),
+  dev: 0,
+  ino: Option.none(),
+  mode: 0,
+  nlink: Option.none(),
+  uid: Option.none(),
+  gid: Option.none(),
+  rdev: Option.none(),
+  size: FileSystem.Size(0),
+  blksize: Option.none(),
+  blocks: Option.none(),
+})
 
 interface ReadCounts {
   readonly full: Record<string, number>
@@ -23,9 +41,10 @@ const testFsLayer = (
   files: Readonly<Record<string, string>>,
   directories: Readonly<Record<string, ReadonlyArray<string>>>,
   reads: ReadCounts = { full: {}, streamed: {} },
+  nonFiles: ReadonlyArray<string> = [],
 ) =>
   FileSystem.layerNoop({
-    exists: (path) => Effect.succeed(path in files || path in directories),
+    exists: (path) => Effect.succeed(path in files || path in directories || nonFiles.includes(path)),
     readDirectory: (path) => {
       const entries = directories[path]
       return entries === undefined ? Effect.fail(notFound("readDirectory", path)) : Effect.succeed([...entries])
@@ -49,6 +68,11 @@ const testFsLayer = (
             return encoder.encode(content.slice(0, bytesToRead))
           })
     },
+    stat: (path) => {
+      if (nonFiles.includes(path)) return Effect.succeed(testFileInfo("Directory"))
+      if (path in files) return Effect.succeed(testFileInfo("File"))
+      return Effect.fail(notFound("stat", path))
+    },
   })
 
 const loaderTestLayer = (
@@ -56,9 +80,10 @@ const loaderTestLayer = (
   files: Readonly<Record<string, string>>,
   directories: Readonly<Record<string, ReadonlyArray<string>>>,
   reads?: ReadCounts,
+  nonFiles?: ReadonlyArray<string>,
 ) =>
   FileSystemCatalog.layer(options).pipe(
-    Layer.provide(Layer.mergeAll(testFsLayer(files, directories, reads), Path.layer)),
+    Layer.provide(Layer.mergeAll(testFsLayer(files, directories, reads, nonFiles), Path.layer)),
   )
 
 const provideTestLayer =
@@ -248,4 +273,51 @@ body`,
       }
     })
   })
+
+  it.effect("skips a directory named SKILL.md and keeps valid siblings", () => {
+    const reads: ReadCounts = { full: {}, streamed: {} }
+    const goodFile = "/repo/skills/good/SKILL.md"
+    const files = {
+      [goodFile]: `---
+name: good
+description: Good
+---
+body`,
+    }
+    const directories = {
+      "/repo/skills": ["good", "good/SKILL.md", "notes", "notes/SKILL.md", "notes/SKILL.md/inner.txt"],
+    }
+    const nonFiles = ["/repo/skills/notes/SKILL.md"]
+    return Effect.gen(function* () {
+      const source = yield* SkillCatalog.SkillCatalog
+      const all = yield* source.all
+
+      expect(all.map((skill) => skill.name)).toEqual(["good"])
+      expect(yield* source.get("notes")).toBeUndefined()
+      expect(reads.streamed[goodFile]).toBe(1)
+      expect(reads.full[goodFile]).toBeUndefined()
+    }).pipe(provideTestLayer(loaderTestLayer({ cwd: "/repo", roots: ["skills"] }, files, directories, reads, nonFiles)))
+  })
+
+  it.effect("skips a real directory named SKILL.md and discovers the valid sibling", () =>
+    provideTestLayer(bunServicesLayer)(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
+        const root = yield* fs.makeTempDirectoryScoped()
+        yield* fs.makeDirectory(path.join(root, ".agents/skills/good"), { recursive: true })
+        yield* fs.writeFileString(
+          path.join(root, ".agents/skills/good/SKILL.md"),
+          "---\nname: good\ndescription: Good\n---\nbody",
+        )
+        yield* fs.makeDirectory(path.join(root, ".agents/skills/notes/SKILL.md"), { recursive: true })
+        yield* fs.writeFileString(path.join(root, ".agents/skills/notes/SKILL.md/inner.txt"), "inner")
+
+        const catalog = yield* FileSystemCatalog.make({ cwd: root })
+        const all = yield* catalog.all
+
+        expect(all.map((skill) => skill.name)).toEqual(["good"])
+      }).pipe(Effect.scoped),
+    ),
+  )
 })
