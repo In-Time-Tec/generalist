@@ -60,7 +60,7 @@ const section = (
 }
 
 const refinementSection = (state: GuidanceState, limits: Required<OverviewOptions>): ReadonlyArray<string> => {
-  const shown = state.refinements.slice(-limits.maxRefinements)
+  const shown = limits.maxRefinements > 0 ? state.refinements.slice(-limits.maxRefinements) : []
   const header = `recent refinements: ${state.refinements.length}${
     shown.length < state.refinements.length ? ` (showing ${shown.length})` : ""
   }`
