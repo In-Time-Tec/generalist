@@ -56,6 +56,36 @@ describe("Overview.format", () => {
     expect(text).not.toContain("t".repeat(13))
   })
 
+  it("emits no title or content text when the matching bound is zero", () => {
+    const state = State.make({
+      scope,
+      entries: [entry({ id: "clamped", kind: "memory", title: "t".repeat(40), content: "c".repeat(40) })],
+    })
+    const segments = (options: Overview.OverviewOptions): { readonly title: string; readonly content: string } => {
+      const line =
+        Overview.format(state, options)
+          .split("\n")
+          .find((value) => value.startsWith("- clamped")) ?? ""
+      expect(line).not.toBe("")
+      const rest = line.slice(line.indexOf(": ") + 2)
+      const dash = rest.indexOf(" \u2014 ")
+      return dash === -1 ? { title: rest, content: "" } : { title: rest.slice(0, dash), content: rest.slice(dash + 3) }
+    }
+
+    expect(segments({ maxEntriesPerKind: 1, maxTitleLength: 0, maxContentLength: 0 })).toEqual({
+      title: "",
+      content: "",
+    })
+    expect(segments({ maxEntriesPerKind: 1, maxTitleLength: 0, maxContentLength: 30 })).toEqual({
+      title: "",
+      content: `${"c".repeat(29)}\u2026`,
+    })
+    expect(segments({ maxEntriesPerKind: 1, maxTitleLength: 12, maxContentLength: 0 })).toEqual({
+      title: `${"t".repeat(11)}\u2026`,
+      content: "",
+    })
+  })
+
   it("bounds total output regardless of state size", () => {
     const small = State.make({ scope, entries: many("memory", 1) })
     const options = { maxEntriesPerKind: 2, maxContentLength: 40, maxTitleLength: 20, maxRefinements: 2 }
@@ -110,6 +140,17 @@ describe("Overview.format", () => {
     expect(text).not.toContain("p003")
   })
 
+  it("uses the default refinement bound", () => {
+    const capped = Overview.format(withRefinements(6))
+    expect(capped).toContain("recent refinements: 6 (showing 5)")
+    expect(capped).toContain("p005")
+    expect(capped).not.toContain("p000")
+
+    const under = Overview.format(withRefinements(3))
+    expect(under.split("\n")).toContain("recent refinements: 3")
+    expect(under.split("\n").filter((line) => line.includes(": Create:memory/"))).toHaveLength(3)
+  })
+
   it("collapses whitespace in content and titles", () => {
     const state = State.make({
       scope,
@@ -144,8 +185,26 @@ describe("Overview.format", () => {
     expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
   })
 
+  it("emits no refinement lines at a zero bound", () => {
+    const text = Overview.format(withRefinements(3), { maxEntriesPerKind: 0, maxRefinements: 0 })
+    expect(text).toContain("recent refinements: 3 (showing 0)")
+    expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
+  })
+
+  it("emits no refinement lines at a NaN bound", () => {
+    const text = Overview.format(withRefinements(3), { maxEntriesPerKind: 0, maxRefinements: Number.NaN })
+    expect(text).toContain("recent refinements: 3 (showing 0)")
+    expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
+  })
+
   it("treats negative bounds as zero", () => {
-    const text = Overview.format(large, { maxEntriesPerKind: -5, maxRefinements: -5 })
+    const state = State.make({
+      scope,
+      entries: State.allEntries(large),
+      refinements: withRefinements(3).refinements,
+    })
+    const text = Overview.format(state, { maxEntriesPerKind: -5, maxRefinements: -5 })
+    expect(text).toContain("recent refinements: 3 (showing 0)")
     expect(text.split("\n").filter((line) => line.startsWith("- "))).toEqual([])
   })
 

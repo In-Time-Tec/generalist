@@ -62,7 +62,10 @@ export const page: {
   (input: HistoryPageInput): (path: ReadonlyArray<Entry>) => HistoryPage
   (path: ReadonlyArray<Entry>, input: HistoryPageInput): HistoryPage
 } = Function.dual(2, (path: ReadonlyArray<Entry>, input: HistoryPageInput): HistoryPage => {
-  const limit = Math.max(0, Math.trunc(input.limit))
+  // `NaN` is not a count: `slice(NaN)` reads the whole window while `slice(0, NaN)` reads none,
+  // and continuation flags derived from it describe neither. Apply the documented zero clamp.
+  // Truncation leaves positive infinity unbounded, and negative infinity already clamps below.
+  const limit = Number.isNaN(input.limit) ? 0 : Math.max(0, Math.trunc(input.limit))
   const beforeIndex = input.before === undefined ? path.length : path.findIndex((entry) => entry.id === input.before)
   const afterIndex = input.after === undefined ? -1 : path.findIndex((entry) => entry.id === input.after)
   const upper = beforeIndex === -1 ? path.length : beforeIndex

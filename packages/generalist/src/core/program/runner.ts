@@ -203,7 +203,10 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
         const actual = digest(identity)
         const expected = current.operations.get(operation)
         if (expected !== undefined)
-          return [ProgramReplayDivergence.make({ operation, expected, actual }), current] as const
+          return [
+            expected === actual ? undefined : ProgramReplayDivergence.make({ operation, expected, actual }),
+            current,
+          ] as const
         const operations = new Map(current.operations)
         operations.set(operation, actual)
         return [undefined, { ...current, operations }] as const

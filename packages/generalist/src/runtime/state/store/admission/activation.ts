@@ -32,6 +32,12 @@ export const requireConversationalSlot = ({
       )
 }
 
+/** Shared with rewind, which must enforce the same precondition inside its own transition. */
+export const requireNoInitialChildren = (run: StoredRun) =>
+  run.children.length > 0
+    ? Effect.fail(RuntimeUnavailable.make({ message: `run ${run.runId} has initial children` }))
+    : Effect.void
+
 export const activationOf = (run: StoredRun): RunActivation => {
   let intent: RunActivation["intent"] = "inactive"
   if (run.status === "cancelling") intent = "cancel"
@@ -58,9 +64,7 @@ export const activateRoot: {
       return yield* RuntimeUnavailable.make({ message: `run ${runId} is not a root` })
     }
     if (run.status !== "queued" || run.cancellationRequested) return [toInspection(state, run), state] as const
-    if (run.children.length > 0) {
-      return yield* RuntimeUnavailable.make({ message: `run ${runId} has initial children` })
-    }
+    yield* requireNoInitialChildren(run)
     const session = state.hostSessions.get(run.message.sessionId)
     const executable = run.executableManifest.entries.find((entry) => entry.pin === run.executableRef.active)
     yield* requireConversationalSlot({ state, run })

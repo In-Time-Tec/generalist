@@ -82,6 +82,14 @@ describe("Server event wire contract", () => {
         }),
       ).pipe(Effect.flip)
       expect(missingIdentity._tag).toBe("SchemaError")
+      const emptyIdentity = yield* Schema.decodeEffect(Schema.fromJsonString(Server.ClientCommand))(
+        yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+          _tag: "Cancel",
+          runId: "run-1",
+          commandId: "",
+        }),
+      ).pipe(Effect.flip)
+      expect(emptyIdentity._tag).toBe("SchemaError")
       const command = Server.ClientCommand.make({
         _tag: "Cancel",
         runId: "run-1",
