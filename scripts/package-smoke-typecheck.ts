@@ -6,12 +6,14 @@ import { Agent, DurableDriver, Handoff, Memory, ModelMiddleware, ModelRegistry, 
 import { LanguageModel } from "effect/unstable/ai"
 import { A2A } from "generalist/unstable/a2a"
 import { AGUI } from "generalist/unstable/ag-ui"
-import { VectorStore } from "generalist/memory"
+import * as MemoryFeature from "generalist/memory"
+import { VectorStore, WorkingMemory as MemoryWorkingMemory } from "generalist/memory"
 import { MCPClient, OAuth } from "generalist/unstable/mcp"
 import { make as makeMcpHttpTransport } from "generalist/unstable/mcp/client/http"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "generalist/unstable/mcp/tools"
 import { load } from "generalist/instructions"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "generalist/instructions/skills"
+import { GitHubCatalog, HttpCatalog, S3Catalog, type Limits } from "generalist/instructions/skills"
+import { consolidate, type ConsolidationProposer } from "generalist/unstable/learning"
 import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
@@ -45,6 +47,68 @@ type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRo
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
+type HostedLimits = Assert<
+  Equal<keyof Limits, "manifestMaxBytes" | "bodyMaxBytes" | "maxSkills" | "toolsBySkill">
+>
+const packageLimits: Limits = {
+  manifestMaxBytes: 1_048_576,
+  bodyMaxBytes: 1_048_576,
+  maxSkills: 1_000,
+  toolsBySkill: {},
+}
+const packageGitHubOptions: GitHubCatalog.Options = {
+  ...packageLimits,
+  owner: "acme",
+  repo: "agent-skills",
+  ref: "a".repeat(40),
+}
+const packageHttpOptions: HttpCatalog.Options = { ...packageLimits, manifestUrl: "https://skills.example/skills.json" }
+const packageS3Options: S3Catalog.Options = { ...packageLimits, bucket: "company-skills", region: "us-west-2" }
+const packageProposer: ConsolidationProposer = consolidate({
+  schedule: "FREQ=DAILY",
+  window: "1 day",
+  model: "summary-model",
+  maxProposals: 1,
+})
+declare const packageSummaryModel: Layer.Layer<LanguageModel.LanguageModel>
+const packageAmbientWorking = MemoryWorkingMemory.layer({ summarize: {} })
+const packageExplicitWorking = MemoryWorkingMemory.layer({ summarize: { model: packageSummaryModel } })
+const packageAmbientMemory = MemoryFeature.layer({ working: { summarize: {} } })
+const packageExplicitMemory = MemoryFeature.layer({ working: { summarize: { model: packageSummaryModel } } })
+type PackageAmbientWorking = Assert<
+  Equal<LayerShape<typeof packageAmbientWorking>, readonly [Memory.Memory, never, LanguageModel.LanguageModel]>
+>
+type PackageExplicitWorking = Assert<
+  Equal<LayerShape<typeof packageExplicitWorking>, readonly [Memory.Memory, never, never]>
+>
+type PackageAmbientMemory = Assert<
+  Equal<
+    LayerShape<typeof packageAmbientMemory>,
+    readonly [
+      Memory.Memory,
+      never,
+      VectorStore.VectorStore | import("effect/unstable/ai").EmbeddingModel.EmbeddingModel | LanguageModel.LanguageModel,
+    ]
+  >
+>
+type PackageExplicitMemory = Assert<
+  Equal<
+    LayerShape<typeof packageExplicitMemory>,
+    readonly [
+      Memory.Memory,
+      never,
+      VectorStore.VectorStore | import("effect/unstable/ai").EmbeddingModel.EmbeddingModel,
+    ]
+  >
+>
+void packageGitHubOptions
+void packageHttpOptions
+void packageS3Options
+void packageProposer
+void packageAmbientWorking
+void packageExplicitWorking
+void packageAmbientMemory
+void packageExplicitMemory
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
 const independentTool = Tool.make("package-checks", {
@@ -256,4 +320,23 @@ const connectOptions: MCPConnectOptions = {
 const routed: Effect.Effect<MCPTools, MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =
   mcpConnect(connectOptions)
 void routed
+`
+
+export const packageSmokeTypecheckFailures = (): string => `import { Effect } from "effect"
+import { defaults } from "generalist/instructions/skills"
+import type { WorkingRequirement } from "generalist/memory"
+import type { ConsolidationProposer } from "generalist/unstable/learning"
+
+type MissingWorkingRequirement = WorkingRequirement<never>
+type MissingSummaryRequirement = import("generalist/memory").WorkingMemory.SummaryRequirement<
+  import("generalist/memory").WorkingMemory.Options
+>
+const arbitraryProposer: ConsolidationProposer = () => Effect.succeed([])
+void defaults
+void arbitraryProposer
+declare function usePrivateTypes(
+  working: MissingWorkingRequirement,
+  summary: MissingSummaryRequirement,
+): void
+void usePrivateTypes
 `

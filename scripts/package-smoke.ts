@@ -2,7 +2,7 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CryptoHasher, version as bunVersion } from "bun"
-import { packageSmokeTypecheck } from "./package-smoke-typecheck.js"
+import { packageSmokeTypecheck, packageSmokeTypecheckFailures } from "./package-smoke-typecheck.js"
 import { componentConsumer } from "./package-smoke-components.js"
 import { backgroundToolConsumer } from "./package-smoke-background-tools.js"
 import { auditInstalledDependencyGraph } from "./package-smoke-dependency-graph.js"
@@ -108,6 +108,29 @@ const run = Effect.fn("PackageSmoke.run")(function* (
     return yield* smokeError(`${command} ${args.join(" ")} failed\n${stdout}\n${stderr}`)
   }
   return stdout
+})
+
+const expectTypecheckFailure = Effect.fn("PackageSmoke.expectTypecheckFailure")(function* (
+  cwd: string,
+  filename: string,
+  expected: ReadonlyArray<string>,
+) {
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+  const handle = yield* spawner.spawn(ChildProcess.make("bun", ["tsc", "--noEmit", "--project", filename], { cwd }))
+  const [stdout, stderr, exitCode] = yield* Effect.all(
+    [
+      Stream.mkString(Stream.decodeText(handle.stdout)),
+      Stream.mkString(Stream.decodeText(handle.stderr)),
+      handle.exitCode,
+    ],
+    { concurrency: 3 },
+  )
+  const diagnostics = `${stdout}\n${stderr}`
+  if (exitCode === 0) return yield* smokeError(`${filename} unexpectedly typechecked`)
+  const missing = expected.filter((diagnostic) => !diagnostics.includes(diagnostic))
+  if (missing.length > 0) {
+    return yield* smokeError(`${filename} omitted expected diagnostics:\n${missing.join("\n")}\n${diagnostics}`)
+  }
 })
 
 const installedPackages = Effect.fn("PackageSmoke.installedPackages")(function* (
@@ -917,6 +940,24 @@ const program = Effect.gen(function* () {
     }),
   )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "typecheck.ts"), packageSmokeTypecheck(packageExports))
+  yield* fileSystem.writeFileString(
+    path.join(consumerDirectory, "typecheck-failures.ts"),
+    packageSmokeTypecheckFailures(),
+  )
+  yield* fileSystem.writeFileString(
+    path.join(consumerDirectory, "tsconfig-failures.json"),
+    encodeJson({
+      compilerOptions: {
+        strict: true,
+        skipLibCheck: true,
+        noEmit: true,
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        target: "ES2024",
+      },
+      include: ["typecheck-failures.ts"],
+    }),
+  )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "components.mjs"), componentConsumer)
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "background-tools.mjs"), backgroundToolConsumer)
   yield* fileSystem.writeFileString(
@@ -1074,6 +1115,12 @@ console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
   }
   yield* verifyInstalledDependencyGraph(consumerDirectory, minimumConsumerProfiles)
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
+  yield* expectTypecheckFailure(consumerDirectory, "tsconfig-failures.json", [
+    "has no exported member 'defaults'",
+    "WorkingRequirement",
+    "SummaryRequirement",
+    "Property '[ConsolidationProposerTypeId]' is missing",
+  ])
   yield* run(
     "bun",
     [
@@ -1102,6 +1149,8 @@ console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
     "package.json",
     "tsconfig.json",
     "typecheck.ts",
+    "tsconfig-failures.json",
+    "typecheck-failures.ts",
     "runtime.mjs",
     "components.mjs",
     "background-tools.mjs",
@@ -1122,6 +1171,12 @@ console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
   }
   yield* verifyInstalledDependencyGraph(npmConsumerDirectory, minimumConsumerProfiles)
   yield* run("npx", ["tsc", "--noEmit"], npmConsumerDirectory)
+  yield* expectTypecheckFailure(npmConsumerDirectory, "tsconfig-failures.json", [
+    "has no exported member 'defaults'",
+    "WorkingRequirement",
+    "SummaryRequirement",
+    "Property '[ConsolidationProposerTypeId]' is missing",
+  ])
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
     (yield* fileSystem.readFileString(path.join(npmConsumerDirectory, "package-lock.json"))).includes(

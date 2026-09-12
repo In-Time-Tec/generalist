@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Crypto, Effect, Encoding, Layer, Schema } from "effect"
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { Tool } from "effect/unstable/ai"
 import { SkillCatalog } from "generalist"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "../../../src/instructions/skills/index"
+import { GitHubCatalog, HttpCatalog, S3Catalog, type Limits } from "../../../src/instructions/skills/index"
 
 const hostedCatalogIsInternal: "HostedCatalog" extends keyof typeof import("../../../src/instructions/skills/index")
   ? false
@@ -10,6 +11,23 @@ const hostedCatalogIsInternal: "HostedCatalog" extends keyof typeof import("../.
 const httpSourceIsInternal: "source" extends keyof HttpCatalog.Options ? false : true = true
 const s3SourceIsInternal: "source" extends keyof S3Catalog.Options ? false : true = true
 const githubSourceIsInternal: "source" extends keyof GitHubCatalog.Options ? false : true = true
+const limits: Limits = {
+  manifestMaxBytes: 1_048_576,
+  bodyMaxBytes: 1_048_576,
+  maxSkills: 1_000,
+  toolsBySkill: {},
+}
+const githubLimits: GitHubCatalog.Options = {
+  ...limits,
+  owner: "acme",
+  repo: "agent-skills",
+  ref: "a".repeat(40),
+}
+const httpLimits: HttpCatalog.Options = { ...limits, manifestUrl: "https://skills.example/skills.json" }
+const s3Limits: S3Catalog.Options = { ...limits, bucket: "company-skills", region: "us-west-2" }
+void githubLimits
+void httpLimits
+void s3Limits
 const digestBytes = new Uint8Array(32).fill(1)
 const digest = Encoding.encodeHex(digestBytes)
 const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
@@ -88,6 +106,12 @@ const manifest = (skillPath: string = "remote/SKILL.md", sha256: string = digest
       },
     ],
   })
+
+const padToBytes = (value: string, size: number): string => {
+  const padding = size - new TextEncoder().encode(value).byteLength
+  if (padding < 0) throw new RangeError("value exceeds target size")
+  return `${value}${" ".repeat(padding)}`
+}
 
 describe("hosted skill catalogs", () => {
   it("keeps hosted construction and diagnostic identifiers out of the public boundary", () => {
@@ -381,6 +405,82 @@ describe("hosted skill catalogs", () => {
     )
   })
 
+  it.effect("retains exact and over-boundary hosted defaults", () => {
+    const exactManifestUrl = "https://skills.example/exact-manifest.json"
+    const manifestLimitUrl = "https://skills.example/default-manifest-limit.json"
+    const exactBodyManifestUrl = "https://skills.example/exact-body/skills.json"
+    const exactBodyUrl = "https://skills.example/exact-body/remote/SKILL.md"
+    const bodyManifestUrl = "https://skills.example/default-body-limit.json"
+    const bodyUrl = "https://skills.example/remote/SKILL.md"
+    const exactSkillLimitUrl = "https://skills.example/exact-skill-limit.json"
+    const skillLimitUrl = "https://skills.example/default-skill-limit.json"
+    const exactManifest = padToBytes(manifest(), 1_048_576)
+    const exactBody = padToBytes(document, 1_048_576)
+    const oversized = "x".repeat(1_048_577)
+    const exactSkills = stringify({
+      version: 1,
+      skills: Array.from({ length: 1_000 }, (_, index) => ({
+        name: `skill-${index}`,
+        description: "Bounded skill",
+        skillPath: `skill-${index}/SKILL.md`,
+        sha256: digest,
+      })),
+    })
+    const tooManySkills = stringify({
+      version: 1,
+      skills: Array.from({ length: 1_001 }, (_, index) => ({
+        name: `skill-${index}`,
+        description: "Bounded skill",
+        skillPath: `skill-${index}/SKILL.md`,
+        sha256: digest,
+      })),
+    })
+    const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
+    return Effect.gen(function* () {
+      const exactManifestSource = yield* HttpCatalog.make({ manifestUrl: exactManifestUrl })
+      expect(yield* exactManifestSource.all).toHaveLength(1)
+
+      const manifestFailure = yield* Effect.flip(HttpCatalog.make({ manifestUrl: manifestLimitUrl }))
+
+      const exactBodySource = yield* HttpCatalog.make({ manifestUrl: exactBodyManifestUrl })
+      const exactBodySkill = yield* exactBodySource.get("remote")
+      if (exactBodySkill === undefined) return yield* Effect.die("missing exact-boundary skill")
+      expect(yield* exactBodySkill.instructions).toContain("# Remote body")
+
+      const bodySource = yield* HttpCatalog.make({ manifestUrl: bodyManifestUrl })
+      const bodySkill = yield* bodySource.get("remote")
+      if (bodySkill === undefined) return yield* Effect.die("missing default-limit skill")
+      const bodyFailure = yield* Effect.flip(bodySkill.instructions)
+
+      const exactSkillSource = yield* HttpCatalog.make({ manifestUrl: exactSkillLimitUrl })
+      expect(yield* exactSkillSource.all).toHaveLength(1_000)
+      const skillFailure = yield* Effect.flip(HttpCatalog.make({ manifestUrl: skillLimitUrl }))
+
+      expect(manifestFailure.message).toContain("exceeds 1048576 bytes")
+      expect(bodyFailure.message).toContain("exceeds 1048576 bytes")
+      expect(skillFailure.message).toContain("exceeds 1000 skills")
+    }).pipe(
+      provideTestLayer(
+        Layer.mergeAll(
+          cryptoLayer(),
+          httpLayer(
+            {
+              [exactManifestUrl]: { body: exactManifest },
+              [manifestLimitUrl]: { body: oversized },
+              [exactBodyManifestUrl]: { body: manifest("remote/SKILL.md") },
+              [exactBodyUrl]: { body: exactBody },
+              [bodyManifestUrl]: { body: manifest() },
+              [bodyUrl]: { body: oversized },
+              [exactSkillLimitUrl]: { body: exactSkills },
+              [skillLimitUrl]: { body: tooManySkills },
+            },
+            requests,
+          ),
+        ),
+      ),
+    )
+  })
+
   it.effect("rejects hosted descriptions outside the shared frontmatter bound", () => {
     const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
     const manifestUrl = "https://skills.example/invalid-description.json"
@@ -595,6 +695,29 @@ describe("hosted skill catalogs", () => {
         Layer.mergeAll(
           recordingCrypto,
           httpLayer({ [manifestUrl]: { body: manifestBody }, [bodyUrl]: { body: raw } }, requests),
+        ),
+      ),
+    )
+  })
+
+  it.effect("retains configured tools for matching hosted skills", () => {
+    const requests: Array<{ readonly url: string; readonly accept: string | undefined }> = []
+    const manifestUrl = "https://skills.example/catalog/tools.json"
+    const bodyUrl = "https://skills.example/catalog/remote/SKILL.md"
+    const trustedTool = Tool.make("trusted", { parameters: Schema.Struct({}), success: Schema.Void })
+    return Effect.gen(function* () {
+      const source = yield* HttpCatalog.make({ manifestUrl, toolsBySkill: { remote: [trustedTool] } })
+      const skill = yield* source.get("remote")
+      if (skill === undefined) return yield* Effect.die("missing configured-tools skill")
+      yield* skill.instructions
+
+      expect(skill.tools).toHaveLength(1)
+      expect(skill.tools[0]).toBe(trustedTool)
+    }).pipe(
+      provideTestLayer(
+        Layer.mergeAll(
+          cryptoLayer(),
+          httpLayer({ [manifestUrl]: { body: manifest() }, [bodyUrl]: { body: document } }, requests),
         ),
       ),
     )

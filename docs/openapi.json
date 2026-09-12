@@ -10743,6 +10743,8 @@
                                       {
                                         "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationMissingEncoded"
                                       },
+                                      { "$ref": "#/components/schemas/generalist_runtime_RevisionUnavailableEncoded" },
+                                      { "$ref": "#/components/schemas/generalist_runtime_RevisionMismatchEncoded" },
                                       {
                                         "anyOf": [
                                           {
@@ -13756,6 +13758,8 @@
                                       {
                                         "$ref": "#/components/schemas/generalist_runtime_ExecutableRegistrationMissingEncoded"
                                       },
+                                      { "$ref": "#/components/schemas/generalist_runtime_RevisionUnavailableEncoded" },
+                                      { "$ref": "#/components/schemas/generalist_runtime_RevisionMismatchEncoded" },
                                       {
                                         "anyOf": [
                                           {
@@ -17289,6 +17293,38 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "pin", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RevisionUnavailableEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RevisionUnavailable"] },
+          "revision": { "type": "string" },
+          "agentName": { "type": "string" },
+          "executablePin": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "revision", "agentName", "executablePin", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_RevisionMismatchEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/RevisionMismatch"] },
+          "expectedRevision": { "type": "string" },
+          "loadedRevision": { "type": "string" },
+          "expectedExecutablePin": { "type": "string" },
+          "derivedExecutablePin": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": [
+          "_tag",
+          "expectedRevision",
+          "loadedRevision",
+          "expectedExecutablePin",
+          "derivedExecutablePin",
+          "hint"
+        ],
         "additionalProperties": false
       },
       "generalist_core_SandboxUnavailableEncoded": {
