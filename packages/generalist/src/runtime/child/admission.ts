@@ -139,12 +139,67 @@ export interface ChildOrigin {
 }
 
 /**
+ * The one escape shape `encodeField` emits for a UTF-16 code unit percent-encoding cannot carry.
+ *
+ * `encodeURIComponent` raises on an unpaired surrogate, and its output never contains `%u` because a
+ * percent escape is always two hex digits. A lone surrogate therefore survives as an uppercase
+ * `%uXXXX`, and literal `%u` text survives percent-encoded, which keeps the encoder total and the
+ * pair an inverse for every string. The decoder accepts exactly this shape and no other `%u`
+ * escape, so a value it reads back is always one the encoder produced.
+ */
+const codeUnitEscape = /%u([0-9A-F]{4})/
+
+/** Canonical non-negative integer text the encoder emits for an ordinal. */
+const ordinalPattern = /^(0|[1-9][0-9]*)$/
+
+/** Percent-encode one invocation-id field, escaping code units percent-encoding cannot carry. */
+const encodeField = (value: string): string => {
+  let encoded = ""
+  let wellFormed = ""
+  for (const character of value) {
+    const code = character.codePointAt(0)!
+    if (code >= 0xd800 && code <= 0xdfff) {
+      encoded += encodeURIComponent(wellFormed)
+      wellFormed = ""
+      encoded += `%u${code.toString(16).toUpperCase().padStart(4, "0")}`
+      continue
+    }
+    wellFormed += character
+  }
+  return encoded + encodeURIComponent(wellFormed)
+}
+
+/** Decode one invocation-id field, or `undefined` when it is not a well-formed encoding. */
+const decodeField = (value: string): string | undefined => {
+  const segments = value.split(codeUnitEscape)
+  let decoded = ""
+  for (const [index, segment] of segments.entries()) {
+    if (index % 2 === 1) {
+      const codeUnit = Number.parseInt(segment, 16)
+      if (codeUnit < 0xd800 || codeUnit > 0xdfff) return undefined
+      decoded += String.fromCharCode(codeUnit)
+      continue
+    }
+    try {
+      decoded += decodeURIComponent(segment)
+    } catch {
+      return undefined
+    }
+  }
+  return decoded
+}
+
+/**
  * The invocation identity one admission key names beneath its parent.
  *
  * Origin travels inside the invocation id because `invocationId` is the one admission field that
  * Generalist already carries into `ChildLinked` and every canonical child-tree event. Encoding it here
  * means correlation survives replay, restart, and reload with no event-schema change and no
  * reconstruction from cell source.
+ *
+ * Every string encodes, including an empty operation key and unpaired surrogates. For a
+ * non-negative safe-integer ordinal, the one the host's durable child sequence assigns,
+ * `admissionOf` reads back exactly the identity this function was given.
  */
 export const invocationIdFor = (input: {
   readonly toolCallId: string
@@ -152,10 +207,10 @@ export const invocationIdFor = (input: {
   readonly origin?: ChildOrigin
 }): string =>
   input.origin === undefined
-    ? `child-admit:${encodeURIComponent(input.toolCallId)}:${encodeURIComponent(input.key)}`
-    : `child-admit:${encodeURIComponent(input.toolCallId)}:${encodeURIComponent(input.origin.operationKey)}#${
+    ? `child-admit:${encodeField(input.toolCallId)}:${encodeField(input.key)}`
+    : `child-admit:${encodeField(input.toolCallId)}:${encodeField(input.origin.operationKey)}#${
         input.origin.ordinal
-      }:${encodeURIComponent(input.key)}`
+      }:${encodeField(input.key)}`
 
 /** The complete admission identity one invocation id carries. */
 export interface ChildAdmissionIdentity {
@@ -164,24 +219,33 @@ export interface ChildAdmissionIdentity {
   readonly origin?: ChildOrigin
 }
 
-/** Read the admission identity an invocation id encodes, if it is one. */
+/**
+ * Read the admission identity an invocation id encodes, if it is one.
+ *
+ * Foreign values are data, not exceptions: anything that is not an encoded admission identity,
+ * including malformed percent escapes, returns `undefined` rather than raising.
+ */
 export const admissionOf = (invocationId: string): ChildAdmissionIdentity | undefined => {
   const parts = invocationId.split(":")
   if (parts[0] !== "child-admit") return undefined
   if (parts.length === 3) {
-    return { toolCallId: decodeURIComponent(parts[1]!), key: decodeURIComponent(parts[2]!) }
+    const toolCallId = decodeField(parts[1]!)
+    const key = decodeField(parts[2]!)
+    return toolCallId === undefined || key === undefined ? undefined : { toolCallId, key }
   }
   if (parts.length !== 4) return undefined
   const marker = parts[2]!
   const separator = marker.lastIndexOf("#")
-  if (separator <= 0) return undefined
-  const ordinal = Number(marker.slice(separator + 1))
-  if (!Number.isSafeInteger(ordinal) || ordinal < 0) return undefined
-  return {
-    toolCallId: decodeURIComponent(parts[1]!),
-    key: decodeURIComponent(parts[3]!),
-    origin: { operationKey: decodeURIComponent(marker.slice(0, separator)), ordinal },
-  }
+  if (separator < 0) return undefined
+  const ordinalText = marker.slice(separator + 1)
+  if (!ordinalPattern.test(ordinalText)) return undefined
+  const ordinal = Number(ordinalText)
+  if (!Number.isSafeInteger(ordinal)) return undefined
+  const toolCallId = decodeField(parts[1]!)
+  const key = decodeField(parts[3]!)
+  const operationKey = decodeField(marker.slice(0, separator))
+  if (toolCallId === undefined || key === undefined || operationKey === undefined) return undefined
+  return { toolCallId, key, origin: { operationKey, ordinal } }
 }
 
 /** Read the origin an invocation id carries, if it carries one. */

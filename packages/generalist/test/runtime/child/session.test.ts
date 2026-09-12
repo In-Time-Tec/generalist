@@ -114,6 +114,88 @@ describe("child origin encoding", () => {
     expect(ChildAdmission.originOf(left)?.operationKey).toBe("a:b")
     expect(ChildAdmission.originOf(right)?.operationKey).toBe("a")
   })
+
+  standalone("round-trips an empty operation key instead of dropping the origin", () => {
+    const identity = {
+      toolCallId: "call-1",
+      key: "reviewer",
+      origin: { operationKey: "", ordinal: 0 },
+    }
+    const invocationId = ChildAdmission.invocationIdFor(identity)
+    expect(ChildAdmission.admissionOf(invocationId)).toEqual(identity)
+    expect(ChildAdmission.originOf(invocationId)).toEqual({ operationKey: "", ordinal: 0 })
+  })
+
+  standalone("round-trips unpaired surrogates that percent-encoding cannot represent", () => {
+    const identity = {
+      toolCallId: "\uD800",
+      key: "k\uDC00",
+      origin: { operationKey: "\uD800\uDC00\uD800", ordinal: 7 },
+    }
+    expect(ChildAdmission.admissionOf(ChildAdmission.invocationIdFor(identity))).toEqual(identity)
+  })
+
+  standalone("round-trips literal escape-shaped text without confusing it for a surrogate", () => {
+    const identity = {
+      toolCallId: "%uD800",
+      key: "%25uDC00",
+      origin: { operationKey: "%uD800", ordinal: 1 },
+    }
+    expect(ChildAdmission.admissionOf(ChildAdmission.invocationIdFor(identity))).toEqual(identity)
+  })
+
+  standalone("returns undefined for malformed percent escapes instead of raising", () => {
+    for (const value of [
+      "child-admit:%:key",
+      "child-admit:a%:b",
+      "child-admit:a%ZZ:b",
+      "child-admit:%:b#0:c",
+      "child-admit:a:#0:%E0%A4",
+      "child-admit:a:#0:b%",
+      "child-admit:%uD8:b",
+      "child-admit:%u0041:b",
+      "child-admit:%ud800:b",
+    ]) {
+      expect(ChildAdmission.admissionOf(value)).toBeUndefined()
+      expect(ChildAdmission.originOf(value)).toBeUndefined()
+    }
+  })
+
+  standalone("returns undefined for ordinal markers the encoder never writes", () => {
+    for (const value of [
+      "child-admit:a:#:b",
+      "child-admit:a:#-1:b",
+      "child-admit:a:# 0:b",
+      "child-admit:a:#0x10:b",
+      "child-admit:a:#1e0:b",
+      "child-admit:a:#9007199254740992:b",
+    ]) {
+      expect(ChildAdmission.admissionOf(value)).toBeUndefined()
+      expect(ChildAdmission.originOf(value)).toBeUndefined()
+    }
+    expect(
+      ChildAdmission.originOf(
+        ChildAdmission.invocationIdFor({
+          toolCallId: "a",
+          key: "b",
+          origin: { operationKey: "op", ordinal: Number.MAX_SAFE_INTEGER },
+        }),
+      ),
+    ).toEqual({ operationKey: "op", ordinal: Number.MAX_SAFE_INTEGER })
+  })
+
+  standalone("keeps the published controls decoding", () => {
+    expect(ChildAdmission.admissionOf("child-admit:call-1:key-1")).toEqual({
+      toolCallId: "call-1",
+      key: "key-1",
+    })
+    expect(ChildAdmission.admissionOf("child-admit:call%3A1:model%3A1#0:key%231")).toEqual({
+      toolCallId: "call:1",
+      key: "key#1",
+      origin: { operationKey: "model:1", ordinal: 0 },
+    })
+    expect(ChildAdmission.admissionOf("not-an-id")).toBeUndefined()
+  })
 })
 
 layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
@@ -427,6 +509,26 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
       const direct = yield* operations.listDirect(parentRunId)
       expect(direct.find((entry) => entry.childRunId === receipt.childRunId)?.origin).toBeUndefined()
+    }),
+  )
+
+  it.effect("keeps an empty operation key's origin and ordinal across a restarted host", () =>
+    Effect.gen(function* () {
+      const store = yield* RunStore.RunStore
+      const { operations, parentRunId } = yield* parentRun("empty-operation-key")
+      const cell = { runId: parentRunId, toolCallId: "call-1", operationKey: "" }
+
+      yield* ChildAdmission.makeAgentChildren(store).admit(spawn("first")).pipe(withCell(cell))
+      // A restarted Server rebuilds the sequence from durable children, so the empty operation key
+      // must decode back to the origin it was admitted under.
+      const restarted = ChildAdmission.makeAgentChildren(store)
+      const second = yield* restarted.admit(spawn("second")).pipe(withCell(cell))
+      const again = yield* restarted.admit(spawn("first")).pipe(withCell(cell))
+
+      const direct = yield* operations.listDirect(parentRunId)
+      const originOf = (childRunId: string) => direct.find((entry) => entry.childRunId === childRunId)?.origin
+      expect(originOf(second.childRunId)).toEqual({ operationKey: "", ordinal: 1 })
+      expect(originOf(again.childRunId)).toEqual({ operationKey: "", ordinal: 0 })
     }),
   )
 
