@@ -2,10 +2,12 @@ import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/obje
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent, Permissions } from "../../src/index.js"
+import { Agent, Approvals, Permissions } from "../../src/index.js"
+import { outputMatches, score } from "../../src/eval/index.js"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
 import type { RunSnapshot } from "../../src/runtime/run.js"
 import type { RunEvent } from "../../src/runtime/run/event.js"
+import { TestModel } from "../../src/testing/index.js"
 import {
   JsonlRecord,
   encode,
@@ -242,6 +244,39 @@ it.effect("exports one documented JSONL record as bytes", () =>
     const line = new TextDecoder().decode(bytes[0])
     const record = yield* Schema.decodeEffect(Schema.fromJsonString(JsonlRecord))(line.trim())
     expect(record.schemaVersion).toBe("1")
+  }),
+)
+
+it.live("projects a decoded null terminal output as null through JSONL and eval", () =>
+  Effect.gen(function* () {
+    const fixture = yield* TestModel.make([
+      TestModel.turn([TestModel.text("text-a")]),
+      TestModel.object({ output: null }),
+    ])
+    const agent = Agent.make({ name: "trajectory-null-output", output: Schema.Null })
+    const runtimeLayer = objectRuntimeLayer({ addresses: [], schedulerMode: "poll" }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    )
+    const projected = yield* provideScoped(
+      Layer.mergeAll(runtimeLayer, fixture.layer, Permissions.layerAllowAll, Approvals.layerAutoApprove),
+      Effect.gen(function* () {
+        const durable = yield* Runtime.Runtime
+        yield* durable.register(agent)
+        const handle = yield* durable.start(agent, "start", {
+          sessionId: "session:trajectory-null-output",
+          idempotencyKey: "trajectory-null-output",
+        })
+        const awaited = yield* handle.await
+        const trajectory = yield* fromJournal(durable, handle.runId)
+        const [match] = yield* score(trajectory, [outputMatches(Schema.Null)])
+        const bytes = yield* Stream.runCollect(exportTrajectory(trajectory, { format: "jsonl" }))
+        const line = new TextDecoder().decode(bytes[0]).trim()
+        const record = yield* Schema.decodeEffect(Schema.fromJsonString(JsonlRecord))(line)
+        return { awaited, output: trajectory.output, matched: match?.passed, jsonl: record.trajectory.output }
+      }),
+    )
+
+    expect(projected).toEqual({ awaited: null, output: null, matched: true, jsonl: null })
   }),
 )
 

@@ -109,6 +109,10 @@ const toolCallsFor = (events: ReadonlyArray<RunEvent>, turn: number): ReadonlyAr
   return [...calls.values()]
 }
 
+/** Encoded terminal Agent output; `text` only fills a journal that recorded no output value. */
+const terminalOutput = (result: { readonly output: unknown; readonly text: string }): Trajectory["output"] =>
+  result.output === undefined ? result.text : result.output
+
 const activeAgent = (snapshot: RunSnapshot) => {
   const active = snapshot.run.executableRef.active
   return snapshot.run.executableManifest.entries.find((entry) => entry._tag === "Agent" && entry.pin === active)
@@ -161,10 +165,7 @@ export const fromJournal = Effect.fn("Trajectory.fromJournal")(function* (
   const first = modelEvents[0]!
   const input = buildContext(yield* pathTo(runtime, first.sessionId, first.sessionParentId))
   const terminal = snapshot.outcome
-  const output =
-    terminal?._tag === "Succeeded" && !("_tag" in terminal.result)
-      ? (terminal.result.output ?? terminal.result.text)
-      : null
+  const output = terminal?._tag === "Succeeded" && !("_tag" in terminal.result) ? terminalOutput(terminal.result) : null
   const lastFinish = events.findLast((event) => event._tag === "TurnCompleted")
   const stopReason = terminal?._tag === "Succeeded" ? (lastFinish?.finishReason ?? "succeeded") : snapshot.run.status
   const trajectory: Types.Mutable<Trajectory> = {
