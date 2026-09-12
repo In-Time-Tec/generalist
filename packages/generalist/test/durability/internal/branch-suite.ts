@@ -616,5 +616,64 @@ export const register = ({
         })
       }).pipe(Effect.scoped, Effect.provide(BunCrypto.layer)),
     )
+    it.effect("non-integer fork and rewind sequences fail with ForkSequenceInvalid before admission", () =>
+      Effect.gen(function* () {
+        const bucket = yield* makeSimulator()
+        const store = yield* openActive(bucket, "sequences")
+        const run = yield* store.admitSend(admission("sequence-boundary"))
+        const lastSequence = (yield* store.inspect(run.runId)).lastSequence
+        const requested: ReadonlyArray<readonly [string, number]> = [
+          ["fractional", 1.5],
+          ["nan", Number.NaN],
+          ["infinity", Number.POSITIVE_INFINITY],
+        ]
+        for (const [label, sequence] of requested) {
+          expect(
+            yield* store
+              .fork({
+                runId: run.runId,
+                atSequence: sequence,
+                commandId: `invalid-fork:${label}`,
+                newRunId: `invalid-fork:${label}`,
+              })
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ForkSequenceInvalid", runId: run.runId, sequence, lastSequence })
+          expect(
+            yield* store
+              .rewind({
+                runId: run.runId,
+                toSequence: sequence,
+                commandId: `invalid-rewind:${label}`,
+                branchRunId: `invalid-rewind:${label}`,
+              })
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ForkSequenceInvalid", runId: run.runId, sequence, lastSequence })
+        }
+        // Integer values outside the committed journal keep failing in the same typed boundary.
+        for (const sequence of [-1, lastSequence + 1]) {
+          expect(
+            yield* store
+              .fork({
+                runId: run.runId,
+                atSequence: sequence,
+                commandId: `range-fork:${sequence}`,
+                newRunId: `range-fork:${sequence}`,
+                budget: { toolCalls: 1, children: 0 },
+              })
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ForkSequenceInvalid", runId: run.runId, sequence, lastSequence })
+          expect(
+            yield* store
+              .rewind({
+                runId: run.runId,
+                toSequence: sequence,
+                commandId: `range-rewind:${sequence}`,
+                branchRunId: `range-rewind:${sequence}`,
+              })
+              .pipe(Effect.flip),
+          ).toMatchObject({ _tag: "generalist/runtime/ForkSequenceInvalid", runId: run.runId, sequence, lastSequence })
+        }
+      }).pipe(Effect.scoped, Effect.provide(BunCrypto.layer)),
+    )
   })
 }
