@@ -98,4 +98,19 @@ export type {
 export type { SteeringReceipt } from "../run/steering.js"
 export { ScheduleInvalid, ScheduleReceipt } from "../execution/trigger/schedule.js"
 export { WakeDisposition, WakeEventInvalid } from "../execution/trigger/wake.js"
-export { layer } from "../state/layer.js"
+export { RevisionMismatch, RevisionUnavailable, RuntimeOptionsInvalid } from "../errors.js"
+export {
+  layer,
+  type AcquisitionError,
+  type AgentRegistry,
+  type AgentServices,
+  type LayerFactory,
+  type Namespace,
+  type Options,
+  type Requirements,
+  type RevisionDefinition,
+  type RevisionLoader,
+  type RevisionLoadResult,
+  type RevisionRequest,
+  type VersionedOptions,
+} from "../composition.js"

@@ -20,6 +20,8 @@ import {
   ExecutablePinMissing,
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
+  RevisionMismatch,
+  RevisionUnavailable,
 } from "./errors.js"
 import {
   ExecutionResult as ExecutionResultSchema,
@@ -144,6 +146,8 @@ export type RunFailure =
   | ExecutableIdentityMismatch
   | ExecutableRegistrationInvalid
   | ExecutableRegistrationMissing
+  | RevisionUnavailable
+  | RevisionMismatch
   | ExecutionFailure
 
 export const RunFailure = Schema.Union([
@@ -153,6 +157,8 @@ export const RunFailure = Schema.Union([
   ExecutableIdentityMismatch,
   ExecutableRegistrationInvalid,
   ExecutableRegistrationMissing,
+  RevisionUnavailable,
+  RevisionMismatch,
   ExecutionFailure,
 ]).pipe(Schema.toTaggedUnion("_tag")) satisfies Schema.Codec<RunFailure, unknown>
 
