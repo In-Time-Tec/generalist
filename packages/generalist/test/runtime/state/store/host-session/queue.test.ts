@@ -8,9 +8,10 @@ import { make as address } from "../../../../../src/runtime/address.js"
 import { Prompt } from "effect/unstable/ai"
 import { activate, layerRunStore } from "../../../../../src/durability/index.js"
 import { ObjectStore } from "../../../../../src/durability/object-store.js"
-import { RunStore } from "../../../../../src/runtime/run/store.js"
+import { RunStore, type Service as RunStoreService } from "../../../../../src/runtime/run/store.js"
+import type { PendingInput } from "../../../../../src/runtime/session/queue.js"
 import { make as makeSimulator, type Client } from "../../../../../src/testing/durability/index.js"
-import { alternateAssistantRef, assistantRef, registrationsFor } from "../../../execution/fixtures.js"
+import { alternateAssistantRef, assistantAddress, assistantRef, registrationsFor } from "../../../execution/fixtures.js"
 import { programExecutable } from "../../../program/fixture.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
 
@@ -581,6 +582,209 @@ it.effect("conserves sponsor allocations across fresh-host sibling and continuat
       yield* fresh.messageSessionInput({ ...followup, commandId: "followup-again" })
       expect((yield* fresh.hostSession("child")).queue.map((entry) => entry.id)).toEqual(["followup-again"])
       expect((yield* fresh.hostSessionRuns("child")).length).toBe(2)
+    }),
+  ).pipe(Effect.scoped),
+)
+
+const settle = (
+  store: RunStoreService,
+  run: { readonly runId: string; readonly sessionId: string; readonly ownerId: string; readonly commandId: string },
+) =>
+  Effect.gen(function* () {
+    const claim = yield* store.claimExecution({
+      runId: run.runId,
+      ownerId: run.ownerId,
+      commandId: `${run.commandId}:claim`,
+    })
+    yield* store.complete({
+      ...claim,
+      commandId: `${run.commandId}:complete`,
+      result: { text: "done", output: "done", turns: 1, session: { sessionId: run.sessionId, leafId: null } },
+    })
+    yield* store.releaseExecution(claim)
+  })
+
+const collide = {
+  sessionId: "session:queue:colliding-command-ids",
+  lane: {
+    id: "lane",
+    to: assistantAddress,
+    sessionId: "session:queue:colliding-command-ids",
+    idempotencyKey: "lane",
+    correlationId: "lane",
+    prompt: Prompt.make("lane"),
+    metadata: {},
+  },
+  message: {
+    sessionId: "session:queue:colliding-command-ids",
+    commandId: "collide",
+    prompt: Prompt.make("shared-id message"),
+    from: { user: "operator" } as const,
+  },
+  submit: {
+    sessionId: "session:queue:colliding-command-ids",
+    commandId: "collide",
+    prompt: Prompt.make("shared-id submit"),
+  },
+}
+
+const pendingEntries = (queue: ReadonlyArray<PendingInput>) =>
+  queue.map((entry) => ({ id: entry.id, revision: entry.revision, retained: entry.from !== undefined }))
+
+// Accept a message and a submit under separate command-identity namespaces while
+// a lane Run holds the active slot, then cancel the active Run so retention keeps
+// both accepted entries pending.
+const acceptQueue = (store: RunStoreService, ids: { readonly message: string; readonly submit: string }) =>
+  Effect.gen(function* () {
+    const sessionId = collide.sessionId
+    yield* store.createHostSession({ id: sessionId, selection })
+    yield* store.submitSessionInput({ sessionId, commandId: "cmd-active", prompt: Prompt.make("active") })
+    const active = (yield* store.hostSession(sessionId)).activeRunId!
+    // A direct lane Run queues behind the active conversational Run, so
+    // terminalizing the conversation retains steering instead of promoting it.
+    const lane = yield* store.admitStart({
+      ...selection,
+      message: collide.lane,
+      initialChildren: [],
+      initialFanOuts: [],
+    })
+    // Distinct command-identity namespaces accept the same caller id string.
+    expect(yield* store.messageSessionInput({ ...collide.message, commandId: ids.message })).toEqual({
+      id: ids.message,
+      revision: 1,
+    })
+    expect(yield* store.submitSessionInput({ ...collide.submit, commandId: ids.submit })).toEqual({
+      id: ids.submit,
+      revision: 1,
+    })
+    // Cancelling the active Run terminalizes it with the steering message
+    // unconsumed, so retention prepends it as a second pending entry.
+    yield* store.cancel({ runId: active, commandId: "cancel-active", reason: "colliding command ids" })
+    const stored = yield* store.hostSession(sessionId)
+    expect(pendingEntries(stored.queue)).toEqual([
+      { id: ids.message, revision: 1, retained: true },
+      { id: ids.submit, revision: 1, retained: false },
+    ])
+    expect(stored.activeRunId).toBe(lane.runId)
+    return { sessionId, lane, queue: stored.queue }
+  })
+
+it.effect("keeps the other accepted input when one removal addresses colliding command ids", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const store = yield* open(yield* makeSimulator(), "collide-host")
+      const { sessionId, lane } = yield* acceptQueue(store, { message: "collide", submit: "collide" })
+      // One revision-addressed removal must address exactly one accepted entry.
+      expect(
+        yield* store.removeSessionInput({ sessionId, commandId: "remove-collide", id: "collide", expectedRevision: 1 }),
+      ).toEqual({ id: "collide", revision: 2 })
+      expect(pendingEntries((yield* store.hostSession(sessionId)).queue)).toEqual([
+        { id: "collide", revision: 1, retained: false },
+      ])
+      // The surviving accepted input later promotes into exactly one Run.
+      yield* settle(store, { runId: lane.runId, sessionId, ownerId: "collide-host", commandId: "lane" })
+      const after = yield* store.hostSession(sessionId)
+      expect(yield* store.hostSessionRuns(sessionId)).toHaveLength(3)
+      expect(yield* store.loadExecution(after.activeRunId!)).toMatchObject({
+        message: { prompt: Prompt.make("shared-id submit") },
+      })
+    }),
+  ).pipe(Effect.scoped),
+)
+
+it.effect("edits one colliding accepted input and leaves the other addressable", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const store = yield* open(yield* makeSimulator(), "edit-host")
+      const { sessionId, lane } = yield* acceptQueue(store, { message: "collide", submit: "collide" })
+      expect(
+        yield* store.updateSessionInput({
+          sessionId,
+          commandId: "edit-collide",
+          id: "collide",
+          expectedRevision: 1,
+          prompt: Prompt.make("edited message"),
+        }),
+      ).toEqual({ id: "collide", revision: 2 })
+      expect(pendingEntries((yield* store.hostSession(sessionId)).queue)).toEqual([
+        { id: "collide", revision: 2, retained: true },
+        { id: "collide", revision: 1, retained: false },
+      ])
+      // The untouched entry is addressed by its own observed revision even though
+      // an earlier entry shares its id.
+      expect(
+        yield* store.removeSessionInput({ sessionId, commandId: "remove-submit", id: "collide", expectedRevision: 1 }),
+      ).toEqual({ id: "collide", revision: 2 })
+      expect(pendingEntries((yield* store.hostSession(sessionId)).queue)).toEqual([
+        { id: "collide", revision: 2, retained: true },
+      ])
+      yield* settle(store, { runId: lane.runId, sessionId, ownerId: "edit-host", commandId: "lane" })
+      const after = yield* store.hostSession(sessionId)
+      expect(yield* store.hostSessionRuns(sessionId)).toHaveLength(3)
+      expect(yield* store.loadExecution(after.activeRunId!)).toMatchObject({
+        message: { prompt: Prompt.make("edited message"), correlationId: "collide" },
+      })
+    }),
+  ).pipe(Effect.scoped),
+)
+
+it.effect("promotes both accepted inputs that share a command id into their own Runs", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const store = yield* open(yield* makeSimulator(), "promote-host")
+      const { sessionId, lane, queue } = yield* acceptQueue(store, { message: "collide", submit: "collide" })
+      const retainedPrompt = queue[0]!.prompt
+      // Settling the blocking lane Run promotes the retained message first.
+      yield* settle(store, { runId: lane.runId, sessionId, ownerId: "promote-host", commandId: "lane" })
+      const first = yield* store.hostSession(sessionId)
+      expect(first.activeRunId).toBeDefined()
+      expect(yield* store.loadExecution(first.activeRunId!)).toMatchObject({
+        message: { prompt: retainedPrompt, correlationId: "collide" },
+      })
+      // Settling that Run promotes the surviving submit under the same caller id.
+      yield* settle(store, {
+        runId: first.activeRunId!,
+        sessionId,
+        ownerId: "promote-host",
+        commandId: "promoted-message",
+      })
+      const second = yield* store.hostSession(sessionId)
+      expect(second.activeRunId).toBeDefined()
+      expect(second.queue).toEqual([])
+      expect(yield* store.loadExecution(second.activeRunId!)).toMatchObject({
+        message: { prompt: Prompt.make("shared-id submit"), correlationId: "collide" },
+      })
+      expect(yield* store.hostSessionRuns(sessionId)).toHaveLength(4)
+    }),
+  ).pipe(Effect.scoped),
+)
+
+it.effect("preserves every accepted input when message and submit command ids differ", () =>
+  provideScoped(
+    BunCrypto.layer,
+    Effect.gen(function* () {
+      const store = yield* open(yield* makeSimulator(), "distinct-host")
+      const { sessionId, lane } = yield* acceptQueue(store, { message: "msg-distinct", submit: "cmd-distinct" })
+      expect(
+        yield* store.removeSessionInput({
+          sessionId,
+          commandId: "remove-distinct",
+          id: "msg-distinct",
+          expectedRevision: 1,
+        }),
+      ).toEqual({ id: "msg-distinct", revision: 2 })
+      expect(pendingEntries((yield* store.hostSession(sessionId)).queue)).toEqual([
+        { id: "cmd-distinct", revision: 1, retained: false },
+      ])
+      yield* settle(store, { runId: lane.runId, sessionId, ownerId: "distinct-host", commandId: "lane" })
+      const after = yield* store.hostSession(sessionId)
+      expect(yield* store.hostSessionRuns(sessionId)).toHaveLength(3)
+      expect(yield* store.loadExecution(after.activeRunId!)).toMatchObject({
+        message: { prompt: Prompt.make("shared-id submit") },
+      })
     }),
   ).pipe(Effect.scoped),
 )
