@@ -449,6 +449,91 @@ layer(services)("Server", (it) => {
     ),
   )
 
+  it.effect("rejects Session ids that canonical storage or the HTTP router cannot address", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "server-id-boundary" })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+
+        const create = (id: string) =>
+          Effect.gen(function* () {
+            const body = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({ id })
+            return yield* Effect.promise(() =>
+              app.handler(
+                new Request("http://generalist.test/sessions", {
+                  method: "POST",
+                  headers: { authorization: "Bearer secret", "content-type": "application/json" },
+                  body,
+                }),
+              ),
+            )
+          })
+        const get = (id: string) =>
+          Effect.promise(() =>
+            app.handler(
+              new Request(`http://generalist.test/sessions/${encodeURIComponent(id)}`, {
+                headers: { authorization: "Bearer secret" },
+              }),
+            ),
+          )
+
+        const empty = yield* create("")
+        const overlongId = `s${"x".repeat(100)}`
+        const overlong = yield* create(overlongId)
+        const controlId = `s${"c".repeat(99)}`
+        const control = yield* create(controlId)
+        const controlGet = yield* get(controlId)
+
+        // URL parsers normalize `.` and `..` path segments before routing, and a
+        // lone surrogate cannot be percent-encoded into a request path.
+        const dot = yield* create(".")
+        const dotDot = yield* create("..")
+        const loneSurrogate = yield* create("\uD800")
+
+        expect(empty.status).toBe(400)
+        expect(overlong.status).toBe(400)
+        expect(dot.status).toBe(400)
+        expect(dotDot.status).toBe(400)
+        expect(loneSurrogate.status).toBe(400)
+        expect(yield* Effect.promise(() => empty.text())).not.toContain("Cannot encode runtime state")
+        expect(yield* Effect.promise(() => overlong.text())).not.toContain("Cannot encode runtime state")
+        expect(control.status).toBe(200)
+        expect(controlGet.status).toBe(200)
+        expect(yield* Effect.promise(() => controlGet.json())).toMatchObject({ id: controlId })
+        expect(
+          yield* host.sessions.get(overlongId).pipe(
+            Effect.map(() => "found"),
+            Effect.catchTag("generalist/host/SessionNotFound", () => Effect.succeed("not-found")),
+          ),
+        ).toBe("not-found")
+
+        const encodedId = "a%2Fb"
+        const encodedCreate = yield* create(encodedId)
+        const encodedGet = yield* get(encodedId)
+        expect(encodedCreate.status).toBe(200)
+        expect(encodedGet.status).toBe(200)
+        const slashId = "a/b"
+        const slashCreate = yield* create(slashId)
+        const slashGet = yield* get(slashId)
+        expect(slashCreate.status).toBe(200)
+        expect(slashGet.status).toBe(200)
+        expect(yield* Effect.promise(() => slashGet.json())).toMatchObject({ id: slashId })
+      }),
+    ),
+  )
+
   it.effect("keeps an admitted Run alive after its SSE response is cancelled and replays completion", () =>
     Effect.scoped(
       Effect.gen(function* () {

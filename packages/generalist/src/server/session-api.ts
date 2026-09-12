@@ -14,9 +14,24 @@ import {
 import { ConversationEntry } from "../runtime/session/conversation.js"
 import { apiErrors } from "./errors.js"
 
+/**
+ * A client-chosen Session id must be non-empty for canonical storage, short
+ * enough for the HTTP router to capture it, and a path segment no standard URL
+ * parser rewrites. Otherwise the Session is stored but no id-addressed route
+ * can reach it: the router drops decoded path parameters longer than its
+ * 100-character default, and URL normalization removes `.` and `..` segments
+ * before routing.
+ */
+const sessionId = Schema.String.check(
+  Schema.isNonEmpty(),
+  Schema.isMaxLength(100),
+  Schema.makeFilter((id) => (id !== "." && id !== "..") || "A Session id cannot be a URL dot segment"),
+  Schema.makeFilter((id) => id.isWellFormed() || "A Session id must be well-formed UTF-16"),
+)
+
 const createSession = HttpApiEndpoint.post("create", "/sessions", {
   payload: Schema.Struct({
-    id: Schema.optionalKey(Schema.String),
+    id: Schema.optionalKey(sessionId),
     title: Schema.optionalKey(Schema.String),
     agent: Schema.optionalKey(Schema.String),
   }),

@@ -119,6 +119,8 @@ Future ingress features add one HttpApi group to `Server.api` and one matching i
 
 `POST /attachments` sends an `application/octet-stream` body with required `x-media-type` and optional `x-filename` headers, returning `Media.Ref` as JSON. `GET /attachments/:sha256` returns the bytes with their stored `content-type` and optional `x-filename`. The generated client constructs upload headers and decodes the buffered download. Both routes use the same Authentication middleware as every other declared route.
 
+`POST /sessions` accepts an optional client-chosen `id`; the Host assigns one when it is omitted. The boundary rejects with HTTP 400 an `id` that durable storage or the router could not address: empty, longer than 100 characters, a URL dot segment (`.` or `..`), or ill-formed UTF-16. Every stored Session therefore remains reachable through the id-addressed routes.
+
 ## SSE and WebSocket
 
 Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter. Authorization is rechecked before each committed event and preview delivery, so a revoked resource closes its stream instead of retaining opening-time authority.
