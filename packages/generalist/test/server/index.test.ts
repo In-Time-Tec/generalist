@@ -331,10 +331,14 @@ layer(services)("Server", (it) => {
           _tag: "generalist/host/ToolNotRegistered",
           name: "not-registered",
         })
+        const unknownStartBody = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
+          commandId: "server-contract:unknown-tool",
+          input: {},
+        })
         const unknownStart = yield* handlerRequest(`/runs/${parentRun.id}/tools/not-registered`, {
           method: "POST",
           headers: { authorization: "Bearer secret", "content-type": "application/json" },
-          body: JSON.stringify({ commandId: "server-contract:unknown-tool", input: {} }),
+          body: unknownStartBody,
         })
         expect(unknownStart.status).toBe(404)
         expect(yield* Effect.promise(() => unknownStart.json())).toMatchObject({
@@ -344,6 +348,16 @@ layer(services)("Server", (it) => {
         expect(
           yield* client.tools.inspect({ runId: parentRun.id, name: "not-registered" }).pipe(Effect.flip),
         ).toMatchObject({ _tag: "generalist/host/ToolNotRegistered" })
+        expect(
+          yield* client.tools
+            .start({
+              runId: parentRun.id,
+              name: "not-registered",
+              commandId: "server-contract:unknown-tool-start",
+              input: {},
+            })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/host/ToolNotRegistered", name: "not-registered" })
         expect(
           yield* client.tools.start({
             runId: parentRun.id,

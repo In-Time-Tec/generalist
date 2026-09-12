@@ -168,7 +168,7 @@ export const artifactApiErrors = [
   ArtifactVersionNotFound.pipe(conflict),
 ] as const
 
-/** Errors encoded by the declared HttpApi endpoints and SSE stream. */
+/** Errors shared by the non-tool endpoint groups and the SSE stream; group-specific tags stay in their own unions. */
 export const ApiError = Schema.Union([...apiErrors, ...artifactApiErrors, InvalidCursor])
 export type ApiError = typeof ApiError.Type
 
