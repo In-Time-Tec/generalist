@@ -18,7 +18,9 @@ import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
+import type { ClosedNativeError, NativeLayerEnvironment } from "generalist/runtime/native-layer-environment"
 import * as Durability from "generalist/durability"
+import { ObjectStoreFailure } from "generalist/durability/object-store"
 import * as S3 from "generalist/durability/s3"
 import * as R2 from "generalist/durability/r2"
 import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
@@ -38,6 +40,7 @@ type Equal<Left, Right> =
       : false
     : false
 type Assert<Value extends true> = Value
+type IsAssignable<Source, Target> = Source extends Target ? true : false
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
 type SkillsRoot = typeof import("generalist/instructions/skills")
 type InstructionsLoad = Assert<Equal<typeof load, typeof import("generalist/instructions").load>>
@@ -458,6 +461,127 @@ const cryptoLayer = Layer.succeed(
     digest: (_algorithm, data) => Effect.succeed(data),
   }),
 )
+class PackageCredentials extends Context.Service<PackageCredentials, { readonly profile: string }>()(
+  "generalist/package-smoke/PackageCredentials",
+) {}
+class PackageRevisionRegistry extends Context.Service<
+  PackageRevisionRegistry,
+  { readonly deployment: string }
+>()("generalist/package-smoke/PackageRevisionRegistry") {}
+class PackageModelLayerError extends Schema.TaggedError<PackageModelLayerError>()(
+  "generalist/package-smoke/PackageModelLayerError",
+  { model: Schema.String },
+) {}
+class PackageRevisionError extends Schema.TaggedError<PackageRevisionError>()(
+  "generalist/package-smoke/PackageRevisionError",
+  { revision: Schema.String },
+) {}
+class PackageEnvironmentError extends Schema.TaggedError<PackageEnvironmentError>()(
+  "generalist/package-smoke/PackageEnvironmentError",
+  { profile: Schema.String },
+) {}
+const fallibleAgent = Agent.make({ name: "fallible-package-agent" })
+declare const fallibleModelLayer: Layer.Layer<
+  LanguageModel.LanguageModel,
+  PackageModelLayerError,
+  PackageCredentials
+>
+const uncurriedFallibleAgent = Agent.close(fallibleAgent, fallibleModelLayer)
+const curriedFallibleAgent = Agent.close(fallibleModelLayer)(fallibleAgent)
+const missingAgentEnvironment = Agent.close(Layer.empty)
+type UncurriedClosureError = Assert<
+  Equal<
+    typeof uncurriedFallibleAgent extends Agent.Closed<infer Error, infer _Requirements> ? Error : never,
+    PackageModelLayerError
+  >
+>
+type CurriedClosureRequirements = Assert<
+  Equal<
+    typeof curriedFallibleAgent extends Agent.Closed<infer _Error, infer Requirements> ? Requirements : never,
+    PackageCredentials
+  >
+>
+type MissingAgentServiceRejected = Assert<
+  Equal<IsAssignable<typeof fallibleAgent, Parameters<typeof missingAgentEnvironment>[0]>, false>
+>
+type FallibleClosureIsNotInfallible = Assert<
+  Equal<IsAssignable<typeof uncurriedFallibleAgent, Agent.Closed<never, never>>, false>
+>
+type S3LayerFailure = Assert<Equal<Layer.Error<typeof s3Layer>, ObjectStoreFailure>>
+const fallibleAgents = { "fallible-package-agent": fallibleAgent } as const
+const loadRevision: Runtime.RevisionLoader<
+  typeof fallibleAgents,
+  PackageRevisionError,
+  PackageRevisionRegistry,
+  PackageModelLayerError,
+  PackageCredentials
+> = (request) =>
+  PackageRevisionRegistry.pipe(
+    Effect.flatMap(() =>
+      request.revision === "fallible-package-v1"
+        ? Effect.succeed({
+            _tag: "Found" as const,
+            definition: {
+              agents: fallibleAgents,
+              revision: "fallible-package-v1",
+              services: fallibleModelLayer,
+            },
+          })
+        : Effect.fail(PackageRevisionError.make({ revision: request.revision })),
+    ),
+  )
+const fallibleRuntimeLayer = Runtime.layer({
+  agents: fallibleAgents,
+  revision: "fallible-package-v2",
+  services: fallibleModelLayer,
+  storage: Layer.merge(s3Layer, cryptoLayer),
+  namespace: { environment: "package", tenant: "consumer", partition: "fallible" },
+  loadRevision,
+})
+type FallibleRuntimeRequirements = Assert<
+  Equal<Layer.Services<typeof fallibleRuntimeLayer>, PackageCredentials | PackageRevisionRegistry>
+>
+type RuntimeModelFailure = Assert<
+  Equal<Extract<Layer.Error<typeof fallibleRuntimeLayer>, PackageModelLayerError>, PackageModelLayerError>
+>
+type RuntimeStorageFailure = Assert<
+  Equal<Extract<Layer.Error<typeof fallibleRuntimeLayer>, ObjectStoreFailure>, ObjectStoreFailure>
+>
+type RuntimeRevisionFailure = Assert<
+  Equal<Extract<Layer.Error<typeof fallibleRuntimeLayer>, PackageRevisionError>, PackageRevisionError>
+>
+const closingNativeLayer = Layer.effect(
+  PackageCredentials,
+  Effect.fail(PackageEnvironmentError.make({ profile: "native" })),
+)
+const nativeLayerEnvironment: NativeLayerEnvironment<PackageCredentials, PackageEnvironmentError> = {
+  environment: closingNativeLayer,
+}
+type MissingNativeEnvironmentRejected = Assert<
+  Equal<
+    IsAssignable<Record<never, never>, NativeLayerEnvironment<PackageCredentials, PackageEnvironmentError>>,
+    false
+  >
+>
+type WrongNativeEnvironmentRejected = Assert<
+  Equal<
+    IsAssignable<
+      { readonly environment: Layer.Layer<PackageRevisionRegistry> },
+      NativeLayerEnvironment<PackageCredentials, PackageEnvironmentError>
+    >,
+    false
+  >
+>
+type NativeFailureUnion = Assert<
+  Equal<
+    ClosedNativeError<Layer.Error<typeof fallibleRuntimeLayer>, PackageEnvironmentError>,
+    Layer.Error<typeof fallibleRuntimeLayer> | PackageEnvironmentError
+  >
+>
+void uncurriedFallibleAgent
+void curriedFallibleAgent
+void fallibleRuntimeLayer
+void nativeLayerEnvironment
 const oauthLayer = OAuth.layer({
   serverUrl: "https://mcp.example/rpc",
   redirectUrl: "http://127.0.0.1/callback",

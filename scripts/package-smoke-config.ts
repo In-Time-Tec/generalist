@@ -118,6 +118,7 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/repl", runtimes: nodeAndBun },
       { specifier: "generalist/repl/bun", runtimes: bunOnly },
       { specifier: "generalist/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
+      { specifier: "generalist/runtime/native-layer-environment", runtimes: nodeAndBun },
       { specifier: "generalist/tasks", runtimes: nodeAndBun, exports: ["layer", "update"] },
       {
         specifier: "generalist/components",
@@ -414,6 +415,7 @@ export const exactPackageExports = [
   "./repl",
   "./repl/bun",
   "./runtime",
+  "./runtime/native-layer-environment",
   "./sandbox",
   "./server",
   "./tasks",
