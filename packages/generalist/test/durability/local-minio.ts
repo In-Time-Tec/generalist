@@ -41,7 +41,7 @@ export const makeMinioStack = (input: { readonly name: string; readonly credenti
     { providers, state: localState() },
     Effect.gen(function* () {
       const image = yield* RemoteImage("Image", {
-        name: "minio/minio",
+        name: "quay.io/minio/minio",
         tag: "RELEASE.2025-04-22T22-12-26Z",
         alwaysPull: false,
       })
