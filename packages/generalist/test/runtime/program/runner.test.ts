@@ -165,7 +165,13 @@ it.effect("assigns a fresh identity to every prototype-member operation on a for
       )
       expect(settled.map((event) => event.operation)).toEqual([
         "first",
-        ...prototypeMemberOperations.map(() => expect.stringMatching(/^b[0-9a-f]{63}$/)),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
+        expect.stringMatching(/^b[0-9a-f]{63}$/),
       ])
       expect(new Set(settled.map((event) => event.operation)).size).toBe(prototypeMemberOperations.length + 1)
       for (const [index, event] of settled.slice(1).entries()) {
