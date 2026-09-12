@@ -23,6 +23,7 @@ import type {
   ApprovalMismatch,
   RunNotFound,
   RunTerminal,
+  RuntimeAvailabilityError,
   RuntimeUnavailable,
   PayloadTooLarge,
   SubscriberLagged,
@@ -404,7 +405,7 @@ export type SendError =
   | ExecutableRegistrationMissing
   | TreePolicyInvalid
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
 export type StartExecutionError =
   | ChildDepthExceeded
@@ -423,7 +424,7 @@ export type StartExecutionError =
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
   | import("../core/durable/run-budget.js").Exhausted
 /** Typed Agent start failures before a Run handle exists. */
@@ -433,20 +434,20 @@ export type ScheduleError =
   | AgentError
   | ScheduleInvalid
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
-export type WakeError = RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure | WakeEventInvalid
+export type WakeError = RunNotFound | RunTerminal | RuntimeAvailabilityError | DurabilityFailure | WakeEventInvalid
 /** Exact-root staged admission failures. */
 export type AdmitError = StartExecutionError
 /** Staged root activation failures. */
-export type ActivateError = RunNotFound | RuntimeUnavailable | DurabilityFailure
+export type ActivateError = RunNotFound | RuntimeAvailabilityError | DurabilityFailure
 export type SpawnError =
   | RunNotFound
   | RunTerminal
   | ChildSelectionMissing
   | IdempotencyConflict
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
   | ChildDepthExceeded
   | ChildLimitExceeded
@@ -468,7 +469,7 @@ export type SendMessageError =
   | import("../core/turn/steering.js").InboxFull
   | import("../core/turn/steering.js").MessageTooLarge
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
 export type DirectoryError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type ChildSettlementError = RunNotFound | RuntimeUnavailable | DurabilityFailure
@@ -498,15 +499,15 @@ export type RespondError =
   | ResponseConflict
   | ResponseKindMismatch
   | RunTerminal
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
 export type RespondApprovalError =
   | RunNotFound
   | ApprovalStale
   | ApprovalMismatch
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
-export type SignalError = RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable | DurabilityFailure
+export type SignalError = RunNotFound | WaitNotOpen | RunTerminal | RuntimeAvailabilityError | DurabilityFailure
 export type CancelError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type RunSendError =
   | import("./errors.js").RunKindUnsupported
@@ -523,7 +524,7 @@ export type RunSendError =
   | import("../core/turn/steering.js").InboxFull
   | import("../core/turn/steering.js").MessageTooLarge
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
 
 export interface SendFunction {
@@ -534,7 +535,11 @@ export interface SendFunction {
   ): Effect.Effect<SteeringReceipt, RunSendError>
   (input: SendInput): Effect.Effect<RunReceipt, SendError>
 }
-export type ResolveOperationError = RunNotFound | OperationResolutionConflict | RuntimeUnavailable | DurabilityFailure
+export type ResolveOperationError =
+  | RunNotFound
+  | OperationResolutionConflict
+  | RuntimeAvailabilityError
+  | DurabilityFailure
 export type GetRunError = InspectError | import("./errors.js").RunKindUnsupported
 export type InspectError = RunNotFound | RuntimeUnavailable | DurabilityFailure
 export type ForkError =
@@ -546,7 +551,7 @@ export type ForkError =
   | BudgetInvalid
   | BudgetExhausted
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
 export type RewindError =
   | import("./errors.js").RunKindUnsupported
@@ -556,10 +561,15 @@ export type RewindError =
   | BudgetInvalid
   | BudgetExhausted
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
-export type ExtendBudgetError = InspectError | BudgetInvalid
-export type OperatorActionError = InspectError | IllegalOperatorAction | PayloadTooLarge
+export type ExtendBudgetError = RunNotFound | RuntimeAvailabilityError | DurabilityFailure | BudgetInvalid
+export type OperatorActionError =
+  | RunNotFound
+  | RuntimeAvailabilityError
+  | DurabilityFailure
+  | IllegalOperatorAction
+  | PayloadTooLarge
 export type OperatorApprovalError = ResolveDurableApprovalError | IllegalOperatorAction
 export type OperatorExtendBudgetError = ExtendBudgetError | IllegalOperatorAction
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable | DurabilityFailure
@@ -575,7 +585,7 @@ export type FanOutError =
   | FanOutRemainderUnsupported
   | ChildSelectionMissing
   | PayloadTooLarge
-  | RuntimeUnavailable
+  | RuntimeAvailabilityError
   | DurabilityFailure
   | import("../core/durable/run-budget.js").Exhausted
 export type InspectFanOutError = FanOutNotFound | RuntimeUnavailable | DurabilityFailure

@@ -42,6 +42,30 @@ describe("activated Runtime retirement", () => {
     }),
   )
 
+  it.effect("reactivates one layer while rejecting a prepared prior scheduler invocation", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const context = yield* host(makeObjectStorage().store, "reactivating-worker", "state-layer-reactivated")
+        const scheduler = Context.get(context, LocalScheduler.LocalScheduler)
+        const firstDrain = scheduler.drain({ fuel: 1 })
+
+        yield* Effect.scoped(activate.pipe(Effect.andThen(firstDrain), Effect.provide(context)))
+
+        const stale = yield* Effect.scoped(
+          activate.pipe(
+            Effect.andThen(scheduler.drain({ fuel: 1 })),
+            Effect.andThen(firstDrain.pipe(Effect.flip)),
+            Effect.provide(context),
+          ),
+        )
+        expect(stale).toMatchObject({
+          _tag: "generalist/runtime/RuntimeUnavailable",
+          message: "scheduler invocation belongs to a retired activation",
+        })
+      }),
+    ),
+  )
+
   it.live("a store failure during the ownership heartbeat retires the incarnation with RuntimeOwnershipLost", () =>
     Effect.gen(function* () {
       const simulator = makeObjectStorage()

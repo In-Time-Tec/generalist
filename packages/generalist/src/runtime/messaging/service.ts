@@ -16,6 +16,8 @@ import {
   RunKindUnsupported,
   RunNotFound,
   RunTerminal,
+  RuntimeOwnershipLost,
+  RuntimeRetired,
   RuntimeUnavailable,
   SteeringConflict,
 } from "../errors.js"
@@ -100,6 +102,8 @@ export const SendMessageError = Schema.Union([
   RunNotFound,
   PayloadTooLarge,
   RuntimeUnavailable,
+  RuntimeOwnershipLost,
+  RuntimeRetired,
 ])
 export type SendMessageError = typeof SendMessageError.Type
 export type DirectoryError = RunNotFound | RuntimeUnavailable | DurabilityFailure

@@ -1,6 +1,7 @@
 import { Effect, Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { type Key, type Memory, type MemoryError, projectTranscript } from "../../context/memory.js"
+import type { Key, Memory, MemoryError } from "../../context/memory.js"
+import { projectTranscript } from "../../context/memory-provenance.js"
 import { type Entry, type SessionStore, buildMemoryContext } from "../../context/session.js"
 import { operationKey } from "../../durable/driver/interpreter.js"
 import { intercept } from "../../durable/driver/run.js"

@@ -1,7 +1,7 @@
 import { Effect, Option } from "effect"
 import { Prompt, Response, Tool } from "effect/unstable/ai"
 import { AgentError } from "../agent/event.js"
-import { isMessageFromRecall, replaceRecalledMessage } from "../context/memory.js"
+import { isMessageFromRecall, replaceRecalledMessage } from "../context/memory-provenance.js"
 import type { Middleware, TurnContext } from "../model/middleware.js"
 
 interface RedactOptions {

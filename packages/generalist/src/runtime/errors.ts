@@ -402,6 +402,9 @@ export class RuntimeRetired extends ActionableTaggedError<RuntimeRetired>()("gen
   hint: errorHint("Build the Runtime.Layer again to acquire a fresh incarnation for this namespace."),
 }) {}
 
+export type RuntimeLifecycleError = RuntimeOwnershipLost | RuntimeRetired
+export type RuntimeAvailabilityError = RuntimeUnavailable | RuntimeLifecycleError
+
 /** A caller-supplied value violates the enforced durable payload bound. */
 export class PayloadTooLarge extends ActionableTaggedError<PayloadTooLarge>()("generalist/runtime/PayloadTooLarge", {
   boundary: Schema.String,

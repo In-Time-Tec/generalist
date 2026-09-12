@@ -13,7 +13,7 @@ export interface Options {
 }
 
 /** @internal The ambient LanguageModel is required only when summarizing without an explicit model layer. */
-export type SummaryRequirement<O> = O extends {
+type SummaryRequirement<O> = O extends {
   readonly summarize: { readonly model: Layer.Layer<LanguageModel.LanguageModel> }
 }
   ? never

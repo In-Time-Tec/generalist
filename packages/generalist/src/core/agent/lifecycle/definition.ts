@@ -123,16 +123,16 @@ export type ClosedServices<
   | OutputCodec["EncodingServices"]
 
 /** Consumer of a hidden Agent identity and its environment. */
-export interface Opened<A> {
+export interface Opened<A, LayerError, LayerRequirements> {
   <Tools extends Record<string, Tool.Any>, R, InputSchema extends Schema.Top, OutputSchema extends Schema.Top>(
     agent: Agent<Tools, R, R, R, InputSchema, OutputSchema>,
-    environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>,
+    environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>, LayerError, LayerRequirements>,
   ): A
 }
 
 /** An Agent closed over its exact environment. */
-export interface Closed extends Any {
-  readonly open: <A>(f: Opened<A>) => A
+export interface Closed<LayerError = never, LayerRequirements = never> extends Any {
+  readonly open: <A>(f: Opened<A, LayerError, LayerRequirements>) => A
 }
 
 /** Extract an agent's runtime requirements. */
@@ -198,12 +198,9 @@ const cloneToolkit = <Tools extends Record<string, Tool.Any>>(
 
 /** Close one Agent over the exact environment it requires. */
 export const close: {
-  <Tools extends Record<string, Tool.Any>, R>(
-    environment: Layer.Layer<NoInfer<ClosedServices<Tools, R>>>,
-  ): <PolicyServices extends R, AuthorizationServices extends R>(
-    agent: Agent<Tools, R, PolicyServices, AuthorizationServices>,
-  ) => Closed
-  <
+  <Services, LayerError, LayerRequirements>(
+    environment: Layer.Layer<Services, LayerError, LayerRequirements>,
+  ): <
     Tools extends Record<string, Tool.Any>,
     R,
     PolicyServices extends R,
@@ -211,9 +208,26 @@ export const close: {
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
   >(
+    agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema> &
+      ([ClosedServices<Tools, R, InputSchema, OutputSchema>] extends [Services] ? unknown : never),
+  ) => Closed<LayerError, LayerRequirements>
+  <
+    Tools extends Record<string, Tool.Any>,
+    R,
+    PolicyServices extends R,
+    AuthorizationServices extends R,
+    InputSchema extends Schema.Top,
+    OutputSchema extends Schema.Top,
+    LayerError,
+    LayerRequirements,
+  >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
-    environment: Layer.Layer<NoInfer<ClosedServices<Tools, R, InputSchema, OutputSchema>>>,
-  ): Closed
+    environment: Layer.Layer<
+      NoInfer<ClosedServices<Tools, R, InputSchema, OutputSchema>>,
+      LayerError,
+      LayerRequirements
+    >,
+  ): Closed<LayerError, LayerRequirements>
 } = dual(
   2,
   <
@@ -223,10 +237,12 @@ export const close: {
     AuthorizationServices extends R,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
+    LayerError,
+    LayerRequirements,
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
-    environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>>,
-  ): Closed => ({ ...agent, open: (f) => f(agent, environment) }),
+    environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>, LayerError, LayerRequirements>,
+  ): Closed<LayerError, LayerRequirements> => ({ ...agent, open: (f) => f(agent, environment) }),
 )
 
 /** Add host-owned tools while preserving an Agent's requirements. */

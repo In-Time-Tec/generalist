@@ -1,4 +1,17 @@
-import { Cause, Clock, Context, Crypto, Effect, Exit, Fiber, FiberSet, Layer, Schema, Semaphore } from "effect"
+import {
+  Cause,
+  Clock,
+  Context,
+  Crypto,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  FiberSet,
+  Layer,
+  Schema,
+  Semaphore,
+} from "effect"
 import {
   Activation,
   StoreActivation,
@@ -10,7 +23,7 @@ import type { ObjectStore } from "../../durability/object-store.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import { DurabilityFailure } from "../../durability/errors.js"
 import { ScheduleInvalid } from "../execution/trigger/schedule.js"
-import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable } from "../errors.js"
+import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable, type RuntimeAvailabilityError } from "../errors.js"
 import { ExecutableResolver } from "../executable/resolver.js"
 import { layer as activeExecutionsLayer, ActiveExecutions } from "../execution/active-executions.js"
 import { layerRegisteredAgents as runExecutorLayer, RunExecutor } from "../execution/run-executor.js"
@@ -30,6 +43,11 @@ interface LeaseNamespace {
   readonly partition: string
 }
 
+interface ActiveScheduler {
+  readonly scheduler: SchedulerService
+  readonly termination: Effect.Effect<never, RuntimeOwnershipLost | RuntimeRetired>
+}
+
 /** Map an ownership-monitor failure onto the public RuntimeOwnershipLost reason vocabulary. */
 const classifyLoss = (cause: Cause.Cause<unknown>): RuntimeOwnershipLost["reason"] => {
   const squashed: unknown = Cause.squash(cause)
@@ -43,7 +61,22 @@ const classifyLoss = (cause: Cause.Cause<unknown>): RuntimeOwnershipLost["reason
 
 export { makeRuntime } from "../hosting/service.js"
 
-export type RuntimeServices = Runtime | RunStore | ExternalChildStore | RunExecutor | LocalScheduler | Activation
+export interface RuntimeLifecycleService {
+  readonly run: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E | RuntimeAvailabilityError, R>
+}
+
+export class RuntimeLifecycle extends Context.Service<RuntimeLifecycle, RuntimeLifecycleService>()(
+  "generalist/runtime/state/layer/RuntimeLifecycle",
+) {}
+
+export type RuntimeServices =
+  | Runtime
+  | RunStore
+  | ExternalChildStore
+  | RunExecutor
+  | LocalScheduler
+  | Activation
+  | RuntimeLifecycle
 
 /** Reconstruct a partition without acquiring authority or starting execution. */
 export const layer = (
@@ -67,7 +100,7 @@ export const layer = (
           Context.add(ActiveExecutions, active),
           Context.add(Runtime, hostRuntime),
         )
-        let running: SchedulerService | undefined
+        let running: ActiveScheduler | undefined
         let retired:
           | {
               readonly incarnation: string
@@ -75,9 +108,9 @@ export const layer = (
               readonly lost: RuntimeOwnershipLost["reason"] | undefined
             }
           | undefined
-        const current: Effect.Effect<SchedulerService, RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost> =
+        const current: Effect.Effect<ActiveScheduler, RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost> =
           Effect.suspend(
-            (): Effect.Effect<SchedulerService, RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost> => {
+            (): Effect.Effect<ActiveScheduler, RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost> => {
               if (running !== undefined) return Effect.succeed(running)
               if (retired !== undefined) {
                 return retired.lost !== undefined
@@ -91,15 +124,18 @@ export const layer = (
               return RuntimeUnavailable.make({ message: "runtime scheduler is not activated" })
             },
           )
+        const lifecycle = RuntimeLifecycle.of({
+          run: (effect) => current.pipe(Effect.flatMap(({ termination }) => Effect.raceFirst(effect, termination))),
+        })
         const prepare = <A, E, R>(command: (scheduler: SchedulerService) => Effect.Effect<A, E, R>) => {
-          let prepared: { readonly scheduler: SchedulerService; readonly effect: Effect.Effect<A, E, R> } | undefined
+          let prepared: { readonly incarnation: ActiveScheduler; readonly effect: Effect.Effect<A, E, R> } | undefined
           return current.pipe(
             Effect.flatMap(
-              (scheduler): Effect.Effect<A, E | RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost, R> => {
-                if (prepared !== undefined && prepared.scheduler !== scheduler) {
+              (incarnation): Effect.Effect<A, E | RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost, R> => {
+                if (prepared !== undefined && prepared.incarnation !== incarnation) {
                   return RuntimeUnavailable.make({ message: "scheduler invocation belongs to a retired activation" })
                 }
-                prepared ??= { scheduler, effect: command(scheduler) }
+                prepared ??= { incarnation, effect: command(incarnation.scheduler) }
                 return prepared.effect
               },
             ),
@@ -107,6 +143,8 @@ export const layer = (
         }
         const acquire = Effect.gen(function* () {
           const lease = yield* ownership.acquire
+          const terminated = yield* Deferred.make<void, RuntimeOwnershipLost | RuntimeRetired>()
+          const termination = Deferred.await(terminated).pipe(Effect.andThen(Effect.never))
           const scheduler = yield* makeLocalScheduler({
             workerId: lease.workerId,
             ...options.scheduler,
@@ -116,10 +154,13 @@ export const layer = (
           const drainLock = yield* Semaphore.make(1)
           const requests = yield* FiberSet.make<unknown, ActivationFailure>()
           const owned = <A, E extends ActivationFailure, R>(effect: Effect.Effect<A, E, R>) =>
-            Effect.gen(function* () {
-              const fiber = yield* FiberSet.run(requests, effect)
-              return yield* Fiber.join(fiber).pipe(Effect.onInterrupt(() => Fiber.interrupt(fiber)))
-            })
+            Effect.raceFirst(
+              Effect.gen(function* () {
+                const fiber = yield* FiberSet.run(requests, effect)
+                return yield* Fiber.join(fiber).pipe(Effect.onInterrupt(() => Fiber.interrupt(fiber)))
+              }),
+              termination,
+            )
           let triggersFirst = false
           const drain: SchedulerService["drain"] = ({ fuel = 64 } = {}) => {
             if (!Number.isSafeInteger(fuel) || fuel <= 0) {
@@ -154,12 +195,16 @@ export const layer = (
             yield* triggers.tick
             yield* scheduler.tick
           }).pipe((effect) => drainLock.withPermit(effect), Effect.provideService(RunStore, runStore))
-          running = {
-            tick: owned(tick),
-            drain,
-            idle: owned(scheduler.idle),
-            reconcileCancellation: (runId) => owned(scheduler.reconcileCancellation(runId)),
+          const incarnation: ActiveScheduler = {
+            termination,
+            scheduler: {
+              tick: owned(tick),
+              drain,
+              idle: owned(scheduler.idle),
+              reconcileCancellation: (runId) => owned(scheduler.reconcileCancellation(runId)),
+            },
           }
+          running = incarnation
           yield* Effect.addFinalizer((exit) =>
             Effect.gen(function* () {
               retired = {
@@ -168,7 +213,17 @@ export const layer = (
                 lost:
                   Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause) ? classifyLoss(exit.cause) : undefined,
               }
-              running = undefined
+              yield* Deferred.fail(
+                terminated,
+                retired.lost === undefined
+                  ? RuntimeRetired.make({ namespace: retired.namespace, incarnation: retired.incarnation })
+                  : RuntimeOwnershipLost.make({
+                      namespace: retired.namespace,
+                      incarnation: retired.incarnation,
+                      reason: retired.lost,
+                    }),
+              )
+              if (running === incarnation) running = undefined
               yield* lease.retire
               yield* FiberSet.clear(requests)
               yield* FiberSet.awaitEmpty(requests)
@@ -186,17 +241,17 @@ export const layer = (
                 : Effect.raceFirst(monitor, Effect.sleep(poll).pipe(Effect.andThen(tick), Effect.forever)),
           }
         }).pipe(Effect.provide(services))
-        return layerActivation(acquire).pipe(
-          Layer.merge(
-            Layer.succeed(
-              LocalScheduler,
-              LocalScheduler.of({
-                tick: Effect.suspend(() => prepare((scheduler) => scheduler.tick)),
-                drain: (input) => prepare((scheduler) => scheduler.drain(input)),
-                idle: Effect.suspend(() => prepare((scheduler) => scheduler.idle)),
-                reconcileCancellation: (runId) => prepare((scheduler) => scheduler.reconcileCancellation(runId)),
-              }),
-            ),
+        return Layer.mergeAll(
+          layerActivation(acquire),
+          Layer.succeed(RuntimeLifecycle, lifecycle),
+          Layer.succeed(
+            LocalScheduler,
+            LocalScheduler.of({
+              tick: Effect.suspend(() => prepare((scheduler) => scheduler.tick)),
+              drain: (input) => prepare((scheduler) => scheduler.drain(input)),
+              idle: Effect.suspend(() => prepare((scheduler) => scheduler.idle)),
+              reconcileCancellation: (runId) => prepare((scheduler) => scheduler.reconcileCancellation(runId)),
+            }),
           ),
         )
       }),

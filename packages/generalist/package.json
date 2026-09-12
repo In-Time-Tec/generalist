@@ -124,6 +124,10 @@
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
     },
+    "./runtime/native-layer-environment": {
+      "types": "./dist/runtime/hosting/native-layer-environment.d.ts",
+      "import": "./dist/runtime/hosting/native-layer-environment.js"
+    },
     "./instructions": {
       "types": "./dist/instructions/index.d.ts",
       "import": "./dist/instructions/index.js"

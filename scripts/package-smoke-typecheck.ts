@@ -6,23 +6,28 @@ import { Agent, DurableDriver, Handoff, Memory, ModelMiddleware, ModelRegistry, 
 import { LanguageModel } from "effect/unstable/ai"
 import { A2A } from "generalist/unstable/a2a"
 import { AGUI } from "generalist/unstable/ag-ui"
-import { VectorStore } from "generalist/memory"
+import * as MemoryFeature from "generalist/memory"
+import { VectorStore, WorkingMemory as MemoryWorkingMemory } from "generalist/memory"
 import { MCPClient, OAuth } from "generalist/unstable/mcp"
 import { make as makeMcpHttpTransport } from "generalist/unstable/mcp/client/http"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "generalist/unstable/mcp/tools"
 import { load } from "generalist/instructions"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "generalist/instructions/skills"
+import { GitHubCatalog, HttpCatalog, S3Catalog, type Limits } from "generalist/instructions/skills"
+import { consolidate, type ConsolidationProposer } from "generalist/unstable/learning"
 import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
+import type { ClosedNativeError, NativeLayerEnvironment } from "generalist/runtime/native-layer-environment"
 import * as Durability from "generalist/durability"
+import { ObjectStoreFailure } from "generalist/durability/object-store"
 import * as S3 from "generalist/durability/s3"
 import * as R2 from "generalist/durability/r2"
 import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
 import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
+import * as AccountAuth from "generalist/unstable/providers/openai-account-auth"
 import { Server } from "generalist/server"
 import { Host, ToolIdentity, type HostToolRun } from "generalist/host"
 import { Config, Context, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -35,6 +40,7 @@ type Equal<Left, Right> =
       : false
     : false
 type Assert<Value extends true> = Value
+type IsAssignable<Source, Target> = Source extends Target ? true : false
 type LayerShape<Value extends Layer.Any> = readonly [Layer.Success<Value>, Layer.Error<Value>, Layer.Services<Value>]
 type SkillsRoot = typeof import("generalist/instructions/skills")
 type InstructionsLoad = Assert<Equal<typeof load, typeof import("generalist/instructions").load>>
@@ -45,8 +51,226 @@ type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRo
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
+type HostedLimits = Assert<
+  Equal<keyof Limits, "manifestMaxBytes" | "bodyMaxBytes" | "maxSkills" | "toolsBySkill">
+>
+const packageLimits: Limits = {
+  manifestMaxBytes: 1_048_576,
+  bodyMaxBytes: 1_048_576,
+  maxSkills: 1_000,
+  toolsBySkill: {},
+}
+const packageGitHubOptions: GitHubCatalog.Options = {
+  ...packageLimits,
+  owner: "acme",
+  repo: "agent-skills",
+  ref: "a".repeat(40),
+}
+const packageHttpOptions: HttpCatalog.Options = { ...packageLimits, manifestUrl: "https://skills.example/skills.json" }
+const packageS3Options: S3Catalog.Options = { ...packageLimits, bucket: "company-skills", region: "us-west-2" }
+const packageProposer: ConsolidationProposer = consolidate({
+  schedule: "FREQ=DAILY",
+  window: "1 day",
+  model: "summary-model",
+  maxProposals: 1,
+})
+declare const packageSummaryModel: Layer.Layer<LanguageModel.LanguageModel>
+const packageAmbientWorking = MemoryWorkingMemory.layer({ summarize: {} })
+const packageExplicitWorking = MemoryWorkingMemory.layer({ summarize: { model: packageSummaryModel } })
+const packageAmbientMemory = MemoryFeature.layer({ working: { summarize: {} } })
+const packageExplicitMemory = MemoryFeature.layer({ working: { summarize: { model: packageSummaryModel } } })
+type PackageAmbientWorking = Assert<
+  Equal<LayerShape<typeof packageAmbientWorking>, readonly [Memory.Memory, never, LanguageModel.LanguageModel]>
+>
+type PackageExplicitWorking = Assert<
+  Equal<LayerShape<typeof packageExplicitWorking>, readonly [Memory.Memory, never, never]>
+>
+type PackageAmbientMemory = Assert<
+  Equal<
+    LayerShape<typeof packageAmbientMemory>,
+    readonly [
+      Memory.Memory,
+      never,
+      VectorStore.VectorStore | import("effect/unstable/ai").EmbeddingModel.EmbeddingModel | LanguageModel.LanguageModel,
+    ]
+  >
+>
+type PackageExplicitMemory = Assert<
+  Equal<
+    LayerShape<typeof packageExplicitMemory>,
+    readonly [
+      Memory.Memory,
+      never,
+      VectorStore.VectorStore | import("effect/unstable/ai").EmbeddingModel.EmbeddingModel,
+    ]
+  >
+>
+void packageGitHubOptions
+void packageHttpOptions
+void packageS3Options
+void packageProposer
+void packageAmbientWorking
+void packageExplicitWorking
+void packageAmbientMemory
+void packageExplicitMemory
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
+type AccountAuthInternalExport =
+  | "issuer"
+  | "clientId"
+  | "redirectUri"
+  | "scopes"
+  | "originator"
+  | "deviceVerificationUrl"
+  | "deviceExchangeRedirect"
+  | "credentialFormatVersion"
+type AccountAuthPublicKeys = keyof typeof AccountAuth
+type AccountAuthInternalExportsRemoved = Assert<
+  Equal<Extract<AccountAuthPublicKeys, AccountAuthInternalExport>, never>
+>
+type AccountAuthRetainedExport =
+  | "AuthError"
+  | "StoreError"
+  | "BrowserAuthorization"
+  | "DeviceAuthorizationPresenter"
+  | "TokenResponse"
+  | "DeviceStartResponse"
+  | "DevicePollResponse"
+  | "OAuthClient"
+  | "CredentialDisk"
+  | "CredentialStore"
+  | "generatePkce"
+  | "authorizationUrl"
+  | "OpenAIAccountAuth"
+  | "layer"
+  | "layerBrowserAuthorizationTest"
+  | "layerDeviceAuthorizationPresenterTest"
+  | "layerOAuthClientTest"
+  | "layerCredentialStoreTest"
+type AccountAuthRetainedExportsPresent = Assert<
+  Equal<Exclude<AccountAuthRetainedExport, AccountAuthPublicKeys>, never>
+>
+type AccountAuthError = AccountAuth.AuthError
+type AccountAuthStoreError = AccountAuth.StoreError
+type AccountAuthFailure = AccountAuth.Error
+type AccountAuthAuthorizationResult = AccountAuth.AuthorizationResult
+type AccountAuthBrowserAuthorization = AccountAuth.BrowserAuthorization
+type AccountAuthDevicePrompt = AccountAuth.DevicePrompt
+type AccountAuthDeviceAuthorizationPresenter = AccountAuth.DeviceAuthorizationPresenter
+type AccountAuthTokenResponse = AccountAuth.TokenResponse
+type AccountAuthDeviceStartResponse = typeof AccountAuth.DeviceStartResponse.Type
+type AccountAuthDevicePollResponse = typeof AccountAuth.DevicePollResponse.Type
+type AccountAuthOAuthClient = AccountAuth.OAuthClient
+type AccountAuthCredentialDisk = typeof AccountAuth.CredentialDisk.Type
+type AccountAuthCredential = AccountAuth.Credential
+type AccountAuthCredentialStore = AccountAuth.CredentialStore
+type AccountAuthStatus = AccountAuth.Status
+type AccountAuthService = AccountAuth.OpenAIAccountAuth
+type AccountAuthTimingOptions = AccountAuth.TimingOptions
+const accountAuthError = AccountAuth.AuthError.make({ kind: "login-required", message: "login required" })
+const accountAuthStoreError = AccountAuth.StoreError.make({ kind: "missing", message: "store missing" })
+const accountAuthCredential: AccountAuthCredential = {
+  accessToken: Redacted.make(""),
+  idToken: Redacted.make(""),
+  refreshToken: Redacted.make(""),
+  accountId: Redacted.make(""),
+  fingerprint: "",
+  generation: "",
+  expiresAt: 0,
+  refreshedAt: 0,
+}
+const accountAuthService: AccountAuthService["Service"] = {
+  loginBrowser: (_redirect?: string) => Effect.succeed(accountAuthCredential),
+  loginDevice: Effect.succeed(accountAuthCredential),
+  status: Effect.succeed({ _tag: "Unauthenticated" }),
+  logout: Effect.succeed({ removed: false, revocationSupported: false }),
+  acquire: Effect.fail(accountAuthError),
+  refreshRejected: (_generation: string) => Effect.fail(accountAuthError),
+}
+const accountAuthBrowser: AccountAuthBrowserAuthorization["Service"] = {
+  authorize: (_url, _state) => Effect.fail(accountAuthError),
+}
+const accountAuthPresenter: AccountAuthDeviceAuthorizationPresenter["Service"] = {
+  device: (_prompt) => Effect.fail(accountAuthError),
+}
+const accountAuthOAuth: AccountAuthOAuthClient["Service"] = {
+  exchange: (_input) => Effect.fail(accountAuthError),
+  refresh: (_refreshToken) => Effect.fail(accountAuthError),
+  deviceStart: Effect.fail(accountAuthError),
+  devicePoll: (_deviceAuthId, _userCode) => Effect.fail(accountAuthError),
+}
+const accountAuthStore: AccountAuthCredentialStore["Service"] = {
+  load: Effect.fail(accountAuthStoreError),
+  save: (_value: AccountAuthCredentialDisk) => Effect.fail(accountAuthStoreError),
+  remove: Effect.fail(accountAuthStoreError),
+  serialized: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+}
+const accountAuthAliases = {
+  AuthError: AccountAuth.AuthError,
+  StoreError: AccountAuth.StoreError,
+  BrowserAuthorization: AccountAuth.BrowserAuthorization,
+  DeviceAuthorizationPresenter: AccountAuth.DeviceAuthorizationPresenter,
+  TokenResponse: AccountAuth.TokenResponse,
+  DeviceStartResponse: AccountAuth.DeviceStartResponse,
+  DevicePollResponse: AccountAuth.DevicePollResponse,
+  OAuthClient: AccountAuth.OAuthClient,
+  CredentialDisk: AccountAuth.CredentialDisk,
+  CredentialStore: AccountAuth.CredentialStore,
+  generatePkce: AccountAuth.generatePkce,
+  authorizationUrl: AccountAuth.authorizationUrl,
+  OpenAIAccountAuth: AccountAuth.OpenAIAccountAuth,
+  layer: AccountAuth.layer,
+  layerBrowserAuthorizationTest: AccountAuth.layerBrowserAuthorizationTest,
+  layerDeviceAuthorizationPresenterTest: AccountAuth.layerDeviceAuthorizationPresenterTest,
+  layerOAuthClientTest: AccountAuth.layerOAuthClientTest,
+  layerCredentialStoreTest: AccountAuth.layerCredentialStoreTest,
+} satisfies Pick<typeof AccountAuth, AccountAuthRetainedExport>
+const accountAuthDirectUrl: URL = AccountAuth.authorizationUrl("challenge", Redacted.make("state"))
+const accountAuthCurriedUrl: URL = AccountAuth.authorizationUrl(Redacted.make("state"))("challenge")
+const accountAuthCredentialSchema: Schema.Schema<AccountAuthCredentialDisk> = AccountAuth.CredentialDisk
+const accountAuthTiming: AccountAuthTimingOptions = { deviceTimeout: 1 }
+const accountAuthLayers = [
+  AccountAuth.layer({ deviceTimeout: 1 }),
+  AccountAuth.layerBrowserAuthorizationTest(accountAuthBrowser),
+  AccountAuth.layerDeviceAuthorizationPresenterTest(accountAuthPresenter),
+  AccountAuth.layerOAuthClientTest(accountAuthOAuth),
+  AccountAuth.layerCredentialStoreTest(accountAuthStore),
+]
+const accountAuthMethods = [
+  accountAuthService.loginBrowser(),
+  accountAuthService.loginBrowser("http://localhost/callback"),
+  accountAuthService.loginDevice,
+  accountAuthService.status,
+  accountAuthService.logout,
+  accountAuthService.acquire,
+  accountAuthService.refreshRejected("generation"),
+]
+void accountAuthAliases
+void accountAuthDirectUrl
+void accountAuthCurriedUrl
+void accountAuthCredentialSchema
+void accountAuthTiming
+void accountAuthLayers
+void accountAuthMethods
+void Option.none<
+  | AccountAuthError
+  | AccountAuthStoreError
+  | AccountAuthFailure
+  | AccountAuthAuthorizationResult
+  | AccountAuthBrowserAuthorization
+  | AccountAuthDevicePrompt
+  | AccountAuthDeviceAuthorizationPresenter
+  | AccountAuthTokenResponse
+  | AccountAuthDeviceStartResponse
+  | AccountAuthDevicePollResponse
+  | AccountAuthOAuthClient
+  | AccountAuthCredentialDisk
+  | AccountAuthCredential
+  | AccountAuthCredentialStore
+  | AccountAuthStatus
+  | AccountAuthService
+  | AccountAuthTimingOptions
+>()
 const independentTool = Tool.make("package-checks", {
   parameters: Schema.Struct({ count: Schema.FiniteFromString }),
   success: Schema.FiniteFromString,
@@ -133,6 +357,113 @@ type ComponentAgentServices = Assert<Equal<EffectServices<typeof componentRun>, 
 type TestingRuntimeDriver = Assert<Equal<typeof Testing.runtimeDriver, typeof import("generalist/testing/runtime-driver").runtimeDriver>>
 type TasksCanonical = Assert<Equal<typeof Tasks, typeof import("generalist/tasks")>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
+type MemoryRetainedSurface = readonly [
+  Memory.Metadata,
+  Memory.Key,
+  Memory.OperationRef,
+  Memory.Version,
+  Memory.ItemPart,
+  Memory.Item,
+  Memory.RecallInput,
+  Memory.RememberInput,
+  Memory.ForgetInput,
+  Memory.HistoryEntry,
+  Memory.RevertInput,
+  Memory.MemoryError,
+  Memory.Service,
+  typeof Memory.OperationRef,
+  typeof Memory.Version,
+  typeof Memory.MemoryError,
+  typeof Memory.Memory,
+  typeof Memory.merge,
+  typeof Memory.layerNoop,
+  typeof Memory.layerTest,
+]
+type MemoryProvenanceInternal = Assert<
+  Equal<
+    Extract<
+      keyof typeof Memory,
+      | "itemFromPromptPart"
+      | "messageFromRecall"
+      | "isMessageFromRecall"
+      | "replaceRecalledMessage"
+      | "recalledMessageIdentity"
+      | "projectTranscript"
+    >,
+    never
+  >
+>
+type HandoffRetainedSurface = readonly [
+  Handoff.DelegateOptions,
+  Handoff.HandoffToolOptions,
+  Handoff.FanOutChild,
+  Handoff.FanOutJoin,
+  Handoff.FanOutRemainder,
+  Handoff.FanOutAllSuccessOptions,
+  Handoff.FanOutCollectOptions,
+  Handoff.FanOutOptions,
+  Handoff.FanOutMemberResult,
+  Handoff.FanOutUnsatisfied,
+  Handoff.Supervisor<never>,
+  Handoff.SupervisorOptions,
+  Handoff.Registration,
+  Handoff.Target,
+  Handoff.Catalog,
+  typeof Handoff.FanOutUnsatisfied,
+  typeof Handoff.Catalog,
+  typeof Handoff.delegateTool,
+  typeof Handoff.transferTool,
+  typeof Handoff.fanOut,
+  typeof Handoff.supervisor,
+  typeof Handoff.target,
+  typeof Handoff.layerCatalog,
+  typeof Handoff.defaultContextProjection,
+  typeof Handoff.filterContextProjection,
+  typeof Handoff.Input,
+  Handoff.Input,
+  typeof Handoff.Output,
+  Handoff.Output,
+  typeof Handoff.ProjectionInvalid,
+  Handoff.ProjectionInvalid,
+  typeof Handoff.Rejected,
+  Handoff.Rejected,
+  typeof Handoff.register,
+  typeof Handoff.RegistrationError,
+  Handoff.RegistrationError,
+]
+type HandoffContinuationInternal = Assert<
+  Equal<
+    Extract<
+      keyof typeof Handoff,
+      | "Commit"
+      | "ControlState"
+      | "HandoffRunState"
+      | "toControlState"
+      | "fromControlState"
+      | "takePendingContinuation"
+      | "initialHandoffRunState"
+      | "edgeCount"
+      | "incrementEdge"
+    >,
+    never
+  >
+>
+const packageMemoryService: Memory.Service = {
+  recall: () => Effect.succeed([]),
+  remember: () => Effect.void,
+  forget: () => Effect.void,
+  history: () => Effect.succeed([]),
+  revert: () => Effect.void,
+}
+const packageMemoryLayer = Memory.layerTest(packageMemoryService)
+const mergedPackageMemoryService = Memory.merge(packageMemoryService, packageMemoryService)
+const packageHandoffTarget = Handoff.target(Agent.make({ name: "package-handoff-target" }))
+const packageHandoffCatalog = Handoff.layerCatalog([packageHandoffTarget])
+const packageHandoffTransfer = Handoff.transferTool(packageHandoffTarget)
+void packageMemoryLayer
+void mergedPackageMemoryService
+void packageHandoffCatalog
+void packageHandoffTransfer
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>
 >
@@ -237,6 +568,127 @@ const cryptoLayer = Layer.succeed(
     digest: (_algorithm, data) => Effect.succeed(data),
   }),
 )
+class PackageCredentials extends Context.Service<PackageCredentials, { readonly profile: string }>()(
+  "generalist/package-smoke/PackageCredentials",
+) {}
+class PackageRevisionRegistry extends Context.Service<
+  PackageRevisionRegistry,
+  { readonly deployment: string }
+>()("generalist/package-smoke/PackageRevisionRegistry") {}
+class PackageModelLayerError extends Schema.TaggedError<PackageModelLayerError>()(
+  "generalist/package-smoke/PackageModelLayerError",
+  { model: Schema.String },
+) {}
+class PackageRevisionError extends Schema.TaggedError<PackageRevisionError>()(
+  "generalist/package-smoke/PackageRevisionError",
+  { revision: Schema.String },
+) {}
+class PackageEnvironmentError extends Schema.TaggedError<PackageEnvironmentError>()(
+  "generalist/package-smoke/PackageEnvironmentError",
+  { profile: Schema.String },
+) {}
+const fallibleAgent = Agent.make({ name: "fallible-package-agent" })
+declare const fallibleModelLayer: Layer.Layer<
+  LanguageModel.LanguageModel,
+  PackageModelLayerError,
+  PackageCredentials
+>
+const uncurriedFallibleAgent = Agent.close(fallibleAgent, fallibleModelLayer)
+const curriedFallibleAgent = Agent.close(fallibleModelLayer)(fallibleAgent)
+const missingAgentEnvironment = Agent.close(Layer.empty)
+type UncurriedClosureError = Assert<
+  Equal<
+    typeof uncurriedFallibleAgent extends Agent.Closed<infer Error, infer _Requirements> ? Error : never,
+    PackageModelLayerError
+  >
+>
+type CurriedClosureRequirements = Assert<
+  Equal<
+    typeof curriedFallibleAgent extends Agent.Closed<infer _Error, infer Requirements> ? Requirements : never,
+    PackageCredentials
+  >
+>
+type MissingAgentServiceRejected = Assert<
+  Equal<IsAssignable<typeof fallibleAgent, Parameters<typeof missingAgentEnvironment>[0]>, false>
+>
+type FallibleClosureIsNotInfallible = Assert<
+  Equal<IsAssignable<typeof uncurriedFallibleAgent, Agent.Closed<never, never>>, false>
+>
+type S3LayerFailure = Assert<Equal<Layer.Error<typeof s3Layer>, ObjectStoreFailure>>
+const fallibleAgents = { "fallible-package-agent": fallibleAgent } as const
+const loadRevision: Runtime.RevisionLoader<
+  typeof fallibleAgents,
+  PackageRevisionError,
+  PackageRevisionRegistry,
+  PackageModelLayerError,
+  PackageCredentials
+> = (request) =>
+  PackageRevisionRegistry.pipe(
+    Effect.flatMap(() =>
+      request.revision === "fallible-package-v1"
+        ? Effect.succeed({
+            _tag: "Found" as const,
+            definition: {
+              agents: fallibleAgents,
+              revision: "fallible-package-v1",
+              services: fallibleModelLayer,
+            },
+          })
+        : Effect.fail(PackageRevisionError.make({ revision: request.revision })),
+    ),
+  )
+const fallibleRuntimeLayer = Runtime.layer({
+  agents: fallibleAgents,
+  revision: "fallible-package-v2",
+  services: fallibleModelLayer,
+  storage: Layer.merge(s3Layer, cryptoLayer),
+  namespace: { environment: "package", tenant: "consumer", partition: "fallible" },
+  loadRevision,
+})
+type FallibleRuntimeRequirements = Assert<
+  Equal<Layer.Services<typeof fallibleRuntimeLayer>, PackageCredentials | PackageRevisionRegistry>
+>
+type RuntimeModelFailure = Assert<
+  Equal<Extract<Layer.Error<typeof fallibleRuntimeLayer>, PackageModelLayerError>, PackageModelLayerError>
+>
+type RuntimeStorageFailure = Assert<
+  Equal<Extract<Layer.Error<typeof fallibleRuntimeLayer>, ObjectStoreFailure>, ObjectStoreFailure>
+>
+type RuntimeRevisionFailure = Assert<
+  Equal<Extract<Layer.Error<typeof fallibleRuntimeLayer>, PackageRevisionError>, PackageRevisionError>
+>
+const closingNativeLayer = Layer.effect(
+  PackageCredentials,
+  Effect.fail(PackageEnvironmentError.make({ profile: "native" })),
+)
+const nativeLayerEnvironment: NativeLayerEnvironment<PackageCredentials, PackageEnvironmentError> = {
+  environment: closingNativeLayer,
+}
+type MissingNativeEnvironmentRejected = Assert<
+  Equal<
+    IsAssignable<Record<never, never>, NativeLayerEnvironment<PackageCredentials, PackageEnvironmentError>>,
+    false
+  >
+>
+type WrongNativeEnvironmentRejected = Assert<
+  Equal<
+    IsAssignable<
+      { readonly environment: Layer.Layer<PackageRevisionRegistry> },
+      NativeLayerEnvironment<PackageCredentials, PackageEnvironmentError>
+    >,
+    false
+  >
+>
+type NativeFailureUnion = Assert<
+  Equal<
+    ClosedNativeError<Layer.Error<typeof fallibleRuntimeLayer>, PackageEnvironmentError>,
+    Layer.Error<typeof fallibleRuntimeLayer> | PackageEnvironmentError
+  >
+>
+void uncurriedFallibleAgent
+void curriedFallibleAgent
+void fallibleRuntimeLayer
+void nativeLayerEnvironment
 const oauthLayer = OAuth.layer({
   serverUrl: "https://mcp.example/rpc",
   redirectUrl: "http://127.0.0.1/callback",
@@ -256,4 +708,44 @@ const connectOptions: MCPConnectOptions = {
 const routed: Effect.Effect<MCPTools, MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =
   mcpConnect(connectOptions)
 void routed
+`
+
+export const packageSmokeInternalContracts = `import { Handoff, Memory } from "generalist"
+void Memory.itemFromPromptPart
+void Memory.messageFromRecall
+void Memory.isMessageFromRecall
+void Memory.replaceRecalledMessage
+void Memory.recalledMessageIdentity
+void Memory.projectTranscript
+void Handoff.Commit
+void Handoff.ControlState
+void Handoff.toControlState
+void Handoff.fromControlState
+void Handoff.takePendingContinuation
+void Handoff.initialHandoffRunState
+void Handoff.edgeLabel
+void Handoff.edgeCount
+void Handoff.incrementEdge
+type HandoffRunState = Handoff.HandoffRunState
+type HandoffFrame = Handoff.HandoffFrame
+type HandoffEdgeCount = Handoff.HandoffEdgeCount
+`
+
+export const packageSmokeTypecheckFailures = (): string => `import { Effect } from "effect"
+import { defaults } from "generalist/instructions/skills"
+import type { WorkingRequirement } from "generalist/memory"
+import type { ConsolidationProposer } from "generalist/unstable/learning"
+
+type MissingWorkingRequirement = WorkingRequirement<never>
+type MissingSummaryRequirement = import("generalist/memory").WorkingMemory.SummaryRequirement<
+  import("generalist/memory").WorkingMemory.Options
+>
+const arbitraryProposer: ConsolidationProposer = () => Effect.succeed([])
+void defaults
+void arbitraryProposer
+declare function usePrivateTypes(
+  working: MissingWorkingRequirement,
+  summary: MissingSummaryRequirement,
+): void
+void usePrivateTypes
 `

@@ -105,6 +105,7 @@ export {
   RuntimeOwnershipLost,
   RuntimeRetired,
 } from "../errors.js"
+export type { RuntimeAvailabilityError, RuntimeLifecycleError } from "../errors.js"
 export {
   layer,
   type AcquisitionError,

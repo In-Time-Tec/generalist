@@ -2,11 +2,17 @@ import { Schema, type Effect, type Stream } from "effect"
 import type { DurabilityFailure } from "../../durability/errors.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Cursor } from "../cursor.js"
-import type { PayloadTooLarge, RuntimeUnavailable } from "../errors.js"
+import type { PayloadTooLarge, RuntimeAvailabilityError, RuntimeUnavailable } from "../errors.js"
 import type { RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
-import { PendingInput, SessionSelection } from "./queue.js"
+import {
+  PendingInput,
+  SessionSelection,
+  type ControlInput,
+  type SessionQueueConflict,
+  type SubmitInput,
+} from "./queue.js"
 import { RetainedSession, type SessionFamilyInput, type SessionFamilyPage } from "./retained.js"
 export { SessionFamilyInput, SessionFamilyPage } from "./retained.js"
 import {
@@ -115,6 +121,12 @@ export class SessionSubscriberLagged extends ActionableTaggedError<SessionSubscr
 
 export type SessionError = SessionNotFound | RuntimeUnavailable | DurabilityFailure
 export type CreateSessionError = SessionConflict | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure
+export type SessionAdmissionError =
+  | SessionNotFound
+  | SessionQueueConflict
+  | PayloadTooLarge
+  | RuntimeAvailabilityError
+  | DurabilityFailure
 export type SessionEventsError =
   | SessionNotFound
   | SessionCursorExpired
@@ -126,17 +138,17 @@ export type SessionEventsError =
 export interface RuntimeHostSessions {
   readonly messageSessionInput: (
     input: Omit<import("./message.js").MessageInput, "from">,
-  ) => Effect.Effect<
-    import("./queue.js").QueueReceipt,
-    SessionError | import("./queue.js").SessionQueueConflict | PayloadTooLarge,
-    import("./message.js").SessionSender
-  >
-  readonly controlSession: import("../run/store.js").Service["controlSession"]
+  ) => Effect.Effect<import("./queue.js").QueueReceipt, SessionAdmissionError, import("./message.js").SessionSender>
+  readonly controlSession: (
+    input: ControlInput,
+  ) => Effect.Effect<void, SessionNotFound | RuntimeAvailabilityError | DurabilityFailure>
   readonly sessionFamily: (
     sessionId: string,
     input: SessionFamilyInput,
   ) => Effect.Effect<SessionFamilyPage, SessionError | SessionPageInvalid>
-  readonly submitSessionInput: import("../run/store.js").Service["submitSessionInput"]
+  readonly submitSessionInput: (
+    input: SubmitInput,
+  ) => Effect.Effect<import("./queue.js").QueueReceipt, SessionAdmissionError>
   readonly updateSessionInput: import("../run/store.js").Service["updateSessionInput"]
   readonly removeSessionInput: import("../run/store.js").Service["removeSessionInput"]
   readonly createSession: (input: CreateSessionInput) => Effect.Effect<HostSession, CreateSessionError>
