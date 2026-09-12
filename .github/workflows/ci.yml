@@ -52,6 +52,22 @@ jobs:
       - name: Check
         run: bun run check
 
+      - name: Prepare MinIO conformance image
+        run: |
+          image="$(bun -e 'import { minioImage } from "./packages/generalist/test/durability/local-minio.ts"; process.stdout.write(`${minioImage.name}:${minioImage.tag}`)')"
+          if docker image inspect "$image" >/dev/null 2>&1; then
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if docker pull "$image"; then
+              exit 0
+            fi
+            if [ "$attempt" = 3 ]; then
+              exit 1
+            fi
+            sleep "$((attempt * 5))"
+          done
+
       - name: Test
         run: bun run test
 

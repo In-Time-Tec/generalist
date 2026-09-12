@@ -35,14 +35,18 @@ export const providers = Layer.effect(Providers, collection([Container, RemoteIm
   Layer.provideMerge(DockerLive),
 )
 
+export const minioImage = {
+  name: "quay.io/minio/minio",
+  tag: "RELEASE.2025-04-22T22-12-26Z",
+} as const
+
 export const makeMinioStack = (input: { readonly name: string; readonly credentials: Credentials }) =>
   Stack(
     input.name,
     { providers, state: localState() },
     Effect.gen(function* () {
       const image = yield* RemoteImage("Image", {
-        name: "quay.io/minio/minio",
-        tag: "RELEASE.2025-04-22T22-12-26Z",
+        ...minioImage,
         alwaysPull: false,
       })
       const volume = yield* Volume("Data", {})
