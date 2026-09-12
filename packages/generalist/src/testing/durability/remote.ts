@@ -10,7 +10,8 @@ import {
   parse,
 } from "../../durability/internal/protocol.js"
 import { ObjectStore, ObjectStoreFailure, type Service } from "../../durability/object-store.js"
-import { atomicCreates, byteIntegrity, freshReads, listing, ObjectStoreConformanceFailure } from "./conformance.js"
+// prettier-ignore
+import { atomicCreates, byteIntegrity, createOutcomeEvidence, freshReads, listing, ObjectStoreConformanceFailure } from "./conformance.js"
 import { check, failureEvidence, increment, payload } from "./remote-support.js"
 import { isRunId, type Configuration } from "./remote-configuration.js"
 import type { CaseEvidence, Evidence } from "./remote-evidence.js"
@@ -148,6 +149,7 @@ export const qualify = (config: Configuration, host: { readonly runId: string; r
       }),
     )
     yield* runCase("conditional-same-slot-independent-clients", atomicCreates(contracts))
+    yield* runCase("create-outcome-evidence", createOutcomeEvidence(contracts))
     yield* runCase("fresh-client-visibility", freshReads(contracts))
     yield* runCase("binary-and-empty-integrity", byteIntegrity(contracts))
     yield* runCase(

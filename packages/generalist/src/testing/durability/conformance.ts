@@ -74,6 +74,66 @@ export const atomicCreates = <E, R>(options: ConformanceOptions<E, R>) =>
     )
   })
 
+/**
+ * Every create outcome other than `"created"` must be backed by a direct read. A conflict is
+ * illegal when read observes no object — in particular for a key that only prefixes another key
+ * or whose segment another object occupies.
+ * @experimental
+ */
+export const createOutcomeEvidence = <E, R>(options: ConformanceOptions<E, R>) =>
+  Effect.gen(function* () {
+    const client = yield* options.connect
+    const bytes = Uint8Array.of(1, 0, 255)
+    const child = `${options.prefix}/outcome/child`
+    yield* check(
+      (yield* client.create(child, bytes)) === "created",
+      "createOutcomeEvidence",
+      "A fresh nested key was not created",
+    )
+    // A key that collides with a stored object through the layout may either be representable
+    // (the create succeeds and reads back) or rejected as a typed layout error; never a phantom conflict.
+    const layoutCollision = (key: string) =>
+      Effect.gen(function* () {
+        const outcome = yield* Effect.result(client.create(key, Uint8Array.of(9)))
+        if (Result.isFailure(outcome)) {
+          return yield* check(
+            outcome.failure.reason === "invalid-response",
+            "createOutcomeEvidence",
+            `A create blocked by a stored object (${key}) failed without a typed invalid-response`,
+          )
+        }
+        yield* check(
+          (yield* client.read(key, { maxBytes: 1 })) !== undefined,
+          "createOutcomeEvidence",
+          outcome.success === "conflict"
+            ? "A conflict was reported for a key whose direct read observes no object"
+            : "A created key was invisible to a direct read",
+        )
+      })
+    yield* layoutCollision(`${options.prefix}/outcome`)
+    const segment = `${options.prefix}/outcome/segment`
+    yield* check(
+      (yield* client.create(segment, bytes)) === "created",
+      "createOutcomeEvidence",
+      "A fresh segment key was not created",
+    )
+    yield* layoutCollision(`${segment}/nested`)
+    const occupied = `${options.prefix}/outcome/occupied`
+    yield* check(
+      (yield* client.create(occupied, bytes)) === "created",
+      "createOutcomeEvidence",
+      "A fresh object key was not created",
+    )
+    const conflict = yield* client.create(occupied, Uint8Array.of(9))
+    yield* check(conflict === "conflict", "createOutcomeEvidence", "An existing object did not report a conflict")
+    const stored = yield* client.read(occupied, { maxBytes: bytes.byteLength })
+    yield* check(
+      equalBytes(stored?.bytes, bytes),
+      "createOutcomeEvidence",
+      "A conflict was not backed by the stored object's bytes",
+    )
+  })
+
 /** A new client must see acknowledged writes and distinguish absence. @experimental */
 export const freshReads = <E, R>(options: ConformanceOptions<E, R>) =>
   Effect.gen(function* () {

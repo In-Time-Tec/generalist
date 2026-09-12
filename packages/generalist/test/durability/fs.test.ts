@@ -43,6 +43,40 @@ layer(bunLayer, { excludeTestServices: true })(
       }),
     )
 
+    it.effect("reports a typed invalid-response instead of a conflict that read cannot observe", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "generalist-fs-" })
+        const store = yield* make({ dir })
+        const maintenance = yield* makeMaintenance({ dir })
+
+        yield* store.create("delta/child", Uint8Array.of(1))
+        expect(yield* store.read("delta", { maxBytes: 1 })).toBeUndefined()
+
+        const occupied = yield* Effect.result(store.create("delta", Uint8Array.of(2)))
+        expect(Result.isFailure(occupied) && occupied.failure.reason).toBe("invalid-response")
+        expect(yield* store.read("delta", { maxBytes: 1 })).toBeUndefined()
+
+        yield* maintenance.remove("delta/child")
+        const afterRemoval = yield* Effect.result(store.create("delta", Uint8Array.of(2)))
+        expect(Result.isFailure(afterRemoval) && afterRemoval.failure.reason).toBe("invalid-response")
+
+        const root = yield* Effect.result(store.create("/", Uint8Array.of(3)))
+        expect(Result.isFailure(root) && root.failure.reason).toBe("invalid-response")
+
+        yield* store.create("leaf", Uint8Array.of(4))
+        expect(yield* store.create("leaf", Uint8Array.of(5))).toBe("conflict")
+        expect(Array.from((yield* store.read("leaf", { maxBytes: 1 }))?.bytes ?? [])).toEqual([4])
+
+        yield* store.create("segment", Uint8Array.of(6))
+        const blocked = yield* Effect.result(store.create("segment/child", Uint8Array.of(7)))
+        expect(Result.isFailure(blocked) && blocked.failure.reason).toBe("invalid-response")
+        expect(yield* store.read("segment/child", { maxBytes: 1 })).toBeUndefined()
+        yield* maintenance.remove("segment")
+        expect(yield* store.create("segment/child", Uint8Array.of(7))).toBe("created")
+      }),
+    )
+
     it.effect("recovers journal head and receipts from a fresh transport over the same directory", () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
