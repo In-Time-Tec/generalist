@@ -187,7 +187,7 @@ const registerStatic = (
         yield* validateHandlers(entry.program.pinned, entry.handlers).pipe(
           Effect.mapError((error) =>
             invalidRegistration(
-              `Program ${error.kind} handler ${error.name} ${error.reason}: ${executable.ref.active}`,
+              `Program ${error.kind} handler ${error.handlerName} ${error.reason}: ${executable.ref.active}`,
             ),
           ),
         )
@@ -426,7 +426,7 @@ const resolveProgram = (
     yield* validateHandlers(program, handlers).pipe(
       Effect.mapError((mismatch) =>
         ExecutableRegistrationInvalid.make({
-          message: `reconstructed ${mismatch.kind} handler ${mismatch.name} ${mismatch.reason}: ${entry.pin}`,
+          message: `reconstructed ${mismatch.kind} handler ${mismatch.handlerName} ${mismatch.reason}: ${entry.pin}`,
         }),
       ),
     )

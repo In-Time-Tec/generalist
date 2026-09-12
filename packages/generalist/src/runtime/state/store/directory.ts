@@ -118,7 +118,7 @@ export const registerAgentName: {
     const key = agentNameKey(scope, input.name)
     const existing = state.agentNames.get(key)
     if (existing !== undefined && existing !== input.runId) {
-      return yield* AgentNameConflict.make({ scope, name: input.name, existingRunId: existing })
+      return yield* AgentNameConflict.make({ scope, agentName: input.name, existingRunId: existing })
     }
     const agentNames = new Map(state.agentNames)
     agentNames.set(key, input.runId)

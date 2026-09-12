@@ -169,7 +169,7 @@ const errorMessage = (error: typeof Schema.Unknown.Type): string => {
           return `handoff:${origin.specialist}`
       }
     }
-    return `tool name collision: ${error.name} (${error.origins.map(originName).join(", ")})`
+    return `tool name collision: ${error.toolName} (${error.origins.map(originName).join(", ")})`
   }
   return error instanceof globalThis.Error ? `${error.name}: ${error.message}` : String(error)
 }

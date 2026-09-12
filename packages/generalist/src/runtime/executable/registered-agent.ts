@@ -62,7 +62,7 @@ export const make = (): RegisteredAgents => {
       const names = new Set<string>()
       for (const registration of registrations) {
         if (names.has(registration.name) || entries.has(registration.name)) {
-          return Effect.fail(DuplicateAgent.make({ name: registration.name }))
+          return Effect.fail(DuplicateAgent.make({ agentName: registration.name }))
         }
         names.add(registration.name)
       }
@@ -400,7 +400,7 @@ export const resolve: {
   return Effect.gen(function* () {
     const name = yield* registeredName(input)
     const registration = yield* agents.get(name)
-    if (Option.isNone(registration)) return yield* UnknownAgent.make({ name, runId: input.runId })
+    if (Option.isNone(registration)) return yield* UnknownAgent.make({ agentName: name, runId: input.runId })
     const root = input.manifest.entries.find((entry) => entry.pin === input.manifest.root)
     const rootRegistration = root?._tag === "Agent" ? yield* agents.get(root.manifest.name) : Option.none()
     const executable = Option.isSome(rootRegistration)

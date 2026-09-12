@@ -101,7 +101,7 @@ export const make = (options: {
   const sessionSelection: RuntimeService["sessionSelection"] = (name) =>
     Effect.gen(function* () {
       const registration = yield* options.agents.get(name)
-      if (Option.isNone(registration)) return yield* UnknownAgent.make({ name, runId: "session-selection" })
+      if (Option.isNone(registration)) return yield* UnknownAgent.make({ agentName: name, runId: "session-selection" })
       return {
         executableRef: registration.value.executable.ref,
         executableManifest: registration.value.executable.manifest,
@@ -115,7 +115,7 @@ export const make = (options: {
     Effect.gen(function* () {
       const registration = yield* options.agents.getFor(agent)
       if (Option.isNone(registration)) {
-        return yield* UnknownAgent.make({ name: agent.name, runId: `schedule_${yield* generateId}` })
+        return yield* UnknownAgent.make({ agentName: agent.name, runId: `schedule_${yield* generateId}` })
       }
       const encoded = yield* encodeAgentInput(agent.input, input).pipe(
         Effect.provideContext(registration.value.context),
@@ -145,7 +145,7 @@ export const make = (options: {
     Effect.gen(function* () {
       const registration = yield* options.agents.getFor(agent)
       if (Option.isNone(registration)) {
-        return yield* UnknownAgent.make({ name: agent.name, runId: `run_${yield* generateId}` })
+        return yield* UnknownAgent.make({ agentName: agent.name, runId: `run_${yield* generateId}` })
       }
       const initialPrompt = yield* encodeAgentInput(agent.input, input).pipe(
         Effect.provideContext(registration.value.context),

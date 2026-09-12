@@ -17410,11 +17410,11 @@
         "properties": {
           "_tag": { "type": "string", "enum": ["generalist/core/ProgramHandlerMismatch"] },
           "kind": { "type": "string", "enum": ["tool", "step", "agent"] },
-          "name": { "type": "string" },
+          "handlerName": { "type": "string" },
           "reason": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "kind", "name", "reason", "hint"],
+        "required": ["_tag", "kind", "handlerName", "reason", "hint"],
         "additionalProperties": false
       },
       "generalist_core_ProgramIdentityMismatchEncoded": {
@@ -17432,11 +17432,11 @@
         "type": "object",
         "properties": {
           "_tag": { "type": "string", "enum": ["generalist/runtime/UnknownAgent"] },
-          "name": { "type": "string" },
+          "agentName": { "type": "string" },
           "runId": { "type": "string" },
           "hint": { "type": "string" }
         },
-        "required": ["_tag", "name", "runId", "hint"],
+        "required": ["_tag", "agentName", "runId", "hint"],
         "additionalProperties": false
       },
       "generalist_core_NestedOperationSuspendedEncoded": {

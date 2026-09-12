@@ -41,7 +41,7 @@ export const assemble = (candidates: ReadonlyArray<Candidate>): Effect.Effect<Re
     if (conflicts !== undefined && conflicts.length > 1) {
       return Effect.fail(
         ToolNameCollision.make({
-          name,
+          toolName: name,
           origins: Array.map(conflicts, ({ candidate: conflict }) => conflict.origin),
         }),
       )

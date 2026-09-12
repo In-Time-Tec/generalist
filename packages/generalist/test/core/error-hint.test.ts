@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
 import { ApprovalTokenInvalid } from "../../src/approvals.js"
-import { InvalidOutput } from "../../src/core/agent/event.js"
+import { InvalidOutput, ToolNameCollision } from "../../src/core/agent/event.js"
 import { ContextInvalid } from "../../src/core/context/session-projection.js"
 import { InvalidRuleFile } from "../../src/core/policy/rule-store.js"
-import { RunNotFound } from "../../src/runtime/errors.js"
+import { ProgramHandlerMismatch } from "../../src/core/program/errors.js"
+import { AgentNameConflict, DuplicateAgent, RunNotFound, UnknownAgent } from "../../src/runtime/errors.js"
 
 describe("actionable errors", () => {
   it("rejects incomplete encoded errors instead of upgrading them", () => {
@@ -17,6 +18,49 @@ describe("actionable errors", () => {
         runId: "run-17",
       }),
     ).toThrow()
+  })
+
+  it("keeps error.name equal to the tag when an error declares a name-shaped field", () => {
+    const duplicate = DuplicateAgent.make({ agentName: "dup" })
+    const unknown = UnknownAgent.make({ agentName: "unknown", runId: "run_1" })
+    const conflict = AgentNameConflict.make({ scope: "scope", agentName: "conflict", existingRunId: "run_1" })
+    const collision = ToolNameCollision.make({ toolName: "tool", origins: [{ _tag: "Static", agent: "agent" }] })
+    const mismatch = ProgramHandlerMismatch.make({
+      kind: "tool",
+      handlerName: "handler",
+      reason: "declared capability has no handler",
+    })
+
+    for (const error of [duplicate, unknown, conflict, collision, mismatch]) {
+      expect(error.name).toBe(error._tag)
+    }
+    expect(duplicate.message).toContain('agentName="dup"')
+    expect(unknown.message).toContain('agentName="unknown"')
+    expect(conflict.message).toContain('agentName="conflict"')
+    expect(collision.message).toContain('toolName="tool"')
+    expect(mismatch.message).toContain('handlerName="handler"')
+
+    const decoded = {
+      duplicate: Schema.decodeUnknownSync(DuplicateAgent)(
+        JSON.parse(JSON.stringify(Schema.encodeSync(DuplicateAgent)(duplicate))),
+      ),
+      unknown: Schema.decodeUnknownSync(UnknownAgent)(
+        JSON.parse(JSON.stringify(Schema.encodeSync(UnknownAgent)(unknown))),
+      ),
+      conflict: Schema.decodeUnknownSync(AgentNameConflict)(
+        JSON.parse(JSON.stringify(Schema.encodeSync(AgentNameConflict)(conflict))),
+      ),
+      collision: Schema.decodeUnknownSync(ToolNameCollision)(
+        JSON.parse(JSON.stringify(Schema.encodeSync(ToolNameCollision)(collision))),
+      ),
+      mismatch: Schema.decodeUnknownSync(ProgramHandlerMismatch)(
+        JSON.parse(JSON.stringify(Schema.encodeSync(ProgramHandlerMismatch)(mismatch))),
+      ),
+    }
+    for (const error of Object.values(decoded)) expect(error.name).toBe(error._tag)
+
+    const control = RunNotFound.make({ runId: "run_1" })
+    expect(control.name).toBe(control._tag)
   })
 
   it("keeps a declared message field and its hint separate", () => {

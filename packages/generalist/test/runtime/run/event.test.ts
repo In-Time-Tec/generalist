@@ -59,7 +59,7 @@ const failures: ReadonlyArray<RunFailureType> = [
   ProgramCapabilities.ProgramOperationUnknown.make({ operation: "externalLookup" }),
   ProgramCapabilities.ProgramSuspended.make({ operation: "approval", reason: "approval", token: "wait:1" }),
   ProgramCapabilities.ProgramCancelled.make({ reason: "cancelled by caller" }),
-  ProgramRunner.ProgramHandlerMismatch.make({ kind: "tool", name: "search", reason: "pin changed" }),
+  ProgramRunner.ProgramHandlerMismatch.make({ kind: "tool", handlerName: "search", reason: "pin changed" }),
   ProgramRunner.ProgramIdentityMismatch.make({ expected: "source-a", actual: "source-b" }),
 ]
 

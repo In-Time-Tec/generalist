@@ -747,7 +747,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "echo",
+            toolName: "echo",
             origins: [
               { _tag: "Static", agent: "collision-agent" },
               { _tag: "Static", agent: "collision-agent" },
@@ -812,7 +812,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "__proto__",
+            toolName: "__proto__",
             origins: [
               { _tag: "Static", agent: "duplicate-prototype-agent" },
               { _tag: "Static", agent: "duplicate-prototype-agent" },
@@ -845,7 +845,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "activate_skill",
+            toolName: "activate_skill",
             origins: [
               { _tag: "Static", agent: "reserved-agent" },
               { _tag: "Builtin", builtin: "activate_skill" },
@@ -1866,7 +1866,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "echo",
+            toolName: "echo",
             origins: [
               { _tag: "Static", agent: "static-skill-agent" },
               { _tag: "Skill", skill: "collision" },
@@ -1915,7 +1915,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(failure).toEqual(
           AgentEvent.ToolNameCollision.make({
-            name: "shared",
+            toolName: "shared",
             origins: [
               { _tag: "Skill", skill: "first" },
               { _tag: "Skill", skill: "second" },

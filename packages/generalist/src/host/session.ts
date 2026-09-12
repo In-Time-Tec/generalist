@@ -118,11 +118,11 @@ export const make =
             .updateSessionInput(request, (name) =>
               registeredByName.has(name)
                 ? runtime.sessionSelection(name)
-                : Effect.fail(UnknownAgent.make({ name, runId: "session-selection" })),
+                : Effect.fail(UnknownAgent.make({ agentName: name, runId: "session-selection" })),
             )
             .pipe(
               Effect.catchTag("generalist/runtime/UnknownAgent", (error) =>
-                AgentNotRegistered.make({ name: error.name }),
+                AgentNotRegistered.make({ name: error.agentName }),
               ),
             )
         }),
