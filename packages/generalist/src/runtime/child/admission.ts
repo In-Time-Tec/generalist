@@ -9,6 +9,7 @@ import { normalizePrompt } from "../state/prompt.js"
 import type {
   ChildSelectionMissing,
   IdempotencyConflict,
+  PayloadTooLarge,
   RunIdConflict,
   RunNotFound,
   RunTerminal,
@@ -82,6 +83,7 @@ export type AdmitChildError =
   | RunIdConflict
   | RunNotFound
   | RunTerminal
+  | PayloadTooLarge
   | RuntimeUnavailable
   | import("../../core/durable/run-budget.js").Exhausted
 export type ChildLookupError =

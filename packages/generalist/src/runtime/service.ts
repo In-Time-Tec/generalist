@@ -24,6 +24,7 @@ import type {
   RunNotFound,
   RunTerminal,
   RuntimeUnavailable,
+  PayloadTooLarge,
   SubscriberLagged,
   WaitNotOpen,
   FanOutConflict,
@@ -402,6 +403,7 @@ export type SendError =
   | ExecutableRegistrationConflict
   | ExecutableRegistrationMissing
   | TreePolicyInvalid
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 export type StartExecutionError =
@@ -420,12 +422,19 @@ export type StartExecutionError =
   | FanOutInvalid
   | FanOutRemainderUnsupported
   | TreePolicyInvalid
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
   | import("../core/durable/run-budget.js").Exhausted
 /** Typed Agent start failures before a Run handle exists. */
 export type StartError = StartExecutionError | UnknownAgent | AgentError
-export type ScheduleError = UnknownAgent | AgentError | ScheduleInvalid | RuntimeUnavailable | DurabilityFailure
+export type ScheduleError =
+  | UnknownAgent
+  | AgentError
+  | ScheduleInvalid
+  | PayloadTooLarge
+  | RuntimeUnavailable
+  | DurabilityFailure
 export type WakeError = RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure | WakeEventInvalid
 /** Exact-root staged admission failures. */
 export type AdmitError = StartExecutionError
@@ -436,6 +445,7 @@ export type SpawnError =
   | RunTerminal
   | ChildSelectionMissing
   | IdempotencyConflict
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
   | ChildDepthExceeded
@@ -457,6 +467,7 @@ export type SendMessageError =
   | CursorExpired
   | import("../core/turn/steering.js").InboxFull
   | import("../core/turn/steering.js").MessageTooLarge
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 export type DirectoryError = RunNotFound | RuntimeUnavailable | DurabilityFailure
@@ -511,6 +522,7 @@ export type RunSendError =
   | CursorExpired
   | import("../core/turn/steering.js").InboxFull
   | import("../core/turn/steering.js").MessageTooLarge
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 
@@ -533,6 +545,7 @@ export type ForkError =
   | SubstitutionInvalid
   | BudgetInvalid
   | BudgetExhausted
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 export type RewindError =
@@ -542,15 +555,16 @@ export type RewindError =
   | NoSnapshot
   | BudgetInvalid
   | BudgetExhausted
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 export type ExtendBudgetError = InspectError | BudgetInvalid
-export type OperatorActionError = InspectError | IllegalOperatorAction
+export type OperatorActionError = InspectError | IllegalOperatorAction | PayloadTooLarge
 export type OperatorApprovalError = ResolveDurableApprovalError | IllegalOperatorAction
 export type OperatorExtendBudgetError = ExtendBudgetError | IllegalOperatorAction
 export type SessionEntryError = SessionEntryNotFound | SessionEntryCorrupt | RuntimeUnavailable | DurabilityFailure
 export type ResolveModelResponseError = SessionEntryError
-export type RecordRewardError = RunNotFound | RuntimeUnavailable | DurabilityFailure
+export type RecordRewardError = RunNotFound | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure
 export type FanOutError =
   | ChildDepthExceeded
   | ChildLimitExceeded
@@ -560,6 +574,7 @@ export type FanOutError =
   | FanOutInvalid
   | FanOutRemainderUnsupported
   | ChildSelectionMissing
+  | PayloadTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
   | import("../core/durable/run-budget.js").Exhausted

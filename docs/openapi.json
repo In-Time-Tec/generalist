@@ -1532,10 +1532,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -3136,10 +3141,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -4685,10 +4695,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -6399,10 +6414,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -6546,10 +6566,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -6725,10 +6750,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -6884,10 +6914,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -7041,10 +7076,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -7183,10 +7223,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -7306,10 +7351,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -7391,6 +7441,7 @@
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
@@ -7474,6 +7525,7 @@
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
@@ -7557,6 +7609,7 @@
                     { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" },
                     { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                     { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
@@ -7686,10 +7739,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -8636,10 +8694,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -10912,10 +10975,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -11019,10 +11087,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -11150,10 +11223,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -11327,10 +11405,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -14075,6 +14158,17 @@
                                 {
                                   "type": "object",
                                   "properties": {
+                                    "_tag": { "type": "string", "enum": ["generalist/runtime/PayloadTooLarge"] },
+                                    "boundary": { "type": "string" },
+                                    "message": { "type": "string" },
+                                    "hint": { "type": "string" }
+                                  },
+                                  "required": ["_tag", "boundary", "message", "hint"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
                                     "_tag": { "type": "string", "enum": ["generalist/server/RequestFailed"] },
                                     "operation": { "type": "string" },
                                     "message": { "type": "string" },
@@ -14221,6 +14315,7 @@
                       { "$ref": "#/components/schemas/generalist_core_RunBudgetInvalidEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_IllegalOperatorActionEncoded" },
                       { "$ref": "#/components/schemas/generalist_server_OperatorDisabledEncoded" },
+                      { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" },
                       { "$ref": "#/components/schemas/generalist_server_RequestFailedEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_RunNotFoundEncoded" },
                       { "$ref": "#/components/schemas/generalist_runtime_RuntimeUnavailableEncoded" },
@@ -14314,10 +14409,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -14424,10 +14524,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -14696,10 +14801,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -14840,10 +14950,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -14966,10 +15081,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -15217,10 +15337,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -15324,10 +15449,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -15443,10 +15573,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -15562,10 +15697,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -15698,10 +15838,15 @@
             }
           },
           "413": {
-            "description": "generalist/blob-store/BlobTooLarge",
+            "description": "generalist/blob-store/BlobTooLarge | generalist/runtime/PayloadTooLarge",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" }
+                "schema": {
+                  "anyOf": [
+                    { "$ref": "#/components/schemas/generalist_blob-store_BlobTooLargeEncoded" },
+                    { "$ref": "#/components/schemas/generalist_runtime_PayloadTooLargeEncoded" }
+                  ]
+                }
               }
             }
           },
@@ -16304,6 +16449,17 @@
           "hint": { "type": "string" }
         },
         "required": ["_tag", "bytes", "maxBytes", "hint"],
+        "additionalProperties": false
+      },
+      "generalist_runtime_PayloadTooLargeEncoded": {
+        "type": "object",
+        "properties": {
+          "_tag": { "type": "string", "enum": ["generalist/runtime/PayloadTooLarge"] },
+          "boundary": { "type": "string" },
+          "message": { "type": "string" },
+          "hint": { "type": "string" }
+        },
+        "required": ["_tag", "boundary", "message", "hint"],
         "additionalProperties": false
       },
       "SystemMessage_1": {

@@ -388,7 +388,8 @@ layer(BunCrypto.layer)("external obligation recovery", (it) => {
         },
       }
       expect(yield* identifyRequest(oversized).pipe(Effect.flip)).toMatchObject({
-        _tag: "generalist/runtime/RuntimeUnavailable",
+        _tag: "generalist/runtime/PayloadTooLarge",
+        boundary: "external child admission",
       })
       yield* fixture.withHost(
         "parent",
@@ -412,7 +413,7 @@ layer(BunCrypto.layer)("external obligation recovery", (it) => {
           const writes = fixture.counts.writes
           expect(
             yield* store.reserve({ ...input, placementId: "oversized", request: oversized }).pipe(Effect.flip),
-          ).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
+          ).toMatchObject({ _tag: "generalist/runtime/PayloadTooLarge", boundary: "external child reservation" })
           expect(fixture.counts.writes).toBe(writes)
         }),
       )

@@ -312,7 +312,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
             result: completedResult("x".repeat(345_000)),
           }),
         )
-        expect(rejected._tag).toBe("generalist/runtime/RuntimeUnavailable")
+        expect(rejected._tag).toBe("generalist/runtime/PayloadTooLarge")
         expect((yield* store.inspect(child.runId)).status).toBe("running")
         expect(yield* runtime.childSettlements({ parentRunId: parent.runId, limit: 10 })).toEqual([])
         const text = "x".repeat(ChildSettlement.maxResultBytes * 2)

@@ -1,6 +1,6 @@
 import { Context, Effect, type Option } from "effect"
 import type { DurabilityFailure } from "../../../durability/errors.js"
-import type { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
+import type { PayloadTooLarge, RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import type {
   ExternalChildCapacityUnavailable,
   ExternalChildPlacementConflict,
@@ -47,6 +47,7 @@ export interface Service {
     | ExternalChildPlacementConflict
     | StaleClaim
     | StaleSessionClaim
+    | PayloadTooLarge
     | RuntimeUnavailable
     | DurabilityFailure
   >

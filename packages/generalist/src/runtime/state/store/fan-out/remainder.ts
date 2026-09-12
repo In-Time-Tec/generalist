@@ -2,7 +2,7 @@ import { Effect, Function } from "effect"
 import type { PreparedObservation } from "../../observation.js"
 import type { FanOutMemberResult } from "../../../child/fan-out.js"
 import { isTerminal } from "../../../run.js"
-import type { RuntimeUnavailable } from "../../../errors.js"
+import type { PayloadTooLarge, RuntimeUnavailable } from "../../../errors.js"
 import {
   appendLifecycle,
   cancellationRequestedEvent,
@@ -41,7 +41,7 @@ const cancelMember = (
   state: RuntimeState,
   parentRunId: string,
   member: FanOutMemberResult,
-): Effect.Effect<MemberCancellation, RuntimeUnavailable, PreparedObservation> =>
+): Effect.Effect<MemberCancellation, PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     if (!isUnsettled(member)) return { state, member }
     const run = state.runs.get(member.childRunId)

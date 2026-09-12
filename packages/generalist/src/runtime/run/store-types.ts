@@ -2,7 +2,7 @@ import type { DurabilityFailure } from "../../durability/errors.js"
 import type { Inheritance } from "../../core/agent/lifecycle/fan-out.js"
 import type { StaleClaim, StaleSessionClaim } from "./ownership-errors.js"
 import type { TreePolicy } from "../tree/policy.js"
-import type { RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
+import type { RunNotFound, RunTerminal, RuntimeUnavailable, PayloadTooLarge } from "../errors.js"
 import type { Message } from "../messaging/message.js"
 import type { AddressInvalid } from "../execution/agent/directory.js"
 import type { RunWait } from "./wait.js"
@@ -187,6 +187,7 @@ export type WorkerMutationError =
   | RunNotFound
   | RunTerminal
   | RuntimeUnavailable
+  | PayloadTooLarge
   | StaleClaim
   | StaleSessionClaim
   | DurabilityFailure
