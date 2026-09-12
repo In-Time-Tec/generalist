@@ -1,5 +1,5 @@
-/* oxlint-disable effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, typescript/no-unsafe-type-assertion, typescript/no-unsafe-argument, typescript/no-unsafe-return, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- Runtime.layer erases heterogeneous Agent declarations behind AgentRegistry and restores each exact contract through the distributive AgentServices helper. */
-import { Context, type Crypto, type Duration, Effect, Layer, Option, Schema, Scope, Types } from "effect"
+/* oxlint-disable effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, typescript/no-unsafe-argument, typescript/no-unsafe-return, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- Runtime.layer erases heterogeneous Agent declarations behind AgentRegistry and restores each exact contract through the distributive AgentServices helper. */
+import { Context, type Crypto, type Duration, Effect, Exit, Layer, Option, Schema, Scope, Types } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent, Any as AnyAgent, ClosedServices } from "../core/agent/lifecycle/definition.js"
 import type { ObjectStore } from "../durability/object-store.js"
@@ -28,6 +28,7 @@ import {
   DuplicateAgent,
   ExecutablePinMissing,
   ExecutableRegistrationInvalid,
+  ExecutableRegistrationMissing,
   RevisionMismatch,
   RevisionUnavailable,
   RuntimeOptionsInvalid,
@@ -287,6 +288,15 @@ const registeredAgentCodec = "generalist/runtime/registered-agent"
 
 const RevisionPayload = Schema.Struct({ revision: Schema.String })
 
+/** Resolution failures that are already RunFailure members and pass through unchanged. */
+const RunFailurePassthrough = Schema.Union([
+  RevisionUnavailable,
+  RevisionMismatch,
+  ExecutablePinMissing,
+  ExecutableRegistrationInvalid,
+  ExecutableRegistrationMissing,
+])
+
 const persistedRevision = (input: ResolverInput): string => {
   for (const registration of input.registrations) {
     const decoded = Schema.decodeUnknownOption(RevisionPayload)(registration.payload)
@@ -364,44 +374,61 @@ const makeResolver = (
       if (options.loadRevision === undefined) {
         return yield* RevisionUnavailable.make({ revision, agentName, executablePin })
       }
+      const loadRevision = options.loadRevision
       const scope = Scope.forkUnsafe(layerScope)
-      const result = yield* options
-        .loadRevision({ revision, agentName, executablePin })
-        .pipe(Effect.provideContext(Context.add(environment, Scope.Scope, scope)))
-      if (result._tag === "NotFound") {
-        return yield* RevisionUnavailable.make({ revision, agentName, executablePin })
-      }
-      const definition = result.definition
-      const services = yield* Layer.build(definition.services).pipe(
-        Effect.provideContext(Context.add(environment, Scope.Scope, scope)),
-      )
-      const agents = makeRegisteredAgents()
-      const declared = Object.values(definition.agents)
-      const pinByAgent = yield* registerClosure(
-        declared,
-        definition.revision,
-        Context.merge(environment, services),
-        agents,
-      )
-      const derivedPin = pinByAgent.get(agentName) ?? ""
-      if (definition.revision !== revision || derivedPin !== executablePin) {
-        return yield* RevisionMismatch.make({
-          expectedRevision: revision,
-          loadedRevision: definition.revision,
-          expectedExecutablePin: executablePin,
-          derivedExecutablePin: derivedPin,
-        })
-      }
-      loaded.set(executablePin, { revision: definition.revision, pinByAgent, agents })
-      return yield* resolveRegisteredAgent(agents, missing, input)
+      const loadAndRegister = Effect.gen(function* () {
+        const result = yield* loadRevision({ revision, agentName, executablePin }).pipe(
+          Effect.provideContext(Context.add(environment, Scope.Scope, scope)),
+        )
+        if (result._tag === "NotFound") {
+          return yield* RevisionUnavailable.make({ revision, agentName, executablePin })
+        }
+        const definition = result.definition
+        const services = yield* Layer.build(definition.services).pipe(
+          Effect.provideContext(Context.add(environment, Scope.Scope, scope)),
+        )
+        const agents = makeRegisteredAgents()
+        const declared = Object.values(definition.agents)
+        const pinByAgent = yield* registerClosure(
+          declared,
+          definition.revision,
+          Context.merge(environment, services),
+          agents,
+        )
+        const derivedPin = pinByAgent.get(agentName) ?? ""
+        if (definition.revision !== revision || derivedPin !== executablePin) {
+          return yield* RevisionMismatch.make({
+            expectedRevision: revision,
+            loadedRevision: definition.revision,
+            expectedExecutablePin: executablePin,
+            derivedExecutablePin: derivedPin,
+          })
+        }
+        loaded.set(executablePin, { revision: definition.revision, pinByAgent, agents })
+        return yield* resolveRegisteredAgent(agents, missing, input)
+      })
+      // A rejected or mismatched load retires its forked scope so already-built
+      // service resources do not accumulate across attempts.
+      return yield* loadAndRegister.pipe(Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))))
     })
   const service: ResolverService = {
-    // SAFETY: revision loading failures implement the resolver contract at runtime; the public
-    // ResolveError union stays narrow for existing static resolvers.
-    resolve: (input) =>
-      (input.registrations.some((registration) => registration.codec === registeredAgentCodec)
-        ? load(input)
-        : missing.resolve(input)) as Effect.Effect<Resolution, ResolveError, Scope.Scope>,
+    resolve: (input) => {
+      if (!input.registrations.some((registration) => registration.codec === registeredAgentCodec)) {
+        return missing.resolve(input)
+      }
+      // Loader and loaded-definition failures are not RunFailure members; collapse them into
+      // ExecutableRegistrationInvalid so a rejected retained Run persists a typed failure.
+      const normalized = load(input).pipe(
+        Effect.catch((error) =>
+          Schema.is(RunFailurePassthrough)(error)
+            ? Effect.fail(error)
+            : ExecutableRegistrationInvalid.make({ message: `Revision load failed: ${String(error)}` }),
+        ),
+      )
+      // SAFETY: every failure escaping `normalized` is a declared RunFailure member; the erased
+      // resolver boundary cannot name the application's loader error types.
+      return normalized as Effect.Effect<Resolution, ResolveError, Scope.Scope>
+    },
   }
   return service
 }
