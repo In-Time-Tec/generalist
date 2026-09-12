@@ -1,8 +1,8 @@
 import { objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "effect"
+import { Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, Hooks, ToolExecutor } from "../../src/index.js"
+import { Agent, Gate, Hooks, ToolExecutor } from "../../src/index.js"
 import {
   Address,
   Errors,
@@ -15,6 +15,7 @@ import {
 } from "../../src/runtime/index.js"
 import type { Service as ActiveExecutionsService } from "../../src/runtime/execution/active-executions.js"
 import { make as makeSteeringAdmission } from "../../src/runtime/run/steering.js"
+import { TestModel } from "../../src/testing/index.js"
 import { allowAllAuthorization } from "../authorization.js"
 import { assistantAddress, assistantRef, completedResult, objectLayer, registrationsFor } from "./execution/fixtures.js"
 import { provideScoped } from "./execution/scoped-provide.js"
@@ -169,6 +170,67 @@ it.effect("steer waits for current tool results and enters the next safe model b
 
 it.effect("Session input waits for the current tool and starts a separate Run after completion", () =>
   toolPolicy("session"),
+)
+
+it.effect("steering accepted during a blocking gate continues the run instead of discarding it", () =>
+  Effect.gen(function* () {
+    const entered = yield* Deferred.make<void>()
+    const release = yield* Deferred.make<void>()
+    const fixture = yield* TestModel.make([TestModel.text("first"), TestModel.text("after-steer")])
+    const agent = Agent.make({
+      name: "gate-steering-continuation",
+      gates: [
+        Gate.predicate({
+          name: "blocking",
+          check: () =>
+            Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release)), Effect.as(true)),
+        }),
+      ],
+      onGateFailure: "fail",
+    })
+    const runtimeLayer = objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(
+      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+    )
+    const services = Layer.merge(runtimeLayer, Layer.mergeAll(fixture.layer, allowAllAuthorization))
+
+    yield* provideScoped(
+      services,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor.RunExecutor
+        yield* runtime.register(agent)
+        const handle = yield* runtime.start(agent, "start")
+        const claim = yield* store.claimExecution({
+          commandId: "runtime-steering-test-ts-gate-claim",
+          runId: handle.runId,
+          ownerId: objectWorkerId,
+        })
+        const fiber = yield* executor.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
+        yield* Deferred.await(entered)
+
+        const steering = yield* runtime.send(handle.runId, "STEER-DURING-GATE", {
+          idempotencyKey: "steer-during-gate",
+          policy: "steer",
+        })
+        yield* Deferred.succeed(release, undefined)
+        yield* Fiber.join(fiber)
+
+        const awaited = yield* handle.await.pipe(Effect.exit)
+        const inspection = yield* runtime.inspect(handle.runId)
+        const history = yield* runtime.history({ runId: handle.runId, limit: 200 })
+        const count = (tag: string) => history.filter((event) => event._tag === tag).length
+
+        expect(steering.entryId).toBeDefined()
+        expect(Exit.isSuccess(awaited)).toBe(true)
+        expect(inspection.status).toBe("succeeded")
+        expect(count("RunCompleted")).toBe(1)
+        expect(count("SteeringConsumed")).toBe(1)
+        expect(count("SteeringDiscarded")).toBe(0)
+        expect(yield* fixture.requests).toHaveLength(2)
+      }),
+    )
+  }),
 )
 
 it.effect("interrupt journals first, stops an in-flight tool, and creates an Unknown obligation", () =>
