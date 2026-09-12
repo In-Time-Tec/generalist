@@ -1,16 +1,7 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context -- Alchemy's standalone adapter exposes any at this test-only resource boundary. */
 import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3"
 import { localState, Stack } from "alchemy"
-import {
-  Container,
-  ContainerProvider,
-  DockerLive,
-  Providers,
-  RemoteImage,
-  RemoteImageProvider,
-  Volume,
-  VolumeProvider,
-} from "alchemy/Docker"
+import { Container, ContainerProvider, DockerLive, Providers, Volume, VolumeProvider } from "alchemy/Docker"
 import { destroy, deploy, toEffect } from "alchemy/Test/Core"
 import { Crypto, Effect, Layer, Schedule, Schema } from "effect"
 import { collection } from "alchemy/Provider"
@@ -30,8 +21,8 @@ export interface Credentials {
   readonly secretAccessKey: string
 }
 
-export const providers = Layer.effect(Providers, collection([Container, RemoteImage, Volume])).pipe(
-  Layer.provide(Layer.mergeAll(ContainerProvider(), RemoteImageProvider(), VolumeProvider())),
+export const providers = Layer.effect(Providers, collection([Container, Volume])).pipe(
+  Layer.provide(Layer.mergeAll(ContainerProvider(), VolumeProvider())),
   Layer.provideMerge(DockerLive),
 )
 
@@ -45,13 +36,9 @@ export const makeMinioStack = (input: { readonly name: string; readonly credenti
     input.name,
     { providers, state: localState() },
     Effect.gen(function* () {
-      const image = yield* RemoteImage("Image", {
-        ...minioImage,
-        alwaysPull: false,
-      })
       const volume = yield* Volume("Data", {})
       const container = yield* Container("Server", {
-        image,
+        image: `${minioImage.name}:${minioImage.tag}`,
         start: true,
         command: ["server", "/data"],
         environment: {
