@@ -3,7 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { ParseOptions } from "effect/SchemaAST"
 import { Address } from "../address.js"
 
-export const Metadata = Schema.Record(Schema.String, Schema.Unknown)
+export const Metadata = Schema.JsonObject
 export type Metadata = typeof Metadata.Type
 
 export const Message = Schema.Struct({

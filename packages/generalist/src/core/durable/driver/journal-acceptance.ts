@@ -1,5 +1,6 @@
 import { Effect, Exit, Ref } from "effect"
 import { DriverError } from "../service.js"
+import type { DriverOperation } from "./contract.js"
 import type { Journal } from "./interpreter.js"
 
 export const make = (journal: Journal): Effect.Effect<Journal> =>
@@ -14,11 +15,18 @@ export const make = (journal: Journal): Effect.Effect<Journal> =>
         }
         return yield* effect.pipe(Effect.onExit((exit) => (Exit.isFailure(exit) ? Ref.set(failed, true) : Effect.void)))
       })
+    const onAdmissionExhausted = journal.onAdmissionExhausted
     return {
       onScheduled: (operation, checkpoint) => accept(Effect.suspend(() => journal.onScheduled(operation, checkpoint))),
       onCompleted: (operation, outcome, checkpoint) =>
         accept(Effect.suspend(() => journal.onCompleted(operation, outcome, checkpoint))),
       onCheckpoint: (checkpoint, commandId) =>
         accept(Effect.suspend(() => journal.onCheckpoint(checkpoint, commandId))),
+      ...(onAdmissionExhausted === undefined
+        ? undefined
+        : {
+            onAdmissionExhausted: (operation: DriverOperation) =>
+              accept(Effect.suspend(() => onAdmissionExhausted(operation))),
+          }),
     }
   })

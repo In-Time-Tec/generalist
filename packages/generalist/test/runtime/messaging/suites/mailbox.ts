@@ -1,9 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { DateTime, Effect, Schema } from "effect"
 import { Errors } from "../../../../src/runtime/index.js"
 import { completedResult, textPrompt } from "../../execution/fixtures.js"
 import { objectWorkerId } from "../../execution/object.js"
 import { messagingBackend, type MessagingBackend } from "../scenario.js"
+
+const nonJsonMetadata = { a: 0 }
+Reflect.set(nonJsonMetadata, "a", DateTime.toDate(DateTime.makeUnsafe(0)))
 
 export const messagingMailboxSuite = <StoreError, Extra = never>(backend: MessagingBackend<StoreError, Extra>) => {
   const { provide, familyFor } = messagingBackend(backend)
@@ -55,6 +58,22 @@ export const messagingMailboxSuite = <StoreError, Extra = never>(backend: Messag
 
         expect(error).toBeInstanceOf(Errors.SteeringConflict)
         expect(yield* runtime.messages({ runId: first.runId, limit: 10 })).toHaveLength(1)
+      }).pipe(provide()),
+    )
+
+    it.live("fails typed for non-JSON addressed metadata", () =>
+      Effect.gen(function* () {
+        const { runtime, parent, first } = yield* familyFor(session("metadata"))
+        const error = yield* runtime
+          .sendMessage({
+            fromRunId: parent.runId,
+            to: first.address,
+            idempotencyKey: "metadata",
+            prompt: textPrompt("hello"),
+            metadata: nonJsonMetadata,
+          })
+          .pipe(Effect.flip)
+        expect(error).toBeInstanceOf(Errors.RuntimeUnavailable)
       }).pipe(provide()),
     )
 

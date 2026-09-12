@@ -49,6 +49,7 @@ import { make as makeToolProgress } from "../tool/progress.js"
 import { managedToolHandlers } from "../../artifact.js"
 import { toolReplayPolicy } from "../../durable/component/replay.js"
 import { BackgroundTools } from "../../tools/background/index.js"
+import { isAdmissionExhausted } from "../../durable/driver/operation-outcome.js"
 
 const provideManagedHandlers = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -346,6 +347,11 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         )
         const executionBase = start.pipe(
           Effect.andThen(inputContext.inbox?.interruptTool(liveOutcome, interrupted) ?? liveOutcome),
+          Effect.flatMap((outcome) =>
+            outcome._tag === "DomainFailure" && isAdmissionExhausted(outcome.failure)
+              ? Effect.fail(outcome.failure)
+              : Effect.succeed(outcome),
+          ),
           Effect.flatMap((outcome) => hookToolResult(request.agentName, turn, call, outcome)),
           Effect.map((outcome) => (outcome._tag === "Suspend" ? outcome : { ...outcome, taint: capabilityTaint })),
         )

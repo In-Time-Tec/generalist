@@ -2,7 +2,12 @@ import type { PreparedObservation } from "../../observation.js"
 import { Effect, Function } from "effect"
 import { RunNotFound, RuntimeUnavailable } from "../../../errors.js"
 import { isTerminal } from "../../../run.js"
-import { canBlindRetry, type OperationRecord, type OperationStatus } from "../../../operation/record.js"
+import {
+  canBlindRetry,
+  type OperationRecord,
+  type OperationStatus,
+  type RetryReason,
+} from "../../../operation/record.js"
 import { appendLifecycle } from "../../append.js"
 import { operationKeyMapKey, operationMapKey, type RuntimeState } from "../../projection.js"
 
@@ -12,11 +17,16 @@ const getRun = (state: RuntimeState, runId: string) => {
   return run === undefined ? Effect.fail(RunNotFound.make({ runId })) : Effect.succeed(run)
 }
 
+type ExpireRunningOperationInput = {
+  readonly runId: string
+  readonly operationId: string
+  readonly reason?: RetryReason
+}
+
 export const expireRunningOperation: {
-  (input: {
-    readonly runId: string
-    readonly operationId: string
-  }): (
+  (
+    input: ExpireRunningOperationInput,
+  ): (
     state: RuntimeState,
   ) => Effect.Effect<
     readonly [
@@ -28,7 +38,7 @@ export const expireRunningOperation: {
   >
   (
     state: RuntimeState,
-    input: { readonly runId: string; readonly operationId: string },
+    input: ExpireRunningOperationInput,
   ): Effect.Effect<
     readonly [
       { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },
@@ -37,14 +47,14 @@ export const expireRunningOperation: {
     RunNotFound | RuntimeUnavailable,
     PreparedObservation
   >
-} = Function.dual(2, (state: RuntimeState, input: { readonly runId: string; readonly operationId: string }) =>
+} = Function.dual(2, (state: RuntimeState, input: ExpireRunningOperationInput) =>
   Effect.gen(function* () {
     const run = yield* getRun(state, input.runId)
     const current = state.operations.get(operationMapKey(input.runId, input.operationId))
     if (current === undefined) return yield* RuntimeUnavailable.make({ message: "operation missing" })
     if (current.status !== "running") return [{ record: current, outcome: current.status }, state] as const
     const operations = new Map(state.operations)
-    if (canBlindRetry(current.replayPolicy)) {
+    if (canBlindRetry(current.replayPolicy) || input.reason === "child-admission-rejected") {
       const record: OperationRecord = { ...current, status: "requested" }
       operations.set(operationMapKey(input.runId, input.operationId), record)
       operations.set(operationKeyMapKey(input.runId, record.operationKey), record)
