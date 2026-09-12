@@ -102,9 +102,14 @@ const decoder = new TextDecoder()
 
 /**
  * One object key segment maps to one filesystem name: UTF-8 bytes outside
- * [A-Za-z0-9._~-] become %XX escapes, and a leading dot is always escaped so no
+ * [a-z0-9._~-] become %XX escapes, and a leading dot is always escaped so no
  * stored name ever starts with "." — dot-prefixed names are transport-internal
- * (write temporaries) and never listed as objects.
+ * (write temporaries) and never listed as objects. ASCII uppercase letters are
+ * escaped too, so the namespace this encoding writes stays injective under
+ * filesystem case folding: case-variant keys cannot alias one file on a
+ * case-insensitive volume. Names stored by earlier unreleased encodings are
+ * not decoded or migrated; the transport is unreleased and a fresh directory
+ * is required across this change.
  */
 const encodeSegment = (segment: string): string => {
   const bytes = encoder.encode(segment)
@@ -115,7 +120,6 @@ const encodeSegment = (segment: string): string => {
     const char = String.fromCharCode(byte)
     const safe =
       (byte >= 0x30 && byte <= 0x39) ||
-      (byte >= 0x41 && byte <= 0x5a) ||
       (byte >= 0x61 && byte <= 0x7a) ||
       char === "_" ||
       char === "~" ||

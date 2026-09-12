@@ -66,5 +66,22 @@ layer(bunLayer, { excludeTestServices: true })(
         expect(page.keys).toEqual(["a/b/object"])
       }),
     )
+
+    it.effect("keeps case-variant keys distinct under filesystem case folding", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "generalist-fs-" })
+        const store = yield* make({ dir })
+        yield* store.create("case/Team", Uint8Array.of(1))
+        expect(yield* store.create("case/team", Uint8Array.of(2))).toBe("created")
+        expect(Array.from((yield* store.read("case/Team", { maxBytes: 1 }))?.bytes ?? [])).toEqual([1])
+        expect(Array.from((yield* store.read("case/team", { maxBytes: 1 }))?.bytes ?? [])).toEqual([2])
+        expect((yield* store.list("case/")).keys).toEqual(["case/Team", "case/team"])
+        // Distinct keys must never encode to file names that a case-insensitive volume folds together.
+        const entries = yield* fs.readDirectory(dir, { recursive: true })
+        const folded = entries.map((entry) => entry.toLowerCase())
+        expect(new Set(folded).size).toBe(folded.length)
+      }),
+    )
   },
 )

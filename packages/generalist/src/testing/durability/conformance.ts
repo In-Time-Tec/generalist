@@ -95,6 +95,38 @@ export const freshReads = <E, R>(options: ConformanceOptions<E, R>) =>
     )
   })
 
+/** Keys differing only by ASCII case are distinct byte strings and cannot alias. @experimental */
+export const caseEquivalentKeys = <E, R>(options: ConformanceOptions<E, R>) =>
+  Effect.gen(function* () {
+    const prefix = `${options.prefix}/case/`
+    const original = `${prefix}Team`
+    const variant = `${prefix}team`
+    const client = yield* options.connect
+    yield* check(
+      (yield* client.create(original, Uint8Array.of(1))) === "created",
+      "caseEquivalentKeys",
+      "An unused uppercase key was not created",
+    )
+    yield* check(
+      (yield* client.create(variant, Uint8Array.of(2))) === "created",
+      "caseEquivalentKeys",
+      "A case-variant key aliased an existing object instead of creating a distinct one",
+    )
+    const fresh = yield* options.connect
+    yield* check(
+      equalBytes((yield* fresh.read(original, { maxBytes: 1 }))?.bytes, Uint8Array.of(1)) &&
+        equalBytes((yield* fresh.read(variant, { maxBytes: 1 }))?.bytes, Uint8Array.of(2)),
+      "caseEquivalentKeys",
+      "Case-variant keys did not expose their own bytes",
+    )
+    const listed = yield* fresh.list(prefix)
+    yield* check(
+      listed.keys.includes(original) && listed.keys.includes(variant),
+      "caseEquivalentKeys",
+      "Listing omitted a case-variant key",
+    )
+  })
+
 /** Complete paginated discovery must neither skip nor duplicate acknowledged keys. @experimental */
 export const listing = <E, R>(options: ConformanceOptions<E, R> & { readonly count?: number }) =>
   Effect.gen(function* () {

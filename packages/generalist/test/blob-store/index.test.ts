@@ -1,8 +1,9 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- This adapter test is the Layer composition root. */
-import { BunCrypto } from "@effect/platform-bun"
+import { BunCrypto, BunServices } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Fiber, Layer } from "effect"
+import { Effect, Fiber, FileSystem, Layer } from "effect"
 import { BlobNotFound, BlobStore, BlobStoreError, layer, type LayerOptions } from "../../src/blob-store/index.js"
+import { layer as fsLayer } from "../../src/durability/fs.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
 import { blobStore } from "../../src/testing/blob-store.js"
 import { make, type Client } from "../../src/testing/durability/index.js"
@@ -142,6 +143,19 @@ describe("Object-backed BlobStore", () => {
       expect(otherRef.filename).toBe("other-tenant.png")
       expect((yield* store.get(ref.sha256)).ref).toEqual(ref)
     }),
+  )
+
+  it.effect("keeps case-variant tenant names isolated over the local-directory transport", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const dir = yield* fs.makeTempDirectoryScoped({ prefix: "generalist-blob-case-" })
+      const storeForTenant = (tenant: string) =>
+        BlobStore.pipe(Effect.provide(layer({ ...options, tenant }).pipe(Layer.provide(fsLayer({ dir })))))
+      const owner = yield* storeForTenant("Team")
+      const ref = yield* owner.put(input)
+      expect(yield* Effect.flip((yield* storeForTenant("team")).get(ref.sha256))).toBeInstanceOf(BlobNotFound)
+      expect(yield* Effect.flip((yield* storeForTenant("unrelated")).get(ref.sha256))).toBeInstanceOf(BlobNotFound)
+    }).pipe(Effect.provide(BunServices.layer)),
   )
 
   it.effect("stores a snapshot of caller bytes rather than a mutable upload buffer", () =>
