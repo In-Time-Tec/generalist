@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.65.8
+
+- Reject wait responses whose kind does not match the wait reason with typed `ResponseKindMismatch`, leaving the wait open for repair (#502).
+- Fail typed `WaitNotOpen` when a signal targets a wait that is not open (#503).
+- Retry provider streams after lifecycle-only start markers instead of treating them as terminal output (#504).
+- Correct invalid tool calls released behind lifecycle-only output by re-raising the correction error (#505).
+- Reject out-of-set hook decisions at each lifecycle boundary with `DriverStateInvalid` (#508).
+- Reject unusable hook `Replace` values as `HookFailed` before use (#507).
+- Reject or clamp compaction reserves that do not fit the context window (#512).
+- Return `FanOutConflict` for changed fan-out admissions (#517).
+- Fail JSON-invalid capability arguments as typed `ProgramSchemaFailure` in the core Program runner (#521).
+- Fix forked Program branch identity lookup for prototype-member operation names like `constructor` and `toString` (#523).
+- Fail duplicate approval wait identities typed before suspension (#525).
+- Clear stale budget suspensions after child settlement refunds (#528).
+- Fix `RunBudget.narrowChild` malformed grants to fail typed (#530).
+- Keep stable schedule registration idempotent across host restarts (#531).
+- Fail unrepresentable recurrence intervals typed instead of defecting (#532).
+- Reject Session create ids the durable store or HTTP router cannot address (#535).
+- Honor `Last-Event-ID` precedence before decoding the cursor query (#536).
+- Return typed `ToolNotRegistered` for unknown Tool lookups (#537).
+- Report oversized durable input as `PayloadTooLarge`, not `RuntimeUnavailable` (#538).
+- Encode stored attachment headers that native `Headers` rejects (#539).
+- Describe accepted request properties in the served OpenAPI (#541).
+- Return `ForkSequenceInvalid` for non-integer fork and rewind sequences (#542).
+- Fix deny projection across nested argument arrays (#544).
+- Persist approval remember rules only for open obligations (#545).
+- Skip turn-0 recall for continuing run segments (#546).
+- Fix fork and rewind at a committed `TurnCompleted` checkpoint (#547).
+- Project a decoded null terminal output as null from `Trajectory.fromJournal` (#548).
+- Reject oversize durable steering messages with a typed error (#499).
+- Fix Session queue mutation dropping a colliding accepted input (#500).
+- Escape ASCII uppercase in local-directory transport keys so case-insensitive volumes cannot fold distinct keys (#501).
+- Reject empty, leading, and trailing path segments in local-directory transport keys (#550).
+- Reject filesystem layout collisions instead of reporting phantom conflicts (#551).
+- Make the child admission invocation-id codec total and inverse (#553).
+- Keep `error.name` equal to the tag for errors with name-shaped fields (#555).
+
 ## 0.65.7
 
 - Price `Eval.usageUnder` USD checks with the `ModelCatalog` cost computation. Cached usage with undeclared cache rates now falls back to the input rate instead of reporting unknown USD, and a declared `inputTokens.uncached` is priced as declared rather than derived from `total` minus `cacheRead`. Token budgets are unchanged.
