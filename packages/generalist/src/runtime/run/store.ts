@@ -19,6 +19,7 @@ import type {
   IdempotencyConflict,
   RunIdConflict,
   ResponseConflict,
+  ResponseKindMismatch,
   ApprovalStale,
   ApprovalMismatch,
   RunNotFound,
@@ -276,7 +277,13 @@ export interface Service {
     input: RespondInput,
   ) => Effect.Effect<
     void,
-    RunNotFound | WaitNotOpen | ResponseConflict | RunTerminal | RuntimeUnavailable | DurabilityFailure
+    | RunNotFound
+    | WaitNotOpen
+    | ResponseConflict
+    | ResponseKindMismatch
+    | RunTerminal
+    | RuntimeUnavailable
+    | DurabilityFailure
   >
   readonly respondApproval: (
     input: RespondApprovalInput,

@@ -15,6 +15,22 @@ export const classifyResponse: {
   return Equal.equals(wait.resolution, resolution) ? "duplicate-identical" : "duplicate-conflict"
 })
 
+/** Resolution kinds the generic `respond` control may apply; `signal` owns named signals. */
+export type RespondResolution = Exclude<WaitResolution, { readonly _tag: "Signal" }>
+
+/** Whether one generic response kind matches the wait's immutable reason. */
+export const acceptsResponseKind: {
+  (resolution: RespondResolution): (reason: WaitReasonType) => boolean
+  (reason: WaitReasonType, resolution: RespondResolution): boolean
+} = Function.dual(2, (reason: WaitReasonType, resolution: RespondResolution): boolean => {
+  if (reason._tag === "Approval") return resolution._tag === "Approved" || resolution._tag === "Denied"
+  // `External` waits model cross-host child placements, whose settlement is a tool result.
+  if (reason._tag === "ToolWait" || reason._tag === "AwaitEvent" || reason._tag === "External") {
+    return resolution._tag === "ToolResult"
+  }
+  return false
+})
+
 export const encodeReason = (reason: WaitReasonType): string => JSON.stringify(reason)
 
 export const decodeReason = (encoded: string): WaitReasonType =>
