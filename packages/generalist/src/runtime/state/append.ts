@@ -9,21 +9,30 @@ import { isTerminal, type RunStatus } from "../run.js"
 import type { DurableAgentLoopEvent } from "../execution/agent/event.js"
 import type { ExecutionResult } from "../execution/state.js"
 import { eventIdFor, type LifecycleEvent, type RunEvent, type RunEventBase, type RunFailure } from "../run/event.js"
-import type { RuntimePublication, RuntimeState, StoredRun, SubscriberQueue } from "./projection.js"
+import type { RuntimePublication, RuntimeState, StoredRun } from "./projection.js"
 import { projectTreeEvent } from "../tree/event.js"
 import { appendTerminalToolResults } from "./session-store.js"
 import { append as appendHostSessionEvent } from "./store/host-session/events.js"
 
-const occurredAt = preparedOccurredAt
 type MutableStoredRun = { -readonly [Key in keyof StoredRun]: StoredRun[Key] }
 type EventBaseBuilder = Omit<RunEventBase, "parentRunId" | "causationId" | "attemptId"> & {
   parentRunId?: string
   causationId?: string
   attemptId?: string
 }
-type CancelledTerminal = { _tag: "RunCancelled"; reason?: string }
-type CancellationRequestedInput = { _tag: "RunCancellationRequested"; reason?: string }
 type CancelledInput = { _tag: "RunCancelled"; reason?: string }
+type CancellationRequestedInput = { _tag: "RunCancellationRequested"; reason?: string }
+type AppendResult = Effect.Effect<
+  readonly [RunEvent, RuntimeState],
+  PayloadTooLarge | RuntimeUnavailable,
+  PreparedObservation
+>
+type PrepareResult = Effect.Effect<RunEvent, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+type BuildResult = Effect.Effect<
+  readonly [RunEvent, StoredRun],
+  PayloadTooLarge | RuntimeUnavailable,
+  PreparedObservation
+>
 
 const baseFields = (run: StoredRun, sequence: number, occurredAtValue: string): RunEventBase => {
   const base: EventBaseBuilder = {
@@ -52,7 +61,7 @@ const terminalReason = (event: RunEvent): "completed" | "failed" | "cancelled" |
 
 const terminalToolState = (state: RuntimeState, runId: string, event: RunEvent) => {
   if (event._tag === "RunCancelled") {
-    const terminal: CancelledTerminal = { _tag: "RunCancelled" }
+    const terminal: CancelledInput = { _tag: "RunCancelled" }
     if (event.reason !== undefined) terminal.reason = event.reason
     return appendTerminalToolResults({ state, runId, terminal })
   }
@@ -93,14 +102,14 @@ const buildEvent = (
   state: RuntimeState,
   runId: string,
   build: (base: RunEventBase, run: StoredRun) => RunEvent,
-): Effect.Effect<readonly [RunEvent, StoredRun], PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
+): BuildResult =>
   Effect.gen(function* () {
     const run = state.runs.get(runId)
     if (run === undefined) {
       return yield* RuntimeUnavailable.make({ message: `run ${runId} missing during append` })
     }
     const sequence = run.lastSequence + 1
-    const at = yield* occurredAt
+    const at = yield* preparedOccurredAt
     const event = build(baseFields(run, sequence, at), run)
     yield* validatePayload({ value: event, boundary: "event", limit: maximumEventBytes })
     return [event, run] as const
@@ -111,15 +120,13 @@ export const appendEvent: {
     runId: string,
     build: (base: RunEventBase, run: StoredRun) => RunEvent,
     nextStatus?: RunStatus,
-  ): (
-    state: RuntimeState,
-  ) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  ): (state: RuntimeState) => AppendResult
   (
     state: RuntimeState,
     runId: string,
     build: (base: RunEventBase, run: StoredRun) => RunEvent,
     nextStatus?: RunStatus,
-  ): Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  ): AppendResult
 } = Function.dual(
   (args) => "runs" in Object(args[0]),
   (
@@ -220,19 +227,8 @@ type LifecycleInput = LifecycleEvent extends infer Event
   : never
 
 export const appendLifecycle: {
-  (
-    runId: string,
-    event: LifecycleInput,
-    nextStatus?: RunStatus,
-  ): (
-    state: RuntimeState,
-  ) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
-  (
-    state: RuntimeState,
-    runId: string,
-    event: LifecycleInput,
-    nextStatus?: RunStatus,
-  ): Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  (runId: string, event: LifecycleInput, nextStatus?: RunStatus): (state: RuntimeState) => AppendResult
+  (state: RuntimeState, runId: string, event: LifecycleInput, nextStatus?: RunStatus): AppendResult
 } = Function.dual(
   (args) => "runs" in Object(args[0]),
   (state: RuntimeState, runId: string, event: LifecycleInput, nextStatus?: RunStatus) =>
@@ -241,15 +237,8 @@ export const appendLifecycle: {
 
 /** @internal Build the next lifecycle event and validate its payload without appending it. */
 export const prepareLifecycle: {
-  (
-    runId: string,
-    event: LifecycleInput,
-  ): (state: RuntimeState) => Effect.Effect<RunEvent, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
-  (
-    state: RuntimeState,
-    runId: string,
-    event: LifecycleInput,
-  ): Effect.Effect<RunEvent, PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  (runId: string, event: LifecycleInput): (state: RuntimeState) => PrepareResult
+  (state: RuntimeState, runId: string, event: LifecycleInput): PrepareResult
 } = Function.dual(
   (args) => "runs" in Object(args[0]),
   (state: RuntimeState, runId: string, event: LifecycleInput) =>
@@ -257,17 +246,8 @@ export const prepareLifecycle: {
 )
 
 export const appendAgentEvent: {
-  (
-    runId: string,
-    event: DurableAgentLoopEvent,
-  ): (
-    state: RuntimeState,
-  ) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
-  (
-    state: RuntimeState,
-    runId: string,
-    event: DurableAgentLoopEvent,
-  ): Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  (runId: string, event: DurableAgentLoopEvent): (state: RuntimeState) => AppendResult
+  (state: RuntimeState, runId: string, event: DurableAgentLoopEvent): AppendResult
 } = Function.dual(3, (state: RuntimeState, runId: string, event: DurableAgentLoopEvent) =>
   appendEvent(state, runId, (base) => ({ ...base, ...event })),
 )
@@ -502,5 +482,3 @@ export const requireOpenRun: {
 
 export const rejectIfTerminal = (run: StoredRun): Option.Option<"succeeded" | "failed" | "cancelled"> =>
   isTerminal(run.status) ? Option.some(run.status) : Option.none()
-
-export type { SubscriberQueue }
