@@ -13,7 +13,7 @@ import { CurrentModelCallOrdinal } from "../operation-context.js"
 import { LoopDriverState, encode as encodeLoopState } from "../loop-driver-state.js"
 import { applyCommit, chargeUsage as chargeCheckpointUsage, withBudget, withHandoffState } from "../loop-driver.js"
 import type { ControlState } from "../../agent/handoff/state.js"
-import { OperationOutcomeResolution } from "./operation-outcome.js"
+import { isAdmissionExhausted, OperationOutcomeResolution } from "./operation-outcome.js"
 import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
@@ -52,6 +52,7 @@ export interface Journal {
     checkpoint: DriverCheckpoint,
   ) => Effect.Effect<void, DriverError>
   readonly onCheckpoint: (checkpoint: DriverCheckpoint, commandId?: string) => Effect.Effect<void, DriverError>
+  readonly onAdmissionExhausted?: (operation: DriverOperation) => Effect.Effect<void, DriverError>
 }
 /** Optional host journal service merged into Agent.stream driver layers. */
 export class DriverJournal extends Context.Service<DriverJournal, Journal>()(
@@ -254,6 +255,18 @@ export const make = (input: {
         }
         const ordinal = modelCallOrdinal(spec)
         const exit = yield* effect.pipe(Effect.provideService(CurrentModelCallOrdinal, ordinal), Effect.exit)
+        if (Exit.isFailure(exit)) {
+          const reason = exit.cause.reasons.length === 1 ? exit.cause.reasons[0] : undefined
+          if (
+            operation.kind === "tool" &&
+            reason !== undefined &&
+            Cause.isFailReason(reason) &&
+            isAdmissionExhausted(reason.error)
+          ) {
+            if (journal.onAdmissionExhausted !== undefined) yield* journal.onAdmissionExhausted(operation)
+            return yield* Effect.failCause(exit.cause)
+          }
+        }
         const outcome = OperationOutcomeResolution.outcomeFromExit(operation, exit)
         if (outcome !== undefined) {
           const encoded = yield* encodeOutcome(spec, outcome)

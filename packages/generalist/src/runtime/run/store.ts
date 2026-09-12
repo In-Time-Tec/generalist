@@ -64,7 +64,7 @@ import { RunFailure, type RewardInput, type RunEvent } from "./event.js"
 import type { CancelInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "../service.js"
 import type { ResolveOperationInput } from "../operation/resolution.js"
 import type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
-import type { OperationRecord, OperationStatus } from "../operation/record.js"
+import type { OperationRecord, OperationStatus, RetryReason } from "../operation/record.js"
 import type { ExecutionContinuation, SteeringEntry } from "./steering.js"
 import type { FanOutInspection, FanOutReceipt } from "../child/fan-out.js"
 import type { AdmitFanOutInput } from "../child/fan-out-internal.js"
@@ -687,6 +687,7 @@ export interface Service {
       ExecutionClaim & {
         readonly runId: string
         readonly operationId: string
+        readonly reason?: RetryReason
       },
   ) => Effect.Effect<
     { readonly record: OperationRecord; readonly outcome: "retried" | "unknown" | OperationStatus },

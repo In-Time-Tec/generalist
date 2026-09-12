@@ -1,10 +1,11 @@
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
-import { Effect, Layer, Ref, Schema } from "effect"
+import { DateTime, Effect, Layer, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
 import { Address, Errors, ExecutableResolver, RunStore, Runtime } from "../../../src/runtime/index.js"
+import { DurabilityFailure } from "../../../src/durability/errors.js"
 import {
   alternateAssistant,
   alternateAssistantRef,
@@ -47,6 +48,11 @@ const registrationsFor = (executable: ExecutableManifest.PinnedExecutable, suffi
   return [...pins].map((pin) => ({ pin, codec: "test", version: "1", payload: { fixture: suffix } }))
 }
 
+const rejectedMetadata: ReadonlyArray<readonly [string, unknown]> = [
+  ["undefined", { a: undefined }],
+  ["date", { a: DateTime.toDate(DateTime.makeUnsafe(0)) }],
+]
+
 const runtimeLayer = objectRuntimeLayer({
   addresses: [],
 }).pipe(
@@ -73,6 +79,31 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
       const duplicate = yield* runtime.startExecution(input)
       expect(duplicate.runId).toBe(first.runId)
       expect(duplicate).toEqual(first)
+    }),
+  )
+
+  it.effect("rejects non-JSON metadata with a declared failure instead of a SchemaError defect", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const base = {
+        executable: assistantRef,
+        registrations: registrationsFor(assistantRef),
+        sessionId: "metadata-session",
+        prompt: textPrompt("hello"),
+      }
+      const started = yield* runtime.startExecution({ ...base, idempotencyKey: "metadata-control", metadata: { a: 1 } })
+      expect(started.runId).toBeTruthy()
+      for (const [id, metadata] of rejectedMetadata) {
+        const error = yield* runtime
+          .startExecution({
+            ...base,
+            idempotencyKey: `metadata-${id}`,
+            metadata: Object.assign({ a: 0 }, metadata),
+          })
+          .pipe(Effect.flip)
+        expect(error).toBeInstanceOf(DurabilityFailure)
+        expect(error).toMatchObject({ reason: "encoding" })
+      }
     }),
   )
 

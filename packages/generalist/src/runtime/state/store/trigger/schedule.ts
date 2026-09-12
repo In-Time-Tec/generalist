@@ -6,6 +6,19 @@ import type { RuntimeState } from "../../projection.js"
 
 const iso = (millis: number): string => DateTime.formatIso(DateTime.makeUnsafe(millis))
 
+export const nextClaimAt = (state: RuntimeState): number | undefined => {
+  let next: number | undefined
+  for (const schedule of state.schedules.values()) {
+    const claim = state.scheduleClaims.get(schedule.scheduleId)
+    const due = Math.max(
+      DateTime.toEpochMillis(DateTime.makeUnsafe(schedule.nextAt)),
+      claim === undefined ? 0 : DateTime.toEpochMillis(DateTime.makeUnsafe(claim.leaseExpiresAt)),
+    )
+    next = next === undefined ? due : Math.min(next, due)
+  }
+  return next
+}
+
 export const registerSchedule: {
   (
     record: ScheduleRecord,

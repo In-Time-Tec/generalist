@@ -33,6 +33,9 @@ export type OperationStatus = typeof OperationStatus.Type
 export const ReplayPolicy = DriverReplayPolicy
 export type ReplayPolicy = DriverReplayPolicy
 
+export const RetryReason = Schema.Literals(["child-admission-rejected"])
+export type RetryReason = typeof RetryReason.Type
+
 export interface OperationRecord {
   readonly runId: string
   readonly operationId: string

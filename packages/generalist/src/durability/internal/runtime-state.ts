@@ -13,6 +13,7 @@ import { RuntimeState as RuntimeSchema, type HydratedState, type CanonicalState 
 import { normalize, restore, Value } from "./runtime-state/value.js"
 import { detach, mapValues as makeMapValues, hasKeyPrefix } from "./runtime-state/cache.js"
 import { make as makeExecutables } from "./runtime-state/executable.js"
+import { make as makeOperations } from "./runtime-state/operation.js"
 import { make as makeProjection } from "./runtime-state/projection.js"
 import type { Changes } from "./runtime-state/publications.js"
 
@@ -145,6 +146,7 @@ const encodeWith = (
   schema: typeof RuntimeSchema,
   normalizeValue: typeof normalize,
   executables: ReturnType<typeof makeExecutables>,
+  operations: ReturnType<typeof makeOperations>,
 ): Effect.Effect<State, DurabilityFailure> =>
   Effect.gen(function* () {
     yield* Effect.try({
@@ -153,7 +155,10 @@ const encodeWith = (
       },
       catch: encodingFailure,
     })
-    const canonical = yield* Effect.try({ try: () => executables.encode(state), catch: encodingFailure })
+    const canonical = yield* Effect.try({
+      try: () => ({ ...executables.encode(state), operations: operations.encode(state.operations) }),
+      catch: encodingFailure,
+    })
     const encoded = yield* Schema.encodeEffect(schema)(canonical).pipe(Effect.mapError(encodingFailure))
     yield* Effect.try({ try: () => executables.validate(canonical), catch: encodingFailure })
     const data = yield* Effect.try({ try: () => normalizeValue(encoded), catch: encodingFailure })
@@ -161,7 +166,7 @@ const encodeWith = (
   })
 
 export const encode = (state: RuntimeState): Effect.Effect<State, DurabilityFailure> =>
-  encodeWith(state, RuntimeSchema, normalize, makeExecutables())
+  encodeWith(state, RuntimeSchema, normalize, makeExecutables(), makeOperations())
 
 /** Fresh reconstruction uses only persisted data plus this process's subscriptions/lifecycle. */
 const decodeWith = (
@@ -171,6 +176,7 @@ const decodeWith = (
   restoreValue: typeof restore,
   copy: (state: HydratedState) => HydratedState,
   executables: ReturnType<typeof makeExecutables>,
+  operations: ReturnType<typeof makeOperations>,
   attach: ReturnType<typeof makeAttachments> = uncachedAttachments,
 ): Effect.Effect<RuntimeState, DurabilityFailure> =>
   Effect.gen(function* () {
@@ -186,7 +192,12 @@ const decodeWith = (
     )
     const restored = yield* Effect.try({ try: () => restoreValue(envelope.data), catch: corruptionFailure })
     const decoded = yield* Schema.decodeEffect(schema)(restored, strict).pipe(Effect.mapError(corruptionFailure))
-    const canonical = copy(yield* Effect.try({ try: () => executables.decode(decoded), catch: corruptionFailure }))
+    const canonical = copy(
+      yield* Effect.try({
+        try: () => ({ ...executables.decode(decoded), operations: operations.decode(decoded.operations) }),
+        catch: corruptionFailure,
+      }),
+    )
     yield* Effect.try({
       try: () => {
         for (const session of canonical.sessions.values()) validateSession(session)
@@ -202,7 +213,7 @@ export const decode = Function.dual<
 >(
   2,
   (persisted: State, local: RuntimeState): Effect.Effect<RuntimeState, DurabilityFailure> =>
-    decodeWith(persisted, local, RuntimeSchema, restore, Function.identity, makeExecutables()),
+    decodeWith(persisted, local, RuntimeSchema, restore, Function.identity, makeExecutables(), makeOperations()),
 )
 const object = (value: Schema.Json): value is State => Predicate.isObject(value) && !Array.isArray(value)
 const array = (value: Schema.Json): value is ReadonlyArray<Schema.Json> => Array.isArray(value)
@@ -265,6 +276,7 @@ export const make = () => {
   const hostAttach = makeAttachments(new WeakMap())
   let installed: { readonly source: HydratedState; readonly view: HydratedState } | undefined
   const executables = makeExecutables(originals)
+  const operations = makeOperations()
   let seed: State | undefined
   let current: { readonly source: State; readonly state: HydratedState; readonly canonical: CanonicalState } | undefined
   const sessions = new WeakMap<
@@ -293,7 +305,7 @@ export const make = () => {
       const decoded = yield* projection.decode(source).pipe(Effect.mapError(corruptionFailure))
       const state = yield* Effect.try({
         try: () => {
-          const hydrated = executables.decode(decoded)
+          const hydrated = { ...executables.decode(decoded), operations: operations.decode(decoded.operations) }
           validateSessions(hydrated)
           return hydrated
         },
@@ -364,7 +376,13 @@ export const make = () => {
         const state = attachState(base.state, local, attach)
         const [receipt, next] = yield* transition(state)
         const encoded = yield* Effect.try({
-          try: () => executables.encode(next, { state, canonical: base.canonical }),
+          try: () => ({
+            ...executables.encode(next, { state, canonical: base.canonical }),
+            operations: operations.encode(next.operations, {
+              hydrated: state.operations,
+              canonical: base.canonical.operations,
+            }),
+          }),
           catch: encodingFailure,
         })
         const prepared = yield* projection.encode(encoded, base.source).pipe(Effect.mapError(encodingFailure))

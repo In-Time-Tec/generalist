@@ -328,3 +328,138 @@ it.live("pages a fixed object leaf across reopen and bounds effective reads at p
     )
   })
 })
+
+it.live("skips an unreserved numeric checkpoint id for reservations and generated appends", () => {
+  const sessionId = "object:unreserved-checkpoint-id"
+
+  return Effect.gen(function* () {
+    const storage = yield* makeSimulator()
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const { store } = yield* claimedSession(sessionId, objectWorkerId, "unreserved-checkpoint:first")
+        const reserved = yield* store.reserveEntryId("reserve")
+        expect(reserved).toBe("0")
+        const checkpoint = yield* store.appendCheckpoint({
+          id: "1",
+          parentId: yield* store.leaf,
+          projectedHistory: Prompt.fromMessages([user("projection")]),
+          telemetry: [],
+        })
+        expect(checkpoint._tag).toBe("Appended")
+        const reservedAgain = yield* store.reserveEntryId("reserve-again")
+        expect(reservedAgain).toBe("2")
+        const generated = yield* store.append(
+          { _tag: "Message", message: user("generated append") },
+          { commandId: "generated-append" },
+        )
+        expect(generated.id).toBe("3")
+        expect((yield* store.entry("1"))?._tag).toBe("Compaction")
+      }),
+    )
+
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const reader = yield* sessionReader(sessionId)
+        expect((yield* reader.entry("1"))?._tag).toBe("Compaction")
+        expect((yield* reader.entry("3"))?._tag).toBe("Message")
+        expect((yield* reader.path()).map((entry) => entry.id)).toEqual(["1", "3"])
+      }),
+    )
+  })
+})
+
+it.live("skips an offset unreserved numeric checkpoint id for generated appends", () => {
+  const sessionId = "object:unreserved-checkpoint-offset"
+
+  return Effect.gen(function* () {
+    const storage = yield* makeSimulator()
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const { store } = yield* claimedSession(sessionId, objectWorkerId, "unreserved-offset:first")
+        const checkpoint = yield* store.appendCheckpoint({
+          id: "4",
+          parentId: yield* store.leaf,
+          projectedHistory: Prompt.fromMessages([user("offset projection")]),
+          telemetry: [],
+        })
+        expect(checkpoint._tag).toBe("Appended")
+        const generatedIds: Array<string> = []
+        for (let index = 0; index < 5; index += 1) {
+          generatedIds.push(
+            (yield* store.append(
+              { _tag: "Message", message: user(`generated-${index}`) },
+              { commandId: `generated-${index}` },
+            )).id,
+          )
+        }
+        expect(generatedIds).not.toContain("4")
+        expect(new Set(generatedIds).size).toBe(generatedIds.length)
+        const reserved = yield* store.reserveEntryId("offset-reserve")
+        expect(generatedIds).not.toContain(reserved)
+        expect((yield* store.entry("4"))?._tag).toBe("Compaction")
+      }),
+    )
+
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const reader = yield* sessionReader(sessionId)
+        expect((yield* reader.entry("4"))?._tag).toBe("Compaction")
+        expect(yield* reader.path()).toHaveLength(6)
+      }),
+    )
+  })
+})
+
+it.live("fails typed instead of cycling when explicit checkpoints exhaust generated integer IDs", () =>
+  Effect.gen(function* () {
+    const storage = yield* makeSimulator()
+    const sessionId = "object:checkpoint-counter-limit"
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const { store } = yield* claimedSession(sessionId, objectWorkerId, "counter-limit")
+        const checkpointId = String(Number.MAX_SAFE_INTEGER - 1)
+        yield* store.appendCheckpoint({
+          id: checkpointId,
+          parentId: yield* store.leaf,
+          projectedHistory: Prompt.fromMessages([user("projection")]),
+          telemetry: [],
+        })
+        expect(yield* store.reserveEntryId("counter-limit-reserve").pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/core/SessionStoreError",
+          reason: "unavailable",
+        })
+        expect(
+          yield* store
+            .append(
+              { _tag: "Message", message: user("generated") },
+              {
+                commandId: "counter-limit-generated",
+              },
+            )
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "generalist/core/SessionStoreError", reason: "unavailable" })
+        yield* store.appendCheckpoint({
+          id: String(Number.MAX_SAFE_INTEGER),
+          parentId: checkpointId,
+          projectedHistory: Prompt.fromMessages([user("last checkpoint")]),
+          telemetry: [],
+        })
+      }),
+    )
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const reader = yield* sessionReader(sessionId)
+        expect((yield* reader.path()).map((entry) => entry.id)).toEqual([
+          String(Number.MAX_SAFE_INTEGER - 1),
+          String(Number.MAX_SAFE_INTEGER),
+        ])
+      }),
+    )
+  }),
+)

@@ -7,7 +7,7 @@ import {
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, RunBudget } from "../../../src/index.js"
 import { TestModel } from "../../../src/testing/index.js"
 import {
@@ -394,6 +394,147 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
       expect(yield* runtime.inspect(receipt.runId)).toMatchObject({ budget: { children: 0 } })
     }),
   )
+})
+
+it.effect("resumes a fan-out interrupted by zero child slots after one extension", () => {
+  const child = Agent.make({ name: "child-zero-worker" })
+  const delegate = AgentTool.fanOut({
+    name: "delegate_child_zero",
+    description: "Delegate work after the extension",
+    agents: { worker: { agent: child } },
+    maxChildren: 1,
+  })
+  const parent = Agent.make({ name: "child-zero-parent", toolkit: Toolkit.make(delegate) })
+  const modelToolNames = Schema.Array(Schema.Struct({ name: Schema.String }))
+  let parentCalls = 0
+  const parentPrompts: Array<Prompt.Prompt> = []
+  const finish = Response.makePart("finish", { reason: "stop", usage, response: undefined })
+  const model = Layer.effect(
+    LanguageModel.LanguageModel,
+    LanguageModel.make({
+      generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+      streamText: (options) => {
+        const names = Schema.decodeSync(modelToolNames)(options.tools).map((tool) => tool.name)
+        if (names.includes(delegate.name)) {
+          parentCalls += 1
+          parentPrompts.push(options.prompt)
+          if (parentCalls === 1) {
+            return Stream.fromIterable<Response.StreamPartEncoded>([
+              Response.makePart("tool-call", {
+                id: "child-zero-call",
+                name: delegate.name,
+                params: { children: [{ agent: "worker", input: "alpha" }], concurrency: 1 },
+                providerExecuted: false,
+              }),
+              Response.makePart("finish", { reason: "tool-calls", usage, response: undefined }),
+            ])
+          }
+          return Stream.fromIterable<Response.StreamPartEncoded>([
+            Response.makePart("text-delta", { id: "parent", delta: "parent done" }),
+            finish,
+          ])
+        }
+        return Stream.fromIterable<Response.StreamPartEncoded>([
+          Response.makePart("text-delta", { id: "child", delta: "child done" }),
+          finish,
+        ])
+      },
+    }),
+  )
+  const storage = makeObjectStorage()
+  const layer = () =>
+    Layer.merge(
+      objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }, storage).pipe(
+        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      ),
+      Layer.merge(allowAllAuthorization, model),
+    )
+  return Effect.gen(function* () {
+    const runId = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(parent)
+        const handle = yield* runtime.start(parent, "run", { budget: RunBudget.make({ children: 0 }) })
+        yield* executor.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-budget-state-test-ts-claim-9",
+            runId: handle.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
+        expect(yield* runtime.inspect(handle.runId)).toMatchObject({
+          status: "waiting",
+          suspension: { _tag: "BudgetExhausted", budget: "children" },
+        })
+        return handle.runId
+      }).pipe((effect) => provideScoped(layer(), effect)),
+    )
+    yield* Effect.scoped(
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(parent)
+        expect(yield* runtime.inspect(runId)).toMatchObject({
+          status: "waiting",
+          suspension: { _tag: "BudgetExhausted", budget: "children" },
+        })
+        const extension = { commandId: "budget:children:resume", runId, delta: { children: 1 } }
+        yield* runtime.extendBudget(extension)
+        yield* runtime.extendBudget(extension)
+        expect(yield* runtime.inspect(runId)).toMatchObject({ status: "running", budget: { children: 1 } })
+        yield* executor.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-budget-state-test-ts-claim-10",
+            runId,
+            ownerId: objectWorkerId,
+          }),
+        )
+        const tree = yield* runtime.treeCheckpoint(runId)
+        const children = tree.inspection.runs.filter((entry) => entry.parentRunId === runId)
+        expect(children).toHaveLength(1)
+        yield* executor.execute(
+          yield* store.claimExecution({
+            commandId: "runtime-budget-state-test-ts-claim-11",
+            runId: children[0]!.run.runId,
+            ownerId: objectWorkerId,
+          }),
+        )
+        const afterChild = yield* runtime.inspect(runId)
+        if (afterChild.status === "running" || afterChild.status === "queued" || afterChild.status === "waiting") {
+          yield* executor.execute(
+            yield* store.claimExecution({
+              commandId: "runtime-budget-state-test-ts-claim-12",
+              runId,
+              ownerId: objectWorkerId,
+            }),
+          )
+        }
+        expect(yield* runtime.inspect(runId)).toMatchObject({ status: "succeeded", budget: { children: 0 } })
+        expect(
+          (yield* runtime.treeCheckpoint(runId)).inspection.runs
+            .filter((entry) => entry.parentRunId === runId)
+            .map((entry) => entry.run.status),
+        ).toEqual(["succeeded"])
+      }).pipe((effect) => provideScoped(layer(), effect)),
+    )
+    expect(
+      parentPrompts.some((prompt) =>
+        prompt.content.some(
+          (message) =>
+            message.role === "tool" &&
+            message.content.some(
+              (part) =>
+                part.type === "tool-result" &&
+                Schema.is(Schema.TaggedStruct("generalist/core/RunBudgetExhausted", {}))(part.result),
+            ),
+        ),
+      ),
+    ).toBe(false)
+    expect(parentCalls).toBe(2)
+  })
 })
 
 it.effect("recomputes spend after fresh object-host recovery and resumes without redispatch", () => {
