@@ -15,7 +15,7 @@ For every error below, the final segment of the tag names when it fires at the n
 
 ## Approvals, eval, host, and trajectory
 
-`generalist/approvals/ApprovalTokenInvalid`, `generalist/eval/InvalidSuiteOptions`, `generalist/host/AgentInputInvalid`, `generalist/host/AgentNotRegistered`, `generalist/host/PluginNameConflict`, `generalist/host/PluginToolConflict`, `generalist/host/SessionConflict`, `generalist/host/SessionCursorExpired`, `generalist/host/SessionNotFound`, `generalist/host/SessionSubscriberLagged`, `generalist/trajectory/ProjectionFailed`.
+`generalist/approvals/ApprovalTokenInvalid`, `generalist/eval/InvalidSuiteOptions`, `generalist/host/AgentInputInvalid`, `generalist/host/AgentNotRegistered`, `generalist/host/PluginNameConflict`, `generalist/host/PluginToolConflict`, `generalist/host/SessionConflict`, `generalist/host/SessionCursorExpired`, `generalist/host/SessionNotFound`, `generalist/host/SessionSubscriberLagged`, `generalist/host/ToolNotRegistered`, `generalist/trajectory/ProjectionFailed`.
 
 ## AI
 
