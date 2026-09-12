@@ -25,6 +25,7 @@ import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
 import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
+import * as AccountAuth from "generalist/unstable/providers/openai-account-auth"
 import { Server } from "generalist/server"
 import { Host, ToolIdentity, type HostToolRun } from "generalist/host"
 import { Config, Context, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -111,6 +112,162 @@ void packageAmbientMemory
 void packageExplicitMemory
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
+type AccountAuthInternalExport =
+  | "issuer"
+  | "clientId"
+  | "redirectUri"
+  | "scopes"
+  | "originator"
+  | "deviceVerificationUrl"
+  | "deviceExchangeRedirect"
+  | "credentialFormatVersion"
+type AccountAuthPublicKeys = keyof typeof AccountAuth
+type AccountAuthInternalExportsRemoved = Assert<
+  Equal<Extract<AccountAuthPublicKeys, AccountAuthInternalExport>, never>
+>
+type AccountAuthRetainedExport =
+  | "AuthError"
+  | "StoreError"
+  | "BrowserAuthorization"
+  | "DeviceAuthorizationPresenter"
+  | "TokenResponse"
+  | "DeviceStartResponse"
+  | "DevicePollResponse"
+  | "OAuthClient"
+  | "CredentialDisk"
+  | "CredentialStore"
+  | "generatePkce"
+  | "authorizationUrl"
+  | "OpenAIAccountAuth"
+  | "layer"
+  | "layerBrowserAuthorizationTest"
+  | "layerDeviceAuthorizationPresenterTest"
+  | "layerOAuthClientTest"
+  | "layerCredentialStoreTest"
+type AccountAuthRetainedExportsPresent = Assert<
+  Equal<Exclude<AccountAuthRetainedExport, AccountAuthPublicKeys>, never>
+>
+type AccountAuthError = AccountAuth.AuthError
+type AccountAuthStoreError = AccountAuth.StoreError
+type AccountAuthFailure = AccountAuth.Error
+type AccountAuthAuthorizationResult = AccountAuth.AuthorizationResult
+type AccountAuthBrowserAuthorization = AccountAuth.BrowserAuthorization
+type AccountAuthDevicePrompt = AccountAuth.DevicePrompt
+type AccountAuthDeviceAuthorizationPresenter = AccountAuth.DeviceAuthorizationPresenter
+type AccountAuthTokenResponse = AccountAuth.TokenResponse
+type AccountAuthDeviceStartResponse = typeof AccountAuth.DeviceStartResponse.Type
+type AccountAuthDevicePollResponse = typeof AccountAuth.DevicePollResponse.Type
+type AccountAuthOAuthClient = AccountAuth.OAuthClient
+type AccountAuthCredentialDisk = typeof AccountAuth.CredentialDisk.Type
+type AccountAuthCredential = AccountAuth.Credential
+type AccountAuthCredentialStore = AccountAuth.CredentialStore
+type AccountAuthStatus = AccountAuth.Status
+type AccountAuthService = AccountAuth.OpenAIAccountAuth
+type AccountAuthTimingOptions = AccountAuth.TimingOptions
+const accountAuthError = AccountAuth.AuthError.make({ kind: "login-required", message: "login required" })
+const accountAuthStoreError = AccountAuth.StoreError.make({ kind: "missing", message: "store missing" })
+const accountAuthCredential: AccountAuthCredential = {
+  accessToken: Redacted.make(""),
+  idToken: Redacted.make(""),
+  refreshToken: Redacted.make(""),
+  accountId: Redacted.make(""),
+  fingerprint: "",
+  generation: "",
+  expiresAt: 0,
+  refreshedAt: 0,
+}
+const accountAuthService: AccountAuthService["Service"] = {
+  loginBrowser: (_redirect?: string) => Effect.succeed(accountAuthCredential),
+  loginDevice: Effect.succeed(accountAuthCredential),
+  status: Effect.succeed({ _tag: "Unauthenticated" }),
+  logout: Effect.succeed({ removed: false, revocationSupported: false }),
+  acquire: Effect.fail(accountAuthError),
+  refreshRejected: (_generation: string) => Effect.fail(accountAuthError),
+}
+const accountAuthBrowser: AccountAuthBrowserAuthorization["Service"] = {
+  authorize: (_url, _state) => Effect.fail(accountAuthError),
+}
+const accountAuthPresenter: AccountAuthDeviceAuthorizationPresenter["Service"] = {
+  device: (_prompt) => Effect.fail(accountAuthError),
+}
+const accountAuthOAuth: AccountAuthOAuthClient["Service"] = {
+  exchange: (_input) => Effect.fail(accountAuthError),
+  refresh: (_refreshToken) => Effect.fail(accountAuthError),
+  deviceStart: Effect.fail(accountAuthError),
+  devicePoll: (_deviceAuthId, _userCode) => Effect.fail(accountAuthError),
+}
+const accountAuthStore: AccountAuthCredentialStore["Service"] = {
+  load: Effect.fail(accountAuthStoreError),
+  save: (_value: AccountAuthCredentialDisk) => Effect.fail(accountAuthStoreError),
+  remove: Effect.fail(accountAuthStoreError),
+  serialized: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+}
+const accountAuthAliases = {
+  AuthError: AccountAuth.AuthError,
+  StoreError: AccountAuth.StoreError,
+  BrowserAuthorization: AccountAuth.BrowserAuthorization,
+  DeviceAuthorizationPresenter: AccountAuth.DeviceAuthorizationPresenter,
+  TokenResponse: AccountAuth.TokenResponse,
+  DeviceStartResponse: AccountAuth.DeviceStartResponse,
+  DevicePollResponse: AccountAuth.DevicePollResponse,
+  OAuthClient: AccountAuth.OAuthClient,
+  CredentialDisk: AccountAuth.CredentialDisk,
+  CredentialStore: AccountAuth.CredentialStore,
+  generatePkce: AccountAuth.generatePkce,
+  authorizationUrl: AccountAuth.authorizationUrl,
+  OpenAIAccountAuth: AccountAuth.OpenAIAccountAuth,
+  layer: AccountAuth.layer,
+  layerBrowserAuthorizationTest: AccountAuth.layerBrowserAuthorizationTest,
+  layerDeviceAuthorizationPresenterTest: AccountAuth.layerDeviceAuthorizationPresenterTest,
+  layerOAuthClientTest: AccountAuth.layerOAuthClientTest,
+  layerCredentialStoreTest: AccountAuth.layerCredentialStoreTest,
+} satisfies Pick<typeof AccountAuth, AccountAuthRetainedExport>
+const accountAuthDirectUrl: URL = AccountAuth.authorizationUrl("challenge", Redacted.make("state"))
+const accountAuthCurriedUrl: URL = AccountAuth.authorizationUrl(Redacted.make("state"))("challenge")
+const accountAuthCredentialSchema: Schema.Schema<AccountAuthCredentialDisk> = AccountAuth.CredentialDisk
+const accountAuthTiming: AccountAuthTimingOptions = { deviceTimeout: 1 }
+const accountAuthLayers = [
+  AccountAuth.layer({ deviceTimeout: 1 }),
+  AccountAuth.layerBrowserAuthorizationTest(accountAuthBrowser),
+  AccountAuth.layerDeviceAuthorizationPresenterTest(accountAuthPresenter),
+  AccountAuth.layerOAuthClientTest(accountAuthOAuth),
+  AccountAuth.layerCredentialStoreTest(accountAuthStore),
+]
+const accountAuthMethods = [
+  accountAuthService.loginBrowser(),
+  accountAuthService.loginBrowser("http://localhost/callback"),
+  accountAuthService.loginDevice,
+  accountAuthService.status,
+  accountAuthService.logout,
+  accountAuthService.acquire,
+  accountAuthService.refreshRejected("generation"),
+]
+void accountAuthAliases
+void accountAuthDirectUrl
+void accountAuthCurriedUrl
+void accountAuthCredentialSchema
+void accountAuthTiming
+void accountAuthLayers
+void accountAuthMethods
+void Option.none<
+  | AccountAuthError
+  | AccountAuthStoreError
+  | AccountAuthFailure
+  | AccountAuthAuthorizationResult
+  | AccountAuthBrowserAuthorization
+  | AccountAuthDevicePrompt
+  | AccountAuthDeviceAuthorizationPresenter
+  | AccountAuthTokenResponse
+  | AccountAuthDeviceStartResponse
+  | AccountAuthDevicePollResponse
+  | AccountAuthOAuthClient
+  | AccountAuthCredentialDisk
+  | AccountAuthCredential
+  | AccountAuthCredentialStore
+  | AccountAuthStatus
+  | AccountAuthService
+  | AccountAuthTimingOptions
+>()
 const independentTool = Tool.make("package-checks", {
   parameters: Schema.Struct({ count: Schema.FiniteFromString }),
   success: Schema.FiniteFromString,

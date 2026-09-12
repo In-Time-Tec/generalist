@@ -1002,7 +1002,20 @@ const TestDurability = await import("generalist/testing/durability")
 const { Server } = await import("generalist/server")
 const { Config, Crypto, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
+const AccountAuth = await import("generalist/unstable/providers/openai-account-auth")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
+for (const name of [
+  "issuer",
+  "clientId",
+  "redirectUri",
+  "scopes",
+  "originator",
+  "deviceVerificationUrl",
+  "deviceExchangeRedirect",
+  "credentialFormatVersion",
+]) {
+  if (name in AccountAuth) throw new Error(\`OpenAI account auth protocol export is not internal: \${name}\`)
+}
 for (const value of [
   A2A.layer,
   AGUI.layer,
