@@ -6,16 +6,111 @@ import { credentialsFromAuth } from "../../../src/unstable/providers/openai-acco
 import {
   AuthError,
   authorizationUrl,
-  clientId,
-  issuer,
+  BrowserAuthorization,
+  CredentialDisk,
+  CredentialStore,
+  DeviceAuthorizationPresenter,
+  DevicePollResponse,
+  DeviceStartResponse,
   generatePkce,
   OAuthClient,
-  originator,
-  redirectUri,
-  scopes,
-  type OpenAIAccountAuth,
+  OpenAIAccountAuth,
+  StoreError,
+  TokenResponse,
+  layer as accountAuthLayer,
+  layerBrowserAuthorizationTest,
+  layerCredentialStoreTest,
+  layerDeviceAuthorizationPresenterTest,
+  layerOAuthClientTest,
 } from "../../../src/unstable/providers/openai-account-auth.js"
 import { layer } from "../../../src/unstable/providers/openai-account-auth-http.js"
+
+const issuer = "https://auth.openai.com"
+const clientId = "app_EMoamEEZ73f0CkXaXp7hrann"
+const redirectUri = "http://localhost:1455/auth/callback"
+const scopes = "openid profile email offline_access api.connectors.read api.connectors.invoke"
+const originator = "codex_cli_rs"
+
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
+      ? true
+      : false
+    : false
+type Assert<Value extends true> = Value
+type InternalExport =
+  | "issuer"
+  | "clientId"
+  | "redirectUri"
+  | "scopes"
+  | "originator"
+  | "deviceVerificationUrl"
+  | "deviceExchangeRedirect"
+  | "credentialFormatVersion"
+type PublicModule = typeof import("../../../src/unstable/providers/openai-account-auth.js")
+type PublicKeys = keyof PublicModule
+type RetainedExport =
+  | "AuthError"
+  | "StoreError"
+  | "BrowserAuthorization"
+  | "DeviceAuthorizationPresenter"
+  | "TokenResponse"
+  | "DeviceStartResponse"
+  | "DevicePollResponse"
+  | "OAuthClient"
+  | "CredentialDisk"
+  | "CredentialStore"
+  | "generatePkce"
+  | "authorizationUrl"
+  | "OpenAIAccountAuth"
+  | "layer"
+  | "layerBrowserAuthorizationTest"
+  | "layerDeviceAuthorizationPresenterTest"
+  | "layerOAuthClientTest"
+  | "layerCredentialStoreTest"
+const publicContractTypes: [
+  Assert<Equal<Extract<PublicKeys, InternalExport>, never>>,
+  Assert<Equal<Exclude<RetainedExport, PublicKeys>, never>>,
+] = [true, true]
+const publicTypeContract = Option.none<
+  | AuthError
+  | StoreError
+  | import("../../../src/unstable/providers/openai-account-auth.js").Error
+  | import("../../../src/unstable/providers/openai-account-auth.js").AuthorizationResult
+  | BrowserAuthorization
+  | import("../../../src/unstable/providers/openai-account-auth.js").DevicePrompt
+  | DeviceAuthorizationPresenter
+  | TokenResponse
+  | typeof DeviceStartResponse.Type
+  | typeof DevicePollResponse.Type
+  | OAuthClient
+  | typeof CredentialDisk.Type
+  | import("../../../src/unstable/providers/openai-account-auth.js").Credential
+  | CredentialStore
+  | import("../../../src/unstable/providers/openai-account-auth.js").Status
+  | OpenAIAccountAuth
+  | import("../../../src/unstable/providers/openai-account-auth.js").TimingOptions
+>()
+const publicValueContract = {
+  AuthError,
+  StoreError,
+  BrowserAuthorization,
+  DeviceAuthorizationPresenter,
+  TokenResponse,
+  DeviceStartResponse,
+  DevicePollResponse,
+  OAuthClient,
+  CredentialDisk,
+  CredentialStore,
+  generatePkce,
+  authorizationUrl,
+  OpenAIAccountAuth,
+  layer: accountAuthLayer,
+  layerBrowserAuthorizationTest,
+  layerDeviceAuthorizationPresenterTest,
+  layerOAuthClientTest,
+  layerCredentialStoreTest,
+} satisfies Pick<PublicModule, RetainedExport>
 
 const digest = (_algorithm: string, data: Uint8Array) =>
   Effect.promise(() =>
@@ -222,5 +317,25 @@ describe("OpenAI account authorization protocol", () => {
       const mismatch = credentialsFromAuth(service, "another-fingerprint")
       expect((yield* Effect.flip(mismatch.refreshRejected("old"))).operation).toBe("refreshRejected")
     }),
+  )
+})
+
+describe("OpenAI account authentication public contract", () => {
+  it.effect("retains supported values and hides fixed protocol constants", () =>
+    Effect.promise(() => import("../../../src/unstable/providers/openai-account-auth.js")).pipe(
+      Effect.map((accountAuth) => {
+        expect(Object.keys(accountAuth).toSorted()).toEqual(Object.keys(publicValueContract).toSorted())
+        expect(publicContractTypes).toEqual([true, true])
+        expect(Option.isNone(publicTypeContract)).toBe(true)
+        expect("issuer" in accountAuth).toBe(false)
+        expect("clientId" in accountAuth).toBe(false)
+        expect("redirectUri" in accountAuth).toBe(false)
+        expect("scopes" in accountAuth).toBe(false)
+        expect("originator" in accountAuth).toBe(false)
+        expect("deviceVerificationUrl" in accountAuth).toBe(false)
+        expect("deviceExchangeRedirect" in accountAuth).toBe(false)
+        expect("credentialFormatVersion" in accountAuth).toBe(false)
+      }),
+    ),
   )
 })

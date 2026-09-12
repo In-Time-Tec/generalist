@@ -1,22 +1,15 @@
 import { Clock, Context, Crypto, Effect, Encoding, Function, Layer, Option, Redacted, Result, Schema } from "effect"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
-
-/** @experimental */
-export const issuer = "https://auth.openai.com"
-/** @experimental */
-export const clientId = "app_EMoamEEZ73f0CkXaXp7hrann"
-/** @experimental */
-export const redirectUri = "http://localhost:1455/auth/callback"
-/** @experimental */
-export const scopes = "openid profile email offline_access api.connectors.read api.connectors.invoke"
-/** @experimental */
-export const originator = "codex_cli_rs"
-/** @experimental */
-export const deviceVerificationUrl = `${issuer}/codex/device`
-/** @experimental */
-export const deviceExchangeRedirect = `${issuer}/deviceauth/callback`
-/** @experimental */
-export const credentialFormatVersion = 1
+import {
+  credentialFormatVersion,
+  deviceExchangeRedirect,
+  deviceVerificationUrl,
+  redirectUri,
+  issuer,
+  clientId,
+  originator,
+  scopes,
+} from "./openai-account-auth-internal.js"
 
 /** @experimental */
 export class AuthError extends ActionableTaggedError<AuthError>()("generalist/ai/OpenAIAccountAuthError", {
