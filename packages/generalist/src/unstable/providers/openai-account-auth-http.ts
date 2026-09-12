@@ -2,13 +2,12 @@ import { Effect, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import {
   AuthError,
-  clientId,
   DevicePollResponse,
   DeviceStartResponse,
   OAuthClient,
-  issuer,
   TokenResponse,
 } from "./openai-account-auth.js"
+import { clientId, issuer } from "./openai-account-auth-internal.js"
 
 const failure = (kind: AuthError["kind"], message: string) => AuthError.make({ kind, message })
 const PermanentRefreshError = Schema.Struct({

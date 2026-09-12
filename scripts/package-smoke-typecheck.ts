@@ -6,12 +6,14 @@ import { Agent, DurableDriver, Handoff, Memory, ModelMiddleware, ModelRegistry, 
 import { LanguageModel } from "effect/unstable/ai"
 import { A2A } from "generalist/unstable/a2a"
 import { AGUI } from "generalist/unstable/ag-ui"
-import { VectorStore } from "generalist/memory"
+import * as MemoryFeature from "generalist/memory"
+import { VectorStore, WorkingMemory as MemoryWorkingMemory } from "generalist/memory"
 import { MCPClient, OAuth } from "generalist/unstable/mcp"
 import { make as makeMcpHttpTransport } from "generalist/unstable/mcp/client/http"
 import { connect as mcpConnect, type MCPTools, type Options as MCPConnectOptions } from "generalist/unstable/mcp/tools"
 import { load } from "generalist/instructions"
-import { GitHubCatalog, HttpCatalog, S3Catalog } from "generalist/instructions/skills"
+import { GitHubCatalog, HttpCatalog, S3Catalog, type Limits } from "generalist/instructions/skills"
+import { consolidate, type ConsolidationProposer } from "generalist/unstable/learning"
 import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
@@ -25,6 +27,7 @@ import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
 import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
+import * as AccountAuth from "generalist/unstable/providers/openai-account-auth"
 import { Server } from "generalist/server"
 import { Host, ToolIdentity, type HostToolRun } from "generalist/host"
 import { Config, Context, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
@@ -48,8 +51,226 @@ type HostedCatalogInternal = Assert<Equal<"HostedCatalog" extends keyof SkillsRo
 type HttpSourceInternal = Assert<Equal<"source" extends keyof HttpCatalog.Options ? true : false, false>>
 type S3SourceInternal = Assert<Equal<"source" extends keyof S3Catalog.Options ? true : false, false>>
 type GitHubSourceInternal = Assert<Equal<"source" extends keyof GitHubCatalog.Options ? true : false, false>>
+type HostedLimits = Assert<
+  Equal<keyof Limits, "manifestMaxBytes" | "bodyMaxBytes" | "maxSkills" | "toolsBySkill">
+>
+const packageLimits: Limits = {
+  manifestMaxBytes: 1_048_576,
+  bodyMaxBytes: 1_048_576,
+  maxSkills: 1_000,
+  toolsBySkill: {},
+}
+const packageGitHubOptions: GitHubCatalog.Options = {
+  ...packageLimits,
+  owner: "acme",
+  repo: "agent-skills",
+  ref: "a".repeat(40),
+}
+const packageHttpOptions: HttpCatalog.Options = { ...packageLimits, manifestUrl: "https://skills.example/skills.json" }
+const packageS3Options: S3Catalog.Options = { ...packageLimits, bucket: "company-skills", region: "us-west-2" }
+const packageProposer: ConsolidationProposer = consolidate({
+  schedule: "FREQ=DAILY",
+  window: "1 day",
+  model: "summary-model",
+  maxProposals: 1,
+})
+declare const packageSummaryModel: Layer.Layer<LanguageModel.LanguageModel>
+const packageAmbientWorking = MemoryWorkingMemory.layer({ summarize: {} })
+const packageExplicitWorking = MemoryWorkingMemory.layer({ summarize: { model: packageSummaryModel } })
+const packageAmbientMemory = MemoryFeature.layer({ working: { summarize: {} } })
+const packageExplicitMemory = MemoryFeature.layer({ working: { summarize: { model: packageSummaryModel } } })
+type PackageAmbientWorking = Assert<
+  Equal<LayerShape<typeof packageAmbientWorking>, readonly [Memory.Memory, never, LanguageModel.LanguageModel]>
+>
+type PackageExplicitWorking = Assert<
+  Equal<LayerShape<typeof packageExplicitWorking>, readonly [Memory.Memory, never, never]>
+>
+type PackageAmbientMemory = Assert<
+  Equal<
+    LayerShape<typeof packageAmbientMemory>,
+    readonly [
+      Memory.Memory,
+      never,
+      VectorStore.VectorStore | import("effect/unstable/ai").EmbeddingModel.EmbeddingModel | LanguageModel.LanguageModel,
+    ]
+  >
+>
+type PackageExplicitMemory = Assert<
+  Equal<
+    LayerShape<typeof packageExplicitMemory>,
+    readonly [
+      Memory.Memory,
+      never,
+      VectorStore.VectorStore | import("effect/unstable/ai").EmbeddingModel.EmbeddingModel,
+    ]
+  >
+>
+void packageGitHubOptions
+void packageHttpOptions
+void packageS3Options
+void packageProposer
+void packageAmbientWorking
+void packageExplicitWorking
+void packageAmbientMemory
+void packageExplicitMemory
 type StreamServices<Value> = Value extends Stream.Stream<unknown, unknown, infer Services> ? Services : never
 type EffectServices<Value> = Value extends Effect.Effect<unknown, unknown, infer Services> ? Services : never
+type AccountAuthInternalExport =
+  | "issuer"
+  | "clientId"
+  | "redirectUri"
+  | "scopes"
+  | "originator"
+  | "deviceVerificationUrl"
+  | "deviceExchangeRedirect"
+  | "credentialFormatVersion"
+type AccountAuthPublicKeys = keyof typeof AccountAuth
+type AccountAuthInternalExportsRemoved = Assert<
+  Equal<Extract<AccountAuthPublicKeys, AccountAuthInternalExport>, never>
+>
+type AccountAuthRetainedExport =
+  | "AuthError"
+  | "StoreError"
+  | "BrowserAuthorization"
+  | "DeviceAuthorizationPresenter"
+  | "TokenResponse"
+  | "DeviceStartResponse"
+  | "DevicePollResponse"
+  | "OAuthClient"
+  | "CredentialDisk"
+  | "CredentialStore"
+  | "generatePkce"
+  | "authorizationUrl"
+  | "OpenAIAccountAuth"
+  | "layer"
+  | "layerBrowserAuthorizationTest"
+  | "layerDeviceAuthorizationPresenterTest"
+  | "layerOAuthClientTest"
+  | "layerCredentialStoreTest"
+type AccountAuthRetainedExportsPresent = Assert<
+  Equal<Exclude<AccountAuthRetainedExport, AccountAuthPublicKeys>, never>
+>
+type AccountAuthError = AccountAuth.AuthError
+type AccountAuthStoreError = AccountAuth.StoreError
+type AccountAuthFailure = AccountAuth.Error
+type AccountAuthAuthorizationResult = AccountAuth.AuthorizationResult
+type AccountAuthBrowserAuthorization = AccountAuth.BrowserAuthorization
+type AccountAuthDevicePrompt = AccountAuth.DevicePrompt
+type AccountAuthDeviceAuthorizationPresenter = AccountAuth.DeviceAuthorizationPresenter
+type AccountAuthTokenResponse = AccountAuth.TokenResponse
+type AccountAuthDeviceStartResponse = typeof AccountAuth.DeviceStartResponse.Type
+type AccountAuthDevicePollResponse = typeof AccountAuth.DevicePollResponse.Type
+type AccountAuthOAuthClient = AccountAuth.OAuthClient
+type AccountAuthCredentialDisk = typeof AccountAuth.CredentialDisk.Type
+type AccountAuthCredential = AccountAuth.Credential
+type AccountAuthCredentialStore = AccountAuth.CredentialStore
+type AccountAuthStatus = AccountAuth.Status
+type AccountAuthService = AccountAuth.OpenAIAccountAuth
+type AccountAuthTimingOptions = AccountAuth.TimingOptions
+const accountAuthError = AccountAuth.AuthError.make({ kind: "login-required", message: "login required" })
+const accountAuthStoreError = AccountAuth.StoreError.make({ kind: "missing", message: "store missing" })
+const accountAuthCredential: AccountAuthCredential = {
+  accessToken: Redacted.make(""),
+  idToken: Redacted.make(""),
+  refreshToken: Redacted.make(""),
+  accountId: Redacted.make(""),
+  fingerprint: "",
+  generation: "",
+  expiresAt: 0,
+  refreshedAt: 0,
+}
+const accountAuthService: AccountAuthService["Service"] = {
+  loginBrowser: (_redirect?: string) => Effect.succeed(accountAuthCredential),
+  loginDevice: Effect.succeed(accountAuthCredential),
+  status: Effect.succeed({ _tag: "Unauthenticated" }),
+  logout: Effect.succeed({ removed: false, revocationSupported: false }),
+  acquire: Effect.fail(accountAuthError),
+  refreshRejected: (_generation: string) => Effect.fail(accountAuthError),
+}
+const accountAuthBrowser: AccountAuthBrowserAuthorization["Service"] = {
+  authorize: (_url, _state) => Effect.fail(accountAuthError),
+}
+const accountAuthPresenter: AccountAuthDeviceAuthorizationPresenter["Service"] = {
+  device: (_prompt) => Effect.fail(accountAuthError),
+}
+const accountAuthOAuth: AccountAuthOAuthClient["Service"] = {
+  exchange: (_input) => Effect.fail(accountAuthError),
+  refresh: (_refreshToken) => Effect.fail(accountAuthError),
+  deviceStart: Effect.fail(accountAuthError),
+  devicePoll: (_deviceAuthId, _userCode) => Effect.fail(accountAuthError),
+}
+const accountAuthStore: AccountAuthCredentialStore["Service"] = {
+  load: Effect.fail(accountAuthStoreError),
+  save: (_value: AccountAuthCredentialDisk) => Effect.fail(accountAuthStoreError),
+  remove: Effect.fail(accountAuthStoreError),
+  serialized: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect,
+}
+const accountAuthAliases = {
+  AuthError: AccountAuth.AuthError,
+  StoreError: AccountAuth.StoreError,
+  BrowserAuthorization: AccountAuth.BrowserAuthorization,
+  DeviceAuthorizationPresenter: AccountAuth.DeviceAuthorizationPresenter,
+  TokenResponse: AccountAuth.TokenResponse,
+  DeviceStartResponse: AccountAuth.DeviceStartResponse,
+  DevicePollResponse: AccountAuth.DevicePollResponse,
+  OAuthClient: AccountAuth.OAuthClient,
+  CredentialDisk: AccountAuth.CredentialDisk,
+  CredentialStore: AccountAuth.CredentialStore,
+  generatePkce: AccountAuth.generatePkce,
+  authorizationUrl: AccountAuth.authorizationUrl,
+  OpenAIAccountAuth: AccountAuth.OpenAIAccountAuth,
+  layer: AccountAuth.layer,
+  layerBrowserAuthorizationTest: AccountAuth.layerBrowserAuthorizationTest,
+  layerDeviceAuthorizationPresenterTest: AccountAuth.layerDeviceAuthorizationPresenterTest,
+  layerOAuthClientTest: AccountAuth.layerOAuthClientTest,
+  layerCredentialStoreTest: AccountAuth.layerCredentialStoreTest,
+} satisfies Pick<typeof AccountAuth, AccountAuthRetainedExport>
+const accountAuthDirectUrl: URL = AccountAuth.authorizationUrl("challenge", Redacted.make("state"))
+const accountAuthCurriedUrl: URL = AccountAuth.authorizationUrl(Redacted.make("state"))("challenge")
+const accountAuthCredentialSchema: Schema.Schema<AccountAuthCredentialDisk> = AccountAuth.CredentialDisk
+const accountAuthTiming: AccountAuthTimingOptions = { deviceTimeout: 1 }
+const accountAuthLayers = [
+  AccountAuth.layer({ deviceTimeout: 1 }),
+  AccountAuth.layerBrowserAuthorizationTest(accountAuthBrowser),
+  AccountAuth.layerDeviceAuthorizationPresenterTest(accountAuthPresenter),
+  AccountAuth.layerOAuthClientTest(accountAuthOAuth),
+  AccountAuth.layerCredentialStoreTest(accountAuthStore),
+]
+const accountAuthMethods = [
+  accountAuthService.loginBrowser(),
+  accountAuthService.loginBrowser("http://localhost/callback"),
+  accountAuthService.loginDevice,
+  accountAuthService.status,
+  accountAuthService.logout,
+  accountAuthService.acquire,
+  accountAuthService.refreshRejected("generation"),
+]
+void accountAuthAliases
+void accountAuthDirectUrl
+void accountAuthCurriedUrl
+void accountAuthCredentialSchema
+void accountAuthTiming
+void accountAuthLayers
+void accountAuthMethods
+void Option.none<
+  | AccountAuthError
+  | AccountAuthStoreError
+  | AccountAuthFailure
+  | AccountAuthAuthorizationResult
+  | AccountAuthBrowserAuthorization
+  | AccountAuthDevicePrompt
+  | AccountAuthDeviceAuthorizationPresenter
+  | AccountAuthTokenResponse
+  | AccountAuthDeviceStartResponse
+  | AccountAuthDevicePollResponse
+  | AccountAuthOAuthClient
+  | AccountAuthCredentialDisk
+  | AccountAuthCredential
+  | AccountAuthCredentialStore
+  | AccountAuthStatus
+  | AccountAuthService
+  | AccountAuthTimingOptions
+>()
 const independentTool = Tool.make("package-checks", {
   parameters: Schema.Struct({ count: Schema.FiniteFromString }),
   success: Schema.FiniteFromString,
@@ -380,4 +601,23 @@ const connectOptions: MCPConnectOptions = {
 const routed: Effect.Effect<MCPTools, MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =
   mcpConnect(connectOptions)
 void routed
+`
+
+export const packageSmokeTypecheckFailures = (): string => `import { Effect } from "effect"
+import { defaults } from "generalist/instructions/skills"
+import type { WorkingRequirement } from "generalist/memory"
+import type { ConsolidationProposer } from "generalist/unstable/learning"
+
+type MissingWorkingRequirement = WorkingRequirement<never>
+type MissingSummaryRequirement = import("generalist/memory").WorkingMemory.SummaryRequirement<
+  import("generalist/memory").WorkingMemory.Options
+>
+const arbitraryProposer: ConsolidationProposer = () => Effect.succeed([])
+void defaults
+void arbitraryProposer
+declare function usePrivateTypes(
+  working: MissingWorkingRequirement,
+  summary: MissingSummaryRequirement,
+): void
+void usePrivateTypes
 `
