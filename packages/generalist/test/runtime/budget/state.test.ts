@@ -8,7 +8,8 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, RunBudget } from "../../../src/index.js"
+import { Agent, AgentTool, RunBudget } from "../../../src/index.js"
+import { TestModel } from "../../../src/testing/index.js"
 import {
   Address,
   ChildAdmission,
@@ -494,3 +495,74 @@ it("normalizes all public dimensions", () => {
     children: 6,
   })
 })
+
+it.effect("clears a stale budget suspension when child settlement refunds its dimension", () =>
+  Effect.gen(function* () {
+    const childUsage = Response.Usage.make({
+      inputTokens: { total: 2, uncached: 2, cacheRead: undefined, cacheWrite: undefined },
+      outputTokens: { total: 2, text: 2, reasoning: undefined },
+    })
+    const fixture = yield* TestModel.make([
+      TestModel.turn(
+        [
+          TestModel.toolCall("delegate_refund", {
+            children: [
+              { agent: "worker", input: "alpha" },
+              { agent: "worker", input: "beta" },
+            ],
+            concurrency: 2,
+          }),
+        ],
+        { usage, finishReason: "tool-calls" },
+      ),
+      TestModel.turn([TestModel.text("alpha")], { usage: childUsage, finishReason: "stop" }),
+      TestModel.turn([TestModel.text("beta")], { usage: childUsage, finishReason: "stop" }),
+      TestModel.turn([TestModel.text("parent done")], { usage, finishReason: "stop" }),
+    ])
+    return yield* provideScoped(
+      runtimeLayer(fixture.layer),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore.RunStore
+        const worker = Agent.make({ name: "refund-worker" })
+        const delegate = AgentTool.fanOut({
+          name: "delegate_refund",
+          description: "Delegate work to a bounded child group",
+          agents: { worker: { agent: worker } },
+          maxChildren: 2,
+        })
+        const parent = Agent.make({ name: "refund-parent", toolkit: Toolkit.make(delegate) })
+        yield* runtime.register(parent)
+        const handle = yield* runtime.start(parent, "run", { budget: RunBudget.make({ tokens: 100, children: 2 }) })
+        const claim = (runId: string, commandId: string) =>
+          store.claimExecution({ commandId, runId, ownerId: objectWorkerId }).pipe(Effect.flatMap(executor.execute))
+        yield* claim(handle.runId, "refund-parent-1")
+        // Fan-out admission reserves all remaining tokens, which suspends the parent on its own dimension.
+        expect(yield* runtime.inspect(handle.runId)).toMatchObject({
+          status: "waiting",
+          budget: { tokens: 0 },
+          suspension: { _tag: "BudgetExhausted", budget: "tokens" },
+        })
+        const tree = yield* runtime.treeCheckpoint(handle.runId)
+        const children = tree.inspection.runs.filter((entry) => entry.parentRunId === handle.runId)
+        expect(children).toHaveLength(2)
+        for (const [index, child] of children.entries()) {
+          yield* claim(child.run.runId, `refund-child-${index}`)
+        }
+        // Settling both children refunds their unused reservations and must not leave a stale suspension.
+        expect(yield* runtime.inspect(handle.runId)).toMatchObject({ status: "running", budget: { tokens: 90 } })
+        expect((yield* runtime.inspect(handle.runId)).suspension).toBeUndefined()
+        for (let index = 0; index < 4; index++) {
+          const current = yield* runtime.inspect(handle.runId)
+          if (current.status !== "running") break
+          yield* claim(handle.runId, `refund-parent-${index + 2}`)
+        }
+        expect(yield* runtime.inspect(handle.runId)).toMatchObject({ status: "succeeded", budget: { tokens: 88 } })
+        const history = yield* runtime.history({ runId: handle.runId, limit: 200 })
+        expect(history.filter((event) => event._tag === "ChildSettled")).toHaveLength(2)
+        expect(history.filter((event) => event._tag === "RunAttemptStarted").length).toBeGreaterThanOrEqual(2)
+      }),
+    )
+  }),
+)

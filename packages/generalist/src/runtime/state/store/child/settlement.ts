@@ -7,6 +7,7 @@ import type { RunEvent } from "../../../run/event.js"
 import { appendLifecycle, childReadinessChangedEvent, childSettledEvent, resumedEvent } from "../../append.js"
 import { openRunWaits, type RuntimeState, type StoredRun } from "../../projection.js"
 import { admitChildSettlement } from "../directory.js"
+import { recoverBudgetSuspension } from "../control/budget.js"
 import { closeWait } from "../control/wait.js"
 import { spendForEvents } from "../../../execution/inspection.js"
 
@@ -155,10 +156,11 @@ export const settleParentChild: {
       currentParent === undefined || terminalEvent === undefined
         ? linked
         : yield* reconcileChildWait(linked, currentParent, child, terminalEvent)
-    const afterResume = reconciled.runs.get(parent.runId)
-    if (afterResume?.status !== "queued" || hasUnsettledChild(reconciled, parent.runId)) return reconciled
+    const recovered = yield* recoverBudgetSuspension(reconciled, parent.runId)
+    const afterResume = recovered.runs.get(parent.runId)
+    if (afterResume?.status !== "queued" || hasUnsettledChild(recovered, parent.runId)) return recovered
     const [, started] = yield* appendLifecycle(
-      reconciled,
+      recovered,
       parent.runId,
       { _tag: "RunAttemptStarted", attempt: afterResume.attempt + 1 },
       "running",
