@@ -1,6 +1,6 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Cause, Context, Effect, Exit, Layer, Schema, Scope, Stream } from "effect"
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent } from "generalist"
 import { ObjectStore } from "generalist/durability/object-store"
@@ -12,13 +12,11 @@ const usage = Response.Usage.make({
   outputTokens: { total: 1, text: 1, reasoning: undefined },
 })
 const finish = Response.makePart("finish", { reason: "stop", usage, response: undefined })
-const modelLayer = Layer.effect(
-  LanguageModel.LanguageModel,
-  LanguageModel.make({
-    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
-    streamText: () => Stream.make(Response.makePart("text-delta", { id: "answer", delta: "done" }), finish),
-  }),
-)
+const modelService = LanguageModel.make({
+  generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+  streamText: () => Stream.make(Response.makePart("text-delta", { id: "answer", delta: "done" }), finish),
+})
+const modelLayer = Layer.effect(LanguageModel.LanguageModel, modelService)
 
 const storageLayer = () => Layer.merge(Layer.succeed(ObjectStore, makeObjectStorage().store), BunCrypto.layer)
 
@@ -144,6 +142,94 @@ describe("Runtime.layer", () => {
         ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime))),
       )
       expect(runtime.start).toBeTypeOf("function")
+    }),
+  )
+
+  it.effect("preserves service and storage Layer failures as their original tagged values", () =>
+    Effect.gen(function* () {
+      const assistant = Agent.make({ name: "fallible-assistant" })
+      const serviceFailure = ModelConfigError.make({ model: "missing-model" })
+      const storageFailure = StorageConfigError.make({ bucket: "missing-bucket" })
+      const failedServices = Layer.effect(LanguageModel.LanguageModel, Effect.fail(serviceFailure))
+      const failedStorage = Layer.merge(Layer.effect(ObjectStore, Effect.fail(storageFailure)), BunCrypto.layer)
+
+      const observedServiceFailure = yield* acquire(
+        Runtime.layer({
+          agents: { "fallible-assistant": assistant },
+          revision: "fallible-services-v1",
+          services: failedServices,
+          storage: storageLayer(),
+          namespace: { ...namespace, partition: "composition-service-failure" },
+        }),
+      ).pipe(Effect.flip)
+      const observedStorageFailure = yield* acquire(
+        Runtime.layer({
+          agents: { "fallible-assistant": assistant },
+          revision: "fallible-storage-v1",
+          services: modelLayer,
+          storage: failedStorage,
+          namespace: { ...namespace, partition: "composition-storage-failure" },
+        }),
+      ).pipe(Effect.flip)
+
+      expect(observedServiceFailure).toBe(serviceFailure)
+      expect(observedStorageFailure).toBe(storageFailure)
+    }),
+  )
+
+  it.effect("retries fallible service acquisition with fresh scoped cleanup", () =>
+    Effect.gen(function* () {
+      const assistant = Agent.make({ name: "retrying-assistant" })
+      const failure = ModelConfigError.make({ model: "retry-model" })
+      const acquisitions = yield* Ref.make(0)
+      const releases = yield* Ref.make(0)
+      const services = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(modelService.pipe(Effect.tap(() => Ref.update(acquisitions, (count) => count + 1))), () =>
+          Ref.update(releases, (count) => count + 1),
+        ).pipe(Effect.andThen(Effect.fail(failure))),
+      )
+      const runtimeLayer = Runtime.layer({
+        agents: { "retrying-assistant": assistant },
+        revision: "retrying-v1",
+        services,
+        storage: storageLayer(),
+        namespace: { ...namespace, partition: "composition-retry" },
+      })
+
+      const first = yield* acquire(runtimeLayer).pipe(Effect.flip)
+      const second = yield* acquire(runtimeLayer).pipe(Effect.flip)
+
+      expect(first).toBe(failure)
+      expect(second).toBe(failure)
+      expect(yield* Ref.get(acquisitions)).toBe(2)
+      expect(yield* Ref.get(releases)).toBe(2)
+    }),
+  )
+
+  it.effect("finalizes partial service acquisition when Runtime acquisition is interrupted", () =>
+    Effect.gen(function* () {
+      const assistant = Agent.make({ name: "interrupted-acquisition-assistant" })
+      const acquired = yield* Deferred.make<void>()
+      const released = yield* Deferred.make<void>()
+      const services = Layer.effect(
+        LanguageModel.LanguageModel,
+        Effect.acquireRelease(Deferred.succeed(acquired, undefined).pipe(Effect.andThen(modelService)), () =>
+          Deferred.succeed(released, undefined),
+        ).pipe(Effect.andThen(Effect.never)),
+      )
+      const runtimeLayer = Runtime.layer({
+        agents: { "interrupted-acquisition-assistant": assistant },
+        revision: "interrupted-acquisition-v1",
+        services,
+        storage: storageLayer(),
+        namespace: { ...namespace, partition: "composition-interrupted-acquisition" },
+      })
+      const fiber = yield* acquire(runtimeLayer).pipe(Effect.forkChild({ startImmediately: true }))
+
+      yield* Deferred.await(acquired)
+      yield* Fiber.interrupt(fiber)
+      expect(yield* Deferred.isDone(released)).toBe(true)
     }),
   )
 

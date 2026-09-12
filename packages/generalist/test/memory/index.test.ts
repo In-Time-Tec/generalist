@@ -51,6 +51,16 @@ expectTypeOf(layerMemory(widenedOptions)).toEqualTypeOf<
 >()
 const memoryLayer: Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | EmbeddingModel.EmbeddingModel> =
   layerMemory(combinedOptions).pipe(Layer.provide(summaryModel))
+const ambientMemoryLayer: Layer.Layer<
+  Memory.Memory,
+  never,
+  VectorStore.VectorStore | EmbeddingModel.EmbeddingModel | LanguageModel.LanguageModel
+> = layerMemory({ working: { summarize: {} } })
+const explicitMemoryLayer: Layer.Layer<Memory.Memory, never, VectorStore.VectorStore | EmbeddingModel.EmbeddingModel> =
+  layerMemory({ working: { summarize: { model: summaryModel } } })
+
+void ambientMemoryLayer
+void explicitMemoryLayer
 
 layer(memoryLayer.pipe(Layer.provideMerge(VectorStore.layerMemory), Layer.provideMerge(embeddingLayer)))(
   "generalist/memory",

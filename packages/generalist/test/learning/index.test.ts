@@ -5,15 +5,25 @@ import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "../../src/index.js"
 import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
 import {
+  consolidate,
   layer as learningLayer,
   proposeWithModel,
   type ApplyHandlers,
+  type ConsolidationProposer,
   type Proposal,
   type Proposer,
 } from "../../src/unstable/learning/index.js"
 import { TestModel } from "../../src/testing/index.js"
 import type { Trajectory } from "../../src/trajectory/index.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
+
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? (<Value>() => Value extends Right ? 1 : 2) extends <Value>() => Value extends Left ? 1 : 2
+      ? true
+      : false
+    : false
+type Assert<Value extends true> = Value
 
 const usage = Response.Usage.make({
   inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -61,6 +71,18 @@ const trajectory: Trajectory = {
   stopReason: "stop",
   gates: [],
 }
+
+const namedProposer: ConsolidationProposer = consolidate({
+  schedule: "FREQ=DAILY",
+  window: "1 day",
+  model: "summary-model",
+  maxProposals: 1,
+})
+void namedProposer
+type ArbitraryCallback = (trajectory: Trajectory) => ReturnType<ConsolidationProposer>
+type ArbitraryCallbackRejected = Assert<Equal<ArbitraryCallback extends ConsolidationProposer ? true : false, false>>
+const arbitraryCallbackRejected: ArbitraryCallbackRejected = true
+void arbitraryCallbackRejected
 
 const handlers = (apply: (proposal: Proposal) => Effect.Effect<void>): ApplyHandlers => ({
   RefineInstruction: apply,

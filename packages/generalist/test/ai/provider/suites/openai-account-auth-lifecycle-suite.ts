@@ -18,9 +18,6 @@ import {
 import { TestClock } from "effect/testing"
 import {
   AuthError,
-  credentialFormatVersion,
-  deviceExchangeRedirect,
-  deviceVerificationUrl,
   OpenAIAccountAuth,
   BrowserAuthorization,
   OAuthClient,
@@ -32,6 +29,8 @@ import {
 
 const digest = (_algorithm: string, data: Uint8Array) =>
   Effect.promise(() => globalThis.crypto.subtle.digest("SHA-256", data.slice()).then((x) => new Uint8Array(x)))
+const deviceVerificationUrl = "https://auth.openai.com/codex/device"
+const deviceExchangeRedirect = "https://auth.openai.com/deviceauth/callback"
 const deterministicCrypto = () => {
   let next = 0
   return Layer.succeed(
@@ -61,7 +60,7 @@ const fingerprint = (account = "account-secret", user = "user-secret") =>
     ? "-tORTwymPrvcfDjuXFED-owRjtjXqgQTMZE3uLEz620"
     : "MCLlOcDYt7mY2jAKStiDz0r11P54VeCNOPMuxoxR8Zk"
 const disk = (overrides: Partial<Disk> = {}): Disk => ({
-  formatVersion: credentialFormatVersion,
+  formatVersion: 1,
   accessToken: jwt(),
   idToken: jwt(),
   refreshToken: "refresh-secret",
