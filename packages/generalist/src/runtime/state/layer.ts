@@ -1,4 +1,4 @@
-import { Clock, Context, Crypto, Effect, Fiber, FiberSet, Layer, Semaphore } from "effect"
+import { Cause, Clock, Context, Crypto, Effect, Exit, Fiber, FiberSet, Layer, Schema, Semaphore } from "effect"
 import {
   Activation,
   StoreActivation,
@@ -8,7 +8,9 @@ import {
 } from "../../durability/internal/runtime.js"
 import type { ObjectStore } from "../../durability/object-store.js"
 import { ExternalChildStore } from "../child/external/store.js"
-import { RuntimeUnavailable } from "../errors.js"
+import { DurabilityFailure } from "../../durability/errors.js"
+import { ScheduleInvalid } from "../execution/trigger/schedule.js"
+import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable } from "../errors.js"
 import { ExecutableResolver } from "../executable/resolver.js"
 import { layer as activeExecutionsLayer, ActiveExecutions } from "../execution/active-executions.js"
 import { layerRegisteredAgents as runExecutorLayer, RunExecutor } from "../execution/run-executor.js"
@@ -21,6 +23,23 @@ import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
 import { layerRegisteredAgents as runtimeLayer } from "../hosting/service.js"
 import { layerRunStore } from "./store.js"
 import { make as makeTriggerScheduler } from "../execution/trigger/scheduler.js"
+
+interface LeaseNamespace {
+  readonly environment: string
+  readonly tenant: string
+  readonly partition: string
+}
+
+/** Map an ownership-monitor failure onto the public RuntimeOwnershipLost reason vocabulary. */
+const classifyLoss = (cause: Cause.Cause<unknown>): RuntimeOwnershipLost["reason"] => {
+  const squashed: unknown = Cause.squash(cause)
+  if (Schema.is(DurabilityFailure)(squashed)) return "store-unavailable"
+  if (Schema.is(RuntimeUnavailable)(squashed) && squashed.message.includes("belongs to a live host")) {
+    return "replaced"
+  }
+  if (Schema.is(ScheduleInvalid)(squashed)) return "scheduler-failed"
+  return "lease-expired"
+}
 
 export { makeRuntime } from "../hosting/service.js"
 
@@ -49,21 +68,41 @@ export const layer = (
           Context.add(Runtime, hostRuntime),
         )
         let running: SchedulerService | undefined
-        const current = Effect.suspend(() =>
-          running === undefined
-            ? RuntimeUnavailable.make({ message: "runtime scheduler is not activated" })
-            : Effect.succeed(running),
-        )
+        let retired:
+          | {
+              readonly incarnation: string
+              readonly namespace: LeaseNamespace
+              readonly lost: RuntimeOwnershipLost["reason"] | undefined
+            }
+          | undefined
+        const current: Effect.Effect<SchedulerService, RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost> =
+          Effect.suspend(
+            (): Effect.Effect<SchedulerService, RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost> => {
+              if (running !== undefined) return Effect.succeed(running)
+              if (retired !== undefined) {
+                return retired.lost !== undefined
+                  ? RuntimeOwnershipLost.make({
+                      namespace: retired.namespace,
+                      incarnation: retired.incarnation,
+                      reason: retired.lost,
+                    })
+                  : RuntimeRetired.make({ namespace: retired.namespace, incarnation: retired.incarnation })
+              }
+              return RuntimeUnavailable.make({ message: "runtime scheduler is not activated" })
+            },
+          )
         const prepare = <A, E, R>(command: (scheduler: SchedulerService) => Effect.Effect<A, E, R>) => {
           let prepared: { readonly scheduler: SchedulerService; readonly effect: Effect.Effect<A, E, R> } | undefined
           return current.pipe(
-            Effect.flatMap((scheduler): Effect.Effect<A, E | RuntimeUnavailable, R> => {
-              if (prepared !== undefined && prepared.scheduler !== scheduler) {
-                return RuntimeUnavailable.make({ message: "scheduler invocation belongs to a retired activation" })
-              }
-              prepared ??= { scheduler, effect: command(scheduler) }
-              return prepared.effect
-            }),
+            Effect.flatMap(
+              (scheduler): Effect.Effect<A, E | RuntimeUnavailable | RuntimeRetired | RuntimeOwnershipLost, R> => {
+                if (prepared !== undefined && prepared.scheduler !== scheduler) {
+                  return RuntimeUnavailable.make({ message: "scheduler invocation belongs to a retired activation" })
+                }
+                prepared ??= { scheduler, effect: command(scheduler) }
+                return prepared.effect
+              },
+            ),
           )
         }
         const acquire = Effect.gen(function* () {
@@ -121,14 +160,19 @@ export const layer = (
             idle: owned(scheduler.idle),
             reconcileCancellation: (runId) => owned(scheduler.reconcileCancellation(runId)),
           }
-          yield* Effect.addFinalizer(() =>
-            lease.retire.pipe(
-              Effect.andThen(
-                Effect.sync(() => {
-                  running = undefined
-                }),
-              ),
-            ),
+          yield* Effect.addFinalizer((exit) =>
+            Effect.gen(function* () {
+              retired = {
+                incarnation: lease.incarnation,
+                namespace: lease.namespace,
+                lost:
+                  Exit.isFailure(exit) && !Cause.hasInterruptsOnly(exit.cause) ? classifyLoss(exit.cause) : undefined,
+              }
+              running = undefined
+              yield* lease.retire
+              yield* FiberSet.clear(requests)
+              yield* FiberSet.awaitEmpty(requests)
+            }),
           )
           const poll = options.scheduler?.pollInterval ?? "250 millis"
           const monitor = Effect.raceFirst(

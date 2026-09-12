@@ -483,7 +483,11 @@ const make = (options: AnyOptions) =>
 
 /**
  * Compose declared Agents, their service Layer, storage, and namespace into one Runtime Layer.
- * Declaration performs no I/O; acquisition validates, derives the executable closure, registers it,
- * and acquires execution authority.
+ * Declaration performs no I/O. Scoped acquisition validates the declaration, builds storage and
+ * Agent services, registers every declared Agent, acquires the fenced execution lease, installs the
+ * scheduler and ownership monitor, and only then publishes `Runtime.Runtime`: the acquired Runtime
+ * is ready without `Durability.activate`. A failed acquisition closes every acquired resource in
+ * reverse order. Ownership loss retires the incarnation (owned requests interrupted and awaited,
+ * scheduler calls fail `RuntimeOwnershipLost`); scope close retires it (`RuntimeRetired`).
  */
 export const layer: LayerFactory = make

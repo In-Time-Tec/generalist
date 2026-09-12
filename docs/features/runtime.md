@@ -36,6 +36,8 @@ This is a composition fragment: `runtimeLayer` must provide the object transport
 
 `register` captures the Agent's exact service environment once per process. `start` is immediate admission: the activated scoped scheduler can claim the returned Run without an application claim loop. `handle.await` returns the Agent's schema-decoded output, `handle.events` replays then follows the Run, and `inspect` reports authoritative lifecycle state.
 
+`Runtime.layer({ agents, revision, services, storage, namespace })` is the declaration-driven alternative: it composes registration, activation, and the scheduler into the Layer itself, so the acquired `Runtime.Runtime` is ready without `Durability.activate`. When that incarnation loses execution authority, owned work is interrupted and awaited and scheduler calls fail `RuntimeOwnershipLost`; after the scope closes they fail `RuntimeRetired`.
+
 ## What runs
 
 ```text

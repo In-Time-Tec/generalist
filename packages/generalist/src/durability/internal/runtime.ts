@@ -28,7 +28,7 @@ import { emptyState, type RuntimeState } from "../../runtime/state/projection.js
 import { PreparedObservation, occurredAtMillis, type Observations } from "../../runtime/state/observation.js"
 import { shutdownStore } from "../../runtime/state/store/events.js"
 import { activationOf } from "../../runtime/state/store/admission/activation.js"
-import { RuntimeUnavailable } from "../../runtime/errors.js"
+import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable } from "../../runtime/errors.js"
 
 const ReceiptEnvelope = Schema.Struct({
   value: Schema.Json,
@@ -48,7 +48,13 @@ export interface Options extends LayerOptions, JournalOptions {
   readonly ownershipLeaseMillis?: number
 }
 
-export type ActivationFailure = DurabilityFailure | RuntimeUnavailable | StartExecutionError | ScheduleInvalid
+export type ActivationFailure =
+  | DurabilityFailure
+  | RuntimeUnavailable
+  | RuntimeOwnershipLost
+  | RuntimeRetired
+  | StartExecutionError
+  | ScheduleInvalid
 
 /** The returned fiber reports ownership failure and is interrupted with the caller's scope. */
 export class Activation extends Context.Service<
@@ -68,6 +74,12 @@ export class StoreActivation extends Context.Service<
         readonly monitor: Effect.Effect<never, ActivationFailure>
         readonly incarnation: string
         readonly retire: Effect.Effect<void>
+        /** This incarnation's namespace identity for typed ownership failures. */
+        readonly namespace: {
+          readonly environment: string
+          readonly tenant: string
+          readonly partition: string
+        }
       },
       ActivationFailure,
       Scope.Scope
@@ -318,6 +330,11 @@ export const make = (options: Options) =>
         )
       })
 
+    const namespace = {
+      environment: options.environment,
+      tenant: options.tenant,
+      partition: options.partition,
+    }
     const acquire = Effect.gen(function* () {
       if (owner !== undefined) return yield* RuntimeUnavailable.make({ message: "runtime host is already activated" })
       const incarnation = yield* crypto.randomUUIDv4.pipe(
@@ -445,6 +462,7 @@ export const make = (options: Options) =>
         workerId,
         incarnation,
         monitor,
+        namespace,
         retire: Effect.sync(() => {
           active = false
         }),

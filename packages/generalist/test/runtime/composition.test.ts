@@ -52,6 +52,12 @@ class DeploymentLookupError extends Schema.TaggedError<DeploymentLookupError>()(
     revision: Schema.String,
   },
 ) {}
+class StorageBreach extends Schema.TaggedError<StorageBreach>()(
+  "generalist/test/runtime/composition.test/StorageBreach",
+  {
+    message: Schema.String,
+  },
+) {}
 
 describe("Runtime.layer", () => {
   it.effect("rejects an empty revision", () =>
@@ -357,6 +363,79 @@ describe("Runtime.layer", () => {
     expect(inferenceFailureProof).toBeTypeOf("function")
     expect(inferenceRequirementsProof).toBeTypeOf("function")
   })
+
+  it.effect("declaration performs no storage I/O before scoped acquisition", () =>
+    Effect.gen(function* () {
+      yield* Effect.void
+      let reads = 0
+      const store = makeObjectStorage()
+      const instrumented: typeof store.store = {
+        ...store.store,
+        read: (key, options) => {
+          reads += 1
+          return store.store.read(key, options)
+        },
+        list: (prefix, options) => {
+          reads += 1
+          return store.store.list(prefix, options)
+        },
+      }
+      const live = Runtime.layer({
+        agents: { assistant: Agent.make({ name: "assistant" }) },
+        revision: "lazy-v1",
+        services: modelLayer,
+        storage: Layer.merge(Layer.succeed(ObjectStore, instrumented), BunCrypto.layer),
+        namespace: { ...namespace, partition: "composition-lazy-io" },
+        scheduler: { pollInterval: "1 hour" },
+      })
+      expect(live).toBeDefined()
+      expect(reads).toBe(0)
+    }),
+  )
+
+  it.live("the first start after acquisition is ready without Durability.activate", () =>
+    Effect.gen(function* () {
+      const agent = Agent.make({ name: "ready-assistant" })
+      const runtime = yield* Layer.build(
+        Runtime.layer({
+          agents: { "ready-assistant": agent },
+          revision: "ready-v1",
+          services: modelLayer,
+          storage: storageLayer(),
+          namespace: { ...namespace, partition: "composition-ready" },
+          scheduler: { pollInterval: "50 millis" },
+        }),
+      ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime)))
+      const run = yield* runtime.start(agent, "Say hi", { idempotencyKey: "ready-1" })
+      expect(yield* run.await).toBe("done")
+    }).pipe(Effect.scoped),
+  )
+
+  it.effect("a failed acquisition preserves the typed error and runs acquired finalizers once", () =>
+    Effect.gen(function* () {
+      let finalized = 0
+      const failing: Layer.Layer<never, StorageBreach> = Layer.unwrap(
+        Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            finalized += 1
+          }),
+        ).pipe(Effect.andThen(Effect.fail(StorageBreach.make({ message: "deliberate storage failure" })))),
+      )
+      const error = yield* Effect.scoped(
+        Layer.build(
+          Runtime.layer({
+            agents: { assistant: Agent.make({ name: "assistant" }) },
+            revision: "partial-v1",
+            services: modelLayer,
+            storage: Layer.mergeAll(Layer.succeed(ObjectStore, makeObjectStorage().store), BunCrypto.layer, failing),
+            namespace: { ...namespace, partition: "composition-partial" },
+          }),
+        ),
+      ).pipe(Effect.flip)
+      expect(error).toBeInstanceOf(StorageBreach)
+      expect(finalized).toBe(1)
+    }),
+  )
 })
 
 declare const inferenceAssistant: Agent.Agent
