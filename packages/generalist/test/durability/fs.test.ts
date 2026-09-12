@@ -1,7 +1,7 @@
 import { layer as bunLayer } from "@effect/platform-bun/BunServices"
 import { expect, layer } from "@effect/vitest"
 import { Effect, FileSystem, Result } from "effect"
-import { make } from "../../src/durability/fs.js"
+import { make, makeMaintenance } from "../../src/durability/fs.js"
 import { unsupportedPreconditions } from "../../src/testing/durability/index.js"
 import { exercise, objectConformance, recover } from "./local-operations.js"
 
@@ -50,6 +50,34 @@ layer(bunLayer, { excludeTestServices: true })(
         const expected = yield* exercise(make({ dir }))
         const store = yield* make({ dir })
         yield* recover({ store, expected })
+      }),
+    )
+
+    it.effect("rejects empty, leading, and trailing key segments instead of aliasing normalized keys", () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "generalist-fs-" })
+        const store = yield* make({ dir })
+        const maintenance = yield* makeMaintenance({ dir })
+
+        for (const key of ["alpha//beta", "gamma/", "/delta-key"]) {
+          expect((yield* Effect.flip(store.create(key, Uint8Array.of(1)))).reason).toBe("invalid-response")
+          expect((yield* Effect.flip(store.read(key, { maxBytes: 1 }))).reason).toBe("invalid-response")
+          expect((yield* Effect.flip(maintenance.remove(key))).reason).toBe("invalid-response")
+        }
+
+        // Normalized neighbors stay independent and list their created spellings.
+        expect(yield* store.create("alpha/beta", Uint8Array.of(2))).toBe("created")
+        expect(yield* store.create("gamma", Uint8Array.of(3))).toBe("created")
+        expect(yield* store.create("delta-key", Uint8Array.of(4))).toBe("created")
+        expect((yield* store.list("alpha/")).keys).toEqual(["alpha/beta"])
+        expect((yield* store.list("gamma")).keys).toEqual(["gamma"])
+        expect(Array.from((yield* store.read("delta-key", { maxBytes: 1 }))!.bytes)).toEqual([4])
+
+        // Listing prefixes with empty or leading segments must not invent a spelling.
+        for (const prefix of ["alpha//", "/alpha/", "alpha//beta", "a/../b"]) {
+          expect((yield* Effect.flip(store.list(prefix))).reason).toBe("invalid-response")
+        }
       }),
     )
 

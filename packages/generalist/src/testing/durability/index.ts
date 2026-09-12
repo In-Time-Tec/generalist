@@ -306,6 +306,7 @@ export {
   caseEquivalentKeys,
   listing,
   byteIntegrity,
+  keySpellings,
   unsupportedPreconditions,
   type ConformanceOptions,
 } from "./conformance.js"
