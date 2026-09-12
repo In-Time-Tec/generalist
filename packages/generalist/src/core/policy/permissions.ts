@@ -67,35 +67,42 @@ const textLeaf = (value: PolicyParameters): Option.Option<string> => {
   return Option.none()
 }
 
-const collectCandidates = (value: PolicyParameters, visiting: Set<object>, out: Array<string>): boolean => {
+interface Collected {
+  readonly complete: boolean
+  readonly leaves: ReadonlyArray<string>
+}
+
+const collectCandidates = (value: PolicyParameters, visiting: Set<object>, out: Array<string>): Collected => {
   const leaf = textLeaf(value)
   if (Option.isSome(leaf)) {
     out.push(leaf.value)
-    return true
+    return { complete: true, leaves: [leaf.value] }
   }
-  if (value === null || value === undefined) return true
+  if (value === null || value === undefined) return { complete: true, leaves: [] }
   const array = Schema.decodeUnknownOption(unknownArray)(value)
   if (Option.isSome(array)) {
-    if (visiting.has(array.value)) return false
+    if (visiting.has(array.value)) return { complete: false, leaves: [] }
     visiting.add(array.value)
-    const joined = array.value.flatMap((element) => Option.toArray(textLeaf(element)))
-    if (joined.length > 0) out.push(joined.join(" "))
-    let complete = true
-    for (const element of array.value) {
-      complete = collectCandidates(element, visiting, out) && complete
-    }
+    const collected = array.value.map((element) => collectCandidates(element, visiting, out))
     visiting.delete(array.value)
-    return complete
+    // Keep the direct-leaf join: exact patterns matched it before recursive joins were added.
+    const directLeaves = array.value.flatMap((element) => Option.toArray(textLeaf(element)))
+    const direct = directLeaves.length > 0 ? directLeaves.join(" ") : undefined
+    if (direct !== undefined) out.push(direct)
+    const leaves = collected.flatMap((element) => element.leaves)
+    const joined = leaves.join(" ")
+    if (leaves.length > 0 && joined !== direct) out.push(joined)
+    return { complete: collected.every((element) => element.complete), leaves }
   }
   const record = Schema.decodeUnknownOption(unknownRecord)(value)
-  if (Option.isNone(record) || visiting.has(record.value)) return false
+  if (Option.isNone(record) || visiting.has(record.value)) return { complete: false, leaves: [] }
   visiting.add(record.value)
-  let complete = true
-  for (const propValue of Object.values(record.value)) {
-    complete = collectCandidates(propValue, visiting, out) && complete
-  }
+  const collected = Object.values(record.value).map((propValue) => collectCandidates(propValue, visiting, out))
   visiting.delete(record.value)
-  return complete
+  return {
+    complete: collected.every((element) => element.complete),
+    leaves: collected.flatMap((element) => element.leaves),
+  }
 }
 
 const serializedParams = (params: PolicyParameters): string => {
@@ -109,7 +116,7 @@ const serializedParams = (params: PolicyParameters): string => {
 
 const project = (params: PolicyParameters): Projection => {
   const candidates: Array<string> = []
-  const complete = collectCandidates(params, new Set(), candidates)
+  const complete = collectCandidates(params, new Set(), candidates).complete
   candidates.push(serializedParams(params))
   return { candidates, complete }
 }
