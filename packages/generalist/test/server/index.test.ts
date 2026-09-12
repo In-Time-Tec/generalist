@@ -534,6 +534,67 @@ layer(services)("Server", (it) => {
     ),
   )
 
+  it.effect("encodes stored attachment headers that native Headers rejects instead of hanging the download", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const host = yield* Host.make({ revision: "local", agents: {} })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const put = (data: string, mediaType: string, filename?: string) =>
+          host.attachments.put({
+            data: new TextEncoder().encode(data),
+            mediaType,
+            ...(filename === undefined ? undefined : { filename }),
+          })
+        const download = (sha256: string) =>
+          Effect.promise(() =>
+            app.handler(
+              new Request(`http://generalist.test/attachments/${sha256}`, {
+                headers: { authorization: "Bearer secret" },
+              }),
+            ),
+          ).pipe(Effect.timeout("5 seconds"))
+
+        const control = yield* put("attachment-control", "text/plain", "réport name.txt")
+        const controlResponse = yield* download(control.sha256)
+        expect(controlResponse.status).toBe(200)
+        expect(controlResponse.headers.get("x-filename")).toBe("réport name.txt")
+        expect(yield* Effect.promise(() => controlResponse.text())).toBe("attachment-control")
+
+        const unsafeFilename = yield* put("attachment-unsafe-filename", "text/plain", "evil\r\nx-injected: 1")
+        const unsafeResponse = yield* download(unsafeFilename.sha256)
+        expect(unsafeResponse.status).toBe(200)
+        expect(unsafeResponse.headers.get("x-filename")).toBe("evil%0D%0Ax-injected: 1")
+        expect(yield* Effect.promise(() => unsafeResponse.text())).toBe("attachment-unsafe-filename")
+
+        const unsafeType = yield* put("attachment-unsafe-type", "text/plain\r\nx-injected: 1", "report.txt")
+        const unsafeTypeResponse = yield* download(unsafeType.sha256)
+        expect(unsafeTypeResponse.status).toBe(200)
+        expect(unsafeTypeResponse.headers.get("content-type")).toBe("text/plain%0D%0Ax-injected: 1")
+
+        const nulFilename = yield* put("attachment-nul-filename", "text/plain", "nul\0byte")
+        const nulResponse = yield* download(nulFilename.sha256)
+        expect(nulResponse.status).toBe(200)
+        expect(nulResponse.headers.get("x-filename")).toBe("nul%00byte")
+
+        const emojiFilename = yield* put("attachment-emoji-filename", "text/plain", "emoji 😀.txt")
+        const emojiResponse = yield* download(emojiFilename.sha256)
+        expect(emojiResponse.status).toBe(200)
+        expect(emojiResponse.headers.get("x-filename")).toBe("emoji %F0%9F%98%80.txt")
+      }),
+    ),
+  )
+
   it.effect("keeps an admitted Run alive after its SSE response is cancelled and replays completion", () =>
     Effect.scoped(
       Effect.gen(function* () {
