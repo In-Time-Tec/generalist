@@ -283,7 +283,7 @@ export interface Service {
   ) => Effect.Effect<void, RunNotFound | ApprovalStale | ApprovalMismatch | RuntimeUnavailable | DurabilityFailure>
   readonly signal: (
     input: CommandIdentity & SignalInput,
-  ) => Effect.Effect<void, RunNotFound | RunTerminal | RuntimeUnavailable | DurabilityFailure>
+  ) => Effect.Effect<void, RunNotFound | WaitNotOpen | RunTerminal | RuntimeUnavailable | DurabilityFailure>
   readonly wake: (
     input: CommandIdentity & {
       readonly runId: string
