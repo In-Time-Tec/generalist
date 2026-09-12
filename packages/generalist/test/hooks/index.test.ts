@@ -519,6 +519,36 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
     ] as const
   })
 
+  ItLayer.make(
+    it,
+    "rejects an unusable Replace value as HookFailed instead of a raw defect",
+    () =>
+      [
+        Layer.mergeAll(
+          modelLayer(() => Stream.make(textDelta("unused"))),
+          ModelMiddleware.layerIdentity,
+          Hooks.layer([
+            Hooks.onRunStart({
+              key: "test.hooks.index.onRunStart.invalid-replace",
+              version: "1",
+              replayPolicy: "never",
+              // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: simulates an untyped JS hook returning an unusable Replace value.
+              hook: () => Effect.succeed(Hooks.Replace(42 as never)),
+            }),
+          ]),
+        ),
+        Effect.gen(function* () {
+          const failure = yield* Agent.run(Agent.make({ name: "invalid-replace" }), "input").pipe(Effect.flip)
+
+          expect(failure._tag).toBe("generalist/core/HookFailed")
+          if (failure._tag === "generalist/core/HookFailed") {
+            expect(failure.event).toBe("RunStart")
+            expect(failure.hint).toContain("Inspect the named lifecycle hook")
+          }
+        }),
+      ] as const,
+  )
+
   it.effect("replays a journaled Block without invoking the hook again", () =>
     Effect.gen(function* () {
       const logicalOperationId = "hook-replay"

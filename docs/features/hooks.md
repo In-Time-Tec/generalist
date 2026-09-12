@@ -78,7 +78,7 @@ hook Effect fails
 └── HookFailed { event, cause, hint } -> Run failure
 ```
 
-Hook defects and typed failures are both captured as `HookFailed`; interruption remains interruption. Hook failures are never converted into tool or child domain data.
+Hook defects and typed failures are both captured as `HookFailed`; interruption remains interruption. Hook failures are never converted into tool or child domain data. A durable Run records `HookFailed` verbatim as its terminal `RunFailed` failure, and a prompt replacement the boundary rejects is never checkpointed as a complete decision.
 
 ## Host plugins
 

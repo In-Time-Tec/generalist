@@ -56,6 +56,36 @@ const hookFailure = (event: HookEvent, cause: Cause.Cause<unknown>): Effect.Effe
         }),
       )
 
+/** Boundaries whose `Replace` value enters the event's prompt and must be a valid `Prompt.RawInput`. */
+const promptBoundaries: ReadonlySet<HookEvent> = new Set<HookEvent>([
+  "RunStart",
+  "TurnStart",
+  "ModelCall",
+  "Compaction",
+  "Steer",
+])
+
+/**
+ * Decode one `Replace` value at a prompt boundary. `Prompt.make` normalizes strings,
+ * message arrays, and existing prompts; the Schema rejects every other value while
+ * the boundary can still fail typed instead of handing an unusable prompt on.
+ */
+const checkDecision =
+  (event: HookEvent) =>
+  (decision: HookDecision): Effect.Effect<HookDecision, HookFailed> => {
+    if (decision._tag !== "Replace" || !promptBoundaries.has(event)) return Effect.succeed(decision)
+    return Effect.try({
+      // SAFETY: hook Replace values are untyped at the JS boundary; `Prompt.make` normalizes strings, message arrays, and prompts, and the Schema below rejects anything unusable.
+      try: () => Prompt.make(decision.value as Prompt.RawInput),
+      catch: (cause) => HookFailed.make({ event, cause }),
+    }).pipe(
+      Effect.flatMap((prompt) =>
+        Schema.decodeEffect(Prompt.Prompt)(prompt).pipe(Effect.mapError((cause) => HookFailed.make({ event, cause }))),
+      ),
+      Effect.as(decision),
+    )
+  }
+
 const invoke = <Input>(
   declaration: Declaration,
   input: Input,
@@ -75,6 +105,7 @@ const invoke = <Input>(
                 cause,
               }),
             ),
+            Effect.flatMap(checkDecision(declaration.event)),
           ),
     ),
   )
@@ -90,13 +121,16 @@ const recordedDecision = (event: HookEvent, decision: HookDecision): Effect.Effe
     ),
   )
 
+/** Recorded decisions are re-validated against the allowed set, then prompt-boundary `Replace` values are checked before use. */
 const recordedDecisions = (
   event: HookEvent,
   decisions: ReadonlyArray<HookDecision>,
-): Effect.Effect<ReadonlyArray<HookDecision>, DriverStateInvalid> =>
-  Effect.forEach(decisions, (decision) => recordedDecision(event, decision))
+): Effect.Effect<ReadonlyArray<HookDecision>, DriverStateInvalid | HookFailed> =>
+  Effect.forEach(decisions, (decision) =>
+    recordedDecision(event, decision).pipe(Effect.flatMap(checkDecision(event))),
+  )
 
-// SAFETY: typed prompt hook constructors only admit Replace<Prompt.RawInput>; replay restores that recorded value.
+// SAFETY: typed prompt hook constructors only admit Replace<Prompt.RawInput>; invoke and replay validate the value before use.
 const replacementPrompt = (value: typeof Schema.Unknown.Type): Prompt.Prompt => Prompt.make(value as Prompt.RawInput)
 
 // SAFETY: onRunEnd ties Replace's value to the Agent's Output type; replay uses the same registered Agent.

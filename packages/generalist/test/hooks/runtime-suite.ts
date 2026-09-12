@@ -223,4 +223,53 @@ export const register = ({
       )
     }),
   )
+
+  it.effect("records an unusable Replace value as a terminal HookFailed without completing its decision", () =>
+    Effect.gen(function* () {
+      const storage = makeObjectStorage()
+      const agent = Agent.make({ name: "hook-invalid-replace" })
+      const resolver = ExecutableResolver.layerStatic([]).pipe(Layer.orDie)
+      const hooks = Hooks.layer([
+        Hooks.onRunStart({
+          key: "invalid-replace",
+          version: "1",
+          replayPolicy: "never",
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: simulates an untyped JS hook returning an unusable Replace value.
+          hook: () => Effect.succeed(Hooks.Replace(42 as never)),
+        }),
+      ])
+      const layer = Layer.mergeAll(
+        objectRuntimeLayer({ addresses: [], workerId: "hook-invalid" }, storage).pipe(Layer.provide(resolver)),
+        Permissions.layerAllowAll,
+        Approvals.layerAutoApprove,
+        hooks,
+        Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.die("unused"),
+            streamText: () => Stream.die("An invalid prompt replacement must fail before model dispatch"),
+          }),
+        ),
+      )
+      yield* scopedWith(layer)(
+        Effect.gen(function* () {
+          const runtime = yield* Runtime.Runtime
+          const executor = yield* RunExecutor.RunExecutor
+          const store = yield* RunStore.RunStore
+          yield* runtime.register(agent)
+          const handle = yield* runtime.start(agent, "input", { idempotencyKey: "hook-invalid-replace" })
+          yield* executor.execute(
+            yield* store.claimExecution({ runId: handle.runId, ownerId: "hook-invalid", commandId: "first" }),
+          )
+          expect((yield* runtime.inspect(handle.runId)).status).toBe("failed")
+          const failed = (yield* runtime.history({ runId: handle.runId, limit: 100 })).find(
+            (event) => event._tag === "RunFailed",
+          )
+          expect(failed).toMatchObject({ error: { _tag: "generalist/core/HookFailed", event: "RunStart" } })
+          const checkpoint = (yield* store.loadExecution(handle.runId)).checkpoint
+          expect(checkpoint).toMatchObject({ state: { hooks: [{ complete: false, decisions: [] }] } })
+        }),
+      )
+    }),
+  )
 }

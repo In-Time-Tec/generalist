@@ -6,6 +6,7 @@ import {
   Ask,
   chainPin,
   Continue,
+  Replace,
   type Declaration,
   Hooks,
   layer,
@@ -224,6 +225,49 @@ it.effect("leaves an idempotent hook resumable when its nested operation suspend
     const reopened = yield* makeInterpreter({ ...input, initial: yield* first.checkpoint })
     expect((yield* run(reopened, [declaration])).decisions).toEqual([Continue()])
     expect(calls).toBe(2)
+  }),
+)
+
+it.effect("rejects an unusable Replace value as HookFailed before recording the decision", () =>
+  Effect.gen(function* () {
+    const input = yield* setup
+    let calls = 0
+    const declaration = onRunStart({
+      key: "invalid-replace",
+      version: "1",
+      replayPolicy: "pure",
+      hook: () =>
+        Effect.sync(() => {
+          calls += 1
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: simulates an untyped JS hook returning an unusable Replace value.
+          return Replace(42 as never)
+        }),
+    })
+    const first = yield* makeInterpreter(input)
+    expect(yield* run(first, [declaration]).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/core/HookFailed",
+      event: "RunStart",
+    })
+    expect(calls).toBe(1)
+    expect((yield* first.recorded).map((entry) => entry.outcome)).toMatchObject([{ _tag: "Failed" }])
+    expect((yield* first.checkpoint).state).toMatchObject({ hooks: [{ complete: false, decisions: [] }] })
+
+    // A checkpoint written by a build that recorded the unusable decision still fails typed on replay.
+    const base = yield* makeInterpreter(input)
+    const chain = make({ declarations: [declaration] }).pin
+    yield* base.recordHookDecisions({
+      chain,
+      key: "hook:run:start",
+      event: "RunStart",
+      decisions: [Replace(42)],
+      complete: true,
+    })
+    const reopened = yield* makeInterpreter({ ...input, initial: yield* base.checkpoint })
+    expect(yield* run(reopened, [declaration]).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/core/HookFailed",
+      event: "RunStart",
+    })
+    expect(calls).toBe(1)
   }),
 )
 

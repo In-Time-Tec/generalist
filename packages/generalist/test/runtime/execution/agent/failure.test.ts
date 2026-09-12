@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause } from "effect"
-import { AgentEvent, Gate, RunBudget } from "../../../../src/index.js"
-import { make as makeAgentExecutionFailure } from "../../../../src/runtime/execution/agent/failure.js"
+import { AgentEvent, Gate, Hooks, RunBudget } from "../../../../src/index.js"
+import { make as makeAgentExecutionFailure, toRunFailure } from "../../../../src/runtime/execution/agent/failure.js"
 
 const messageFor = <E>(error: E): string => makeAgentExecutionFailure(Cause.fail(error)).message
 
@@ -93,5 +93,10 @@ describe("terminal agent failure messages", () => {
     const message = makeAgentExecutionFailure(Cause.die(new Error(""))).message
     expect(message).not.toBe("Agent execution failed")
     expect(message.length).toBeGreaterThan("Agent execution failed".length)
+  })
+
+  it("preserves a typed hook failure as the terminal RunFailure", () => {
+    const error = Hooks.HookFailed.make({ event: "RunStart", cause: new TypeError("invalid replacement") })
+    expect(toRunFailure(Cause.fail(error))).toStrictEqual(error)
   })
 })
