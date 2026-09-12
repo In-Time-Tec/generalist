@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
-import { projectTranscript } from "./memory.js"
+import { projectTranscript } from "./memory-provenance.js"
 import type { Entry, SkillEntry } from "./session.js"
 import { promptFromResponseParts } from "../../media/prompt.js"
 

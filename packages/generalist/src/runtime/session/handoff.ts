@@ -1,4 +1,4 @@
-import { Commit } from "../../core/policy/handoff.js"
+import { Commit } from "../../core/agent/handoff/state.js"
 import { Function, Option, Schema } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import { RuntimeUnavailable } from "../errors.js"

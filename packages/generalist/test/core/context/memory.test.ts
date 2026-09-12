@@ -1,4 +1,9 @@
 import { layerMemory } from "../../../src/core/context/session-memory.js"
+import {
+  itemFromPromptPart,
+  messageFromRecall,
+  projectTranscript,
+} from "../../../src/core/context/memory-provenance.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Ref, Schema, Stream } from "effect"
 import { Chat, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -107,21 +112,21 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       Prompt.makePart("tool-approval-request", { approvalId: "approval-1", toolCallId: "call-1" }),
     ]
 
-    expect(Memory.itemFromPromptPart(text)).toEqual(Option.some(text))
-    expect(Memory.itemFromPromptPart(file)).toEqual(Option.some(file))
-    expect(protocolParts.map(Memory.itemFromPromptPart)).toEqual(protocolParts.map(() => Option.none()))
+    expect(itemFromPromptPart(text)).toEqual(Option.some(text))
+    expect(itemFromPromptPart(file)).toEqual(Option.some(file))
+    expect(protocolParts.map(itemFromPromptPart)).toEqual(protocolParts.map(() => Option.none()))
   })
 
   it("projects recalled origin structurally while retaining identical authored content", () => {
-    const recalled = Memory.messageFromRecall([textPart("identical")])
+    const recalled = messageFromRecall([textPart("identical")])
     const authored = Prompt.makeMessage("user", { content: [textPart("identical")] })
 
-    expect(Memory.projectTranscript(Prompt.fromMessages([recalled, authored])).content).toEqual([authored])
+    expect(projectTranscript(Prompt.fromMessages([recalled, authored])).content).toEqual([authored])
   })
 
   it.effect("preserves recall origin through Chat export and restore", () =>
     Effect.gen(function* () {
-      const recalled = Memory.messageFromRecall([textPart("persisted recall")])
+      const recalled = messageFromRecall([textPart("persisted recall")])
       const authored = Prompt.makeMessage("user", { content: [textPart("persisted authored")] })
       const chat = yield* Chat.fromPrompt([recalled, authored])
       const exported = yield* chat.export
@@ -131,7 +136,7 @@ layer(unusedToolHandlerLayer)("Memory", (it) => {
       expect(history.content[0]?.options).toEqual({
         "generalist/memory": { origin: "memoryRecall" },
       })
-      expect(Memory.projectTranscript(history).content.map(messageText)).toEqual(["persisted authored"])
+      expect(projectTranscript(history).content.map(messageText)).toEqual(["persisted authored"])
     }),
   )
 

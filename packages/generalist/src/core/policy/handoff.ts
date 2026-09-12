@@ -484,6 +484,5 @@ export {
   ProjectionInvalid,
 } from "./handoff-projection.js"
 export { Rejected } from "./handoff-runtime.js"
-export { Commit, ControlState } from "../agent/handoff/state.js"
 export { register, RegistrationError } from "../agent/tool.js"
 export type { Registration } from "../agent/tool/registration.js"
