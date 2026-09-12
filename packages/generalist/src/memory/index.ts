@@ -3,11 +3,7 @@ import { EmbeddingModel, LanguageModel } from "effect/unstable/ai"
 import { Memory, merge } from "../core/context/memory.js"
 import { make as makeSemanticRecall, type Options as SemanticRecallOptions } from "./semantic-recall.js"
 import type { VectorStore } from "./vector-store.js"
-import {
-  make as makeWorkingMemory,
-  type Options as WorkingMemoryOptions,
-  type SummaryRequirement,
-} from "./working-memory.js"
+import { make as makeWorkingMemory, type Options as WorkingMemoryOptions } from "./working-memory.js"
 
 export * as SemanticRecall from "./semantic-recall.js"
 export * as Supermemory from "./supermemory.js"
@@ -22,10 +18,10 @@ export interface Options {
 export { layer as layerSupermemory, SupermemoryError, type Options as SupermemoryOptions } from "./supermemory.js"
 
 /** @internal The ambient LanguageModel is required only when working memory summarizes without an explicit model layer. */
-export type WorkingRequirement<O> = O extends { readonly working?: infer W }
+type WorkingRequirement<O> = O extends { readonly working?: infer W }
   ? [Extract<W, WorkingMemoryOptions>] extends [never]
     ? never
-    : SummaryRequirement<Extract<W, WorkingMemoryOptions>>
+    : Effect.Services<ReturnType<typeof makeWorkingMemory<Extract<W, WorkingMemoryOptions>>>>
   : never
 export function layer(): Layer.Layer<Memory, never, VectorStore | EmbeddingModel.EmbeddingModel>
 export function layer<O extends Options>(

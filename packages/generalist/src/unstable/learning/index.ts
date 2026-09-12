@@ -52,7 +52,7 @@ export {
   Remember,
   TrajectoryRef,
 }
-export type { ConsolidateOptions } from "./consolidate.js"
+export type { ConsolidateOptions, ConsolidationProposer } from "./consolidate.js"
 export type {
   ApplyHandlers,
   AuthorSkill as AuthorSkillProposal,
