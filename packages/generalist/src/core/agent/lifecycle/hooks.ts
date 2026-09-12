@@ -126,9 +126,7 @@ const recordedDecisions = (
   event: HookEvent,
   decisions: ReadonlyArray<HookDecision>,
 ): Effect.Effect<ReadonlyArray<HookDecision>, DriverStateInvalid | HookFailed> =>
-  Effect.forEach(decisions, (decision) =>
-    recordedDecision(event, decision).pipe(Effect.flatMap(checkDecision(event))),
-  )
+  Effect.forEach(decisions, (decision) => recordedDecision(event, decision).pipe(Effect.flatMap(checkDecision(event))))
 
 // SAFETY: typed prompt hook constructors only admit Replace<Prompt.RawInput>; invoke and replay validate the value before use.
 const replacementPrompt = (value: typeof Schema.Unknown.Type): Prompt.Prompt => Prompt.make(value as Prompt.RawInput)

@@ -111,7 +111,9 @@ export const appendEvent: {
     runId: string,
     build: (base: RunEventBase, run: StoredRun) => RunEvent,
     nextStatus?: RunStatus,
-  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
@@ -222,7 +224,9 @@ export const appendLifecycle: {
     runId: string,
     event: LifecycleInput,
     nextStatus?: RunStatus,
-  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,
@@ -256,7 +260,9 @@ export const appendAgentEvent: {
   (
     runId: string,
     event: DurableAgentLoopEvent,
-  ): (state: RuntimeState) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
+  ): (
+    state: RuntimeState,
+  ) => Effect.Effect<readonly [RunEvent, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation>
   (
     state: RuntimeState,
     runId: string,

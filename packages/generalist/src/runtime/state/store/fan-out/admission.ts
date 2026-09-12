@@ -1,7 +1,8 @@
 import { type PreparedObservation, occurredAtMillis } from "../../observation.js"
 import { Effect, Function } from "effect"
 import { make as makeAddress } from "../../../address.js"
-import { PayloadTooLarge,
+import {
+  PayloadTooLarge,
   FanOutConflict,
   FanOutInvalid,
   ChildSelectionMissing,
@@ -163,7 +164,11 @@ const addMember = (
   depth: number,
   readyCount: number,
   budget: BudgetLimits,
-): Effect.Effect<readonly [FanOutMemberResult, RuntimeState], PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
+): Effect.Effect<
+  readonly [FanOutMemberResult, RuntimeState],
+  PayloadTooLarge | RuntimeUnavailable,
+  PreparedObservation
+> =>
   Effect.gen(function* () {
     const ready = member.ordinal < readyCount
     const readiness: FanOutMemberResult["readiness"] = ready ? "ready" : "queued"

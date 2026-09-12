@@ -41,7 +41,9 @@ const joinedEvent = (input: CompletionInput) => ({
   remainder: input.remainder,
 })
 
-const emitJoined = (input: CompletionInput): Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
+const emitJoined = (
+  input: CompletionInput,
+): Effect.Effect<RuntimeState, PayloadTooLarge | RuntimeUnavailable, PreparedObservation> =>
   Effect.gen(function* () {
     const parent = input.state.runs.get(input.fanOut.parentRunId)
     if (parent === undefined || isTerminal(parent.status)) return input.state

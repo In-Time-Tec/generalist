@@ -1,7 +1,14 @@
 import { type PreparedObservation, occurredAt as preparedOccurredAt } from "../observation.js"
 /* oxlint-disable no-accumulating-spread */
 import { Effect, Function, Option } from "effect"
-import { PayloadTooLarge, ResponseConflict, RunNotFound, RunTerminal, RuntimeUnavailable, WaitNotOpen } from "../../errors.js"
+import {
+  PayloadTooLarge,
+  ResponseConflict,
+  RunNotFound,
+  RunTerminal,
+  RuntimeUnavailable,
+  WaitNotOpen,
+} from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { CancelInput as CancelCommand } from "../../service.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
