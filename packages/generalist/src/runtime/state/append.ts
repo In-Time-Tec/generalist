@@ -88,6 +88,24 @@ const discardPendingSteering = (
       : entry,
   )
 
+/** @internal Build the next journal event and enforce the per-event payload bound without appending it. */
+const buildEvent = (
+  state: RuntimeState,
+  runId: string,
+  build: (base: RunEventBase, run: StoredRun) => RunEvent,
+): Effect.Effect<readonly [RunEvent, StoredRun], RuntimeUnavailable, PreparedObservation> =>
+  Effect.gen(function* () {
+    const run = state.runs.get(runId)
+    if (run === undefined) {
+      return yield* RuntimeUnavailable.make({ message: `run ${runId} missing during append` })
+    }
+    const sequence = run.lastSequence + 1
+    const at = yield* occurredAt
+    const event = build(baseFields(run, sequence, at), run)
+    yield* validatePayload({ value: event, boundary: "event", limit: maximumEventBytes })
+    return [event, run] as const
+  })
+
 export const appendEvent: {
   (
     runId: string,
@@ -112,14 +130,8 @@ export const appendEvent: {
       if (state.closed) {
         return yield* RuntimeUnavailable.make({ message: "runtime store released" })
       }
-      const run = state.runs.get(runId)
-      if (run === undefined) {
-        return yield* RuntimeUnavailable.make({ message: `run ${runId} missing during append` })
-      }
+      const [event, run] = yield* buildEvent(state, runId, build)
       const sequence = run.lastSequence + 1
-      const at = yield* occurredAt
-      const event = build(baseFields(run, sequence, at), run)
-      yield* validatePayload({ value: event, boundary: "event", limit: maximumEventBytes })
       const discardReason = terminalReason(event)
       const pendingSteering = run.steering.filter(
         (entry) => entry.consumedOperationId === undefined && entry.discardedReason === undefined,
@@ -221,6 +233,23 @@ export const appendLifecycle: {
   (args) => "runs" in Object(args[0]),
   (state: RuntimeState, runId: string, event: LifecycleInput, nextStatus?: RunStatus) =>
     appendEvent(state, runId, (base) => ({ ...base, ...event }), nextStatus),
+)
+
+/** @internal Build the next lifecycle event and validate its payload without appending it. */
+export const prepareLifecycle: {
+  (
+    runId: string,
+    event: LifecycleInput,
+  ): (state: RuntimeState) => Effect.Effect<RunEvent, RuntimeUnavailable, PreparedObservation>
+  (
+    state: RuntimeState,
+    runId: string,
+    event: LifecycleInput,
+  ): Effect.Effect<RunEvent, RuntimeUnavailable, PreparedObservation>
+} = Function.dual(
+  (args) => "runs" in Object(args[0]),
+  (state: RuntimeState, runId: string, event: LifecycleInput) =>
+    buildEvent(state, runId, (base) => ({ ...base, ...event })).pipe(Effect.map(([prepared]) => prepared)),
 )
 
 export const appendAgentEvent: {

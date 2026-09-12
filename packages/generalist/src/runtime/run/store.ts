@@ -8,7 +8,7 @@ import type {
   Invalid as RunBudgetInvalid,
 } from "../../core/durable/run-budget.js"
 import type { ProgramBudgetExhausted } from "../../core/program/capabilities.js"
-import type { InboxFull } from "../../core/turn/steering.js"
+import type { InboxFull, MessageTooLarge } from "../../core/turn/steering.js"
 import type { SessionStore as SessionService } from "../../core/context/session.js"
 import type { CancellationOutcome } from "../../core/tools/tool-executor.js"
 import type { Address } from "../address.js"
@@ -337,6 +337,7 @@ export interface Service {
     | RunBusy
     | SteeringConflict
     | InboxFull
+    | MessageTooLarge
     | RuntimeUnavailable
     | import("../errors.js").RunKindUnsupported
     | DurabilityFailure
@@ -351,6 +352,7 @@ export interface Service {
     | RunBusy
     | SteeringConflict
     | InboxFull
+    | MessageTooLarge
     | ForkSequenceInvalid
     | NoSnapshot
     | RunBudgetInvalid

@@ -455,6 +455,7 @@ export type SendMessageError =
   | BudgetExhausted
   | CursorExpired
   | import("../core/turn/steering.js").InboxFull
+  | import("../core/turn/steering.js").MessageTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 export type DirectoryError = RunNotFound | RuntimeUnavailable | DurabilityFailure
@@ -507,6 +508,7 @@ export type RunSendError =
   | BudgetExhausted
   | CursorExpired
   | import("../core/turn/steering.js").InboxFull
+  | import("../core/turn/steering.js").MessageTooLarge
   | RuntimeUnavailable
   | DurabilityFailure
 

@@ -1,5 +1,11 @@
 import { digest as pinDigest } from "../../core/durable/pin.js"
-export { InboxFull, defaultCapacity, defaultMaxPendingBytes, promptBytes } from "../../core/turn/steering.js"
+export {
+  InboxFull,
+  MessageTooLarge,
+  defaultCapacity,
+  defaultMaxPendingBytes,
+  promptBytes,
+} from "../../core/turn/steering.js"
 import { Effect, Schema, Semaphore, SynchronizedRef } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { generateId } from "../../core/model/telemetry/events.js"
