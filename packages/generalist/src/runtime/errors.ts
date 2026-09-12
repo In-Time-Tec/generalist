@@ -435,3 +435,33 @@ export class AgentNameConflict extends ActionableTaggedError<AgentNameConflict>(
     hint: errorHint("Use a unique name in this scope or address the existing named Run."),
   },
 ) {}
+
+/** Declaration field group rejected by Runtime.layer validation. */
+export class RuntimeOptionsInvalid extends ActionableTaggedError<RuntimeOptionsInvalid>()(
+  "generalist/runtime/RuntimeOptionsInvalid",
+  {
+    field: Schema.Literals(["agents", "revision", "namespace"]),
+    message: Schema.String,
+    hint: errorHint("Correct the declaration group named by field before acquiring the Runtime Layer."),
+  },
+) {}
+
+/** A retained run requested an exact revision no registered or loaded closure provides. */
+export class RevisionUnavailable extends ActionableTaggedError<RevisionUnavailable>()(
+  "generalist/runtime/RevisionUnavailable",
+  {
+    revision: Schema.String,
+    agentName: Schema.String,
+    executablePin: Schema.String,
+    hint: errorHint("Declare the retained revision through Runtime.layer loadRevision or retire the Run."),
+  },
+) {}
+
+/** A loaded revision definition derives a different closure than the retained run requires. */
+export class RevisionMismatch extends ActionableTaggedError<RevisionMismatch>()("generalist/runtime/RevisionMismatch", {
+  expectedRevision: Schema.String,
+  loadedRevision: Schema.String,
+  expectedExecutablePin: Schema.String,
+  derivedExecutablePin: Schema.String,
+  hint: errorHint("Return the RevisionDefinition that derives the retained executable pin exactly."),
+}) {}

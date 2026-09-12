@@ -258,7 +258,7 @@ const graphIdentities = (
     pin,
     codec,
     version,
-    payload: { pin },
+    payload: { pin, revision },
   }))
   return {
     graph,
@@ -400,12 +400,21 @@ export const resolve: {
   return Effect.gen(function* () {
     const name = yield* registeredName(input)
     const registration = yield* agents.get(name)
-    if (Option.isNone(registration)) return yield* UnknownAgent.make({ agentName: name, runId: input.runId })
+    if (Option.isNone(registration)) {
+      return yield* fallback
+        .resolve(input)
+        .pipe(
+          Effect.catchTag("generalist/runtime/ExecutablePinMissing", () =>
+            UnknownAgent.make({ agentName: name, runId: input.runId }),
+          ),
+        )
+    }
     const root = input.manifest.entries.find((entry) => entry.pin === input.manifest.root)
     const rootRegistration = root?._tag === "Agent" ? yield* agents.get(root.manifest.name) : Option.none()
     const executable = Option.isSome(rootRegistration)
       ? rootRegistration.value.executable
       : registration.value.executable
+    if (executable.ref.executable !== input.ref.executable) return yield* fallback.resolve(input)
     const active = executable.manifest.entries.find((entry) => entry._tag === "Agent" && entry.manifest.name === name)
     if (active === undefined) return yield* ExecutablePinMissing.make({ runId: input.runId, ref: input.ref })
     return {
