@@ -1562,8 +1562,7 @@
                   "id": { "type": "string", "minLength": 1, "maxLength": 100 },
                   "title": { "type": "string" },
                   "agent": { "type": "string" }
-                },
-                "additionalProperties": false
+                }
               }
             }
           },
@@ -6577,8 +6576,7 @@
                   "leafId": { "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 1024 }, { "type": "null" }] },
                   "limit": { "type": "integer", "minimum": 1, "maximum": 64 }
                 },
-                "required": ["leafId", "limit"],
-                "additionalProperties": false
+                "required": ["leafId", "limit"]
               }
             }
           },
@@ -6759,8 +6757,7 @@
                   "rootRunId": { "type": "string", "minLength": 1, "maxLength": 1024 },
                   "limit": { "type": "integer", "minimum": 1, "maximum": 64 }
                 },
-                "required": ["at", "limit"],
-                "additionalProperties": false
+                "required": ["at", "limit"]
               }
             }
           },
@@ -7217,8 +7214,7 @@
                   "before": { "type": "integer", "minimum": -1, "maximum": 9007199254740991 },
                   "limit": { "type": "integer", "minimum": 1, "maximum": 64 }
                 },
-                "required": ["limit"],
-                "additionalProperties": false
+                "required": ["limit"]
               }
             }
           },
@@ -7340,8 +7336,7 @@
                   "commandId": { "type": "string", "minLength": 1 },
                   "action": { "type": "string", "enum": ["stop", "close", "resume"] }
                 },
-                "required": ["commandId", "action"],
-                "additionalProperties": false
+                "required": ["commandId", "action"]
               }
             }
           },
@@ -7421,8 +7416,7 @@
                   "commandId": { "type": "string", "minLength": 1 },
                   "input": { "anyOf": [{ "type": "string" }, { "$ref": "#/components/schemas/PromptEncoded" }] }
                 },
-                "required": ["commandId", "input"],
-                "additionalProperties": false
+                "required": ["commandId", "input"]
               }
             }
           },
@@ -7507,8 +7501,7 @@
                   "input": { "anyOf": [{ "type": "string" }, { "$ref": "#/components/schemas/PromptEncoded" }] },
                   "agent": { "type": "string" }
                 },
-                "required": ["commandId", "expectedRevision", "input"],
-                "additionalProperties": false
+                "required": ["commandId", "expectedRevision", "input"]
               }
             }
           },
@@ -7589,8 +7582,7 @@
                   "commandId": { "type": "string", "minLength": 1 },
                   "expectedRevision": { "type": "integer", "exclusiveMinimum": 0 }
                 },
-                "required": ["commandId", "expectedRevision"],
-                "additionalProperties": false
+                "required": ["commandId", "expectedRevision"]
               }
             }
           },
@@ -7725,8 +7717,7 @@
                   "input": {},
                   "commandId": { "type": "string", "minLength": 1 }
                 },
-                "required": ["agent", "input", "commandId"],
-                "additionalProperties": false
+                "required": ["agent", "input", "commandId"]
               }
             }
           },
@@ -11055,8 +11046,7 @@
               "schema": {
                 "type": "object",
                 "properties": { "commandId": { "type": "string", "minLength": 1 }, "reason": { "type": "string" } },
-                "required": ["commandId"],
-                "additionalProperties": false
+                "required": ["commandId"]
               }
             }
           },
@@ -11190,8 +11180,7 @@
                   "commandId": { "type": "string", "minLength": 1 },
                   "input": { "anyOf": [{ "type": "string" }, { "$ref": "#/components/schemas/PromptEncoded" }] }
                 },
-                "required": ["commandId", "input"],
-                "additionalProperties": false
+                "required": ["commandId", "input"]
               }
             }
           },
@@ -11439,8 +11428,7 @@
                   "prompt": { "type": "string", "minLength": 1 },
                   "label": { "type": "string" }
                 },
-                "required": ["commandId", "selection", "prompt"],
-                "additionalProperties": false
+                "required": ["commandId", "selection", "prompt"]
               }
             }
           },
@@ -11624,8 +11612,7 @@
               "schema": {
                 "type": "object",
                 "properties": { "commandId": { "type": "string", "minLength": 1 }, "input": {} },
-                "required": ["commandId", "input"],
-                "additionalProperties": false
+                "required": ["commandId", "input"]
               }
             }
           },
@@ -14742,8 +14729,7 @@
                       {
                         "type": "object",
                         "properties": { "_tag": { "type": "string", "enum": ["Approved"] } },
-                        "required": ["_tag"],
-                        "additionalProperties": false
+                        "required": ["_tag"]
                       },
                       {
                         "type": "object",
@@ -14751,14 +14737,12 @@
                           "_tag": { "type": "string", "enum": ["Denied"] },
                           "reason": { "type": "string" }
                         },
-                        "required": ["_tag"],
-                        "additionalProperties": false
+                        "required": ["_tag"]
                       }
                     ]
                   }
                 },
-                "required": ["commandId", "decision"],
-                "additionalProperties": false
+                "required": ["commandId", "decision"]
               }
             }
           },
@@ -15367,8 +15351,7 @@
               "schema": {
                 "type": "object",
                 "properties": { "commandId": { "type": "string", "minLength": 1 } },
-                "required": ["commandId"],
-                "additionalProperties": false
+                "required": ["commandId"]
               }
             }
           },
@@ -15487,8 +15470,7 @@
               "schema": {
                 "type": "object",
                 "properties": { "commandId": { "type": "string", "minLength": 1 } },
-                "required": ["commandId"],
-                "additionalProperties": false
+                "required": ["commandId"]
               }
             }
           },
@@ -15614,20 +15596,17 @@
                       {
                         "type": "object",
                         "properties": { "outcome": { "type": "string", "enum": ["succeeded"] }, "result": {} },
-                        "required": ["outcome", "result"],
-                        "additionalProperties": false
+                        "required": ["outcome", "result"]
                       },
                       {
                         "type": "object",
                         "properties": { "outcome": { "type": "string", "enum": ["failed"] }, "error": {} },
-                        "required": ["outcome", "error"],
-                        "additionalProperties": false
+                        "required": ["outcome", "error"]
                       }
                     ]
                   }
                 },
-                "required": ["commandId", "operationId", "resolution"],
-                "additionalProperties": false
+                "required": ["commandId", "operationId", "resolution"]
               }
             }
           },
@@ -15755,12 +15734,10 @@
                       "duration": { "type": "number", "minimum": 0, "maximum": 9007199254740991 },
                       "toolCalls": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                       "children": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                    },
-                    "additionalProperties": false
+                    }
                   }
                 },
-                "required": ["commandId", "delta"],
-                "additionalProperties": false
+                "required": ["commandId", "delta"]
               }
             }
           },
@@ -15819,8 +15796,7 @@
           "role": { "type": "string", "enum": ["system"] },
           "content": { "type": "string" }
         },
-        "required": ["role", "content"],
-        "additionalProperties": false
+        "required": ["role", "content"]
       },
       "TextPart": {
         "type": "object",
@@ -15835,8 +15811,7 @@
           "type": { "type": "string", "enum": ["text"] },
           "text": { "type": "string" }
         },
-        "required": ["type", "text"],
-        "additionalProperties": false
+        "required": ["type", "text"]
       },
       "FilePart": {
         "type": "object",
@@ -15859,8 +15834,7 @@
             ]
           }
         },
-        "required": ["type", "mediaType", "data"],
-        "additionalProperties": false
+        "required": ["type", "mediaType", "data"]
       },
       "UserMessage": {
         "type": "object",
@@ -15885,8 +15859,7 @@
             ]
           }
         },
-        "required": ["role", "content"],
-        "additionalProperties": false
+        "required": ["role", "content"]
       },
       "ReasoningPart": {
         "type": "object",
@@ -15901,8 +15874,7 @@
           "type": { "type": "string", "enum": ["reasoning"] },
           "text": { "type": "string" }
         },
-        "required": ["type", "text"],
-        "additionalProperties": false
+        "required": ["type", "text"]
       },
       "ToolCallPart": {
         "type": "object",
@@ -15920,8 +15892,7 @@
           "params": {},
           "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] }
         },
-        "required": ["type", "id", "name", "params"],
-        "additionalProperties": false
+        "required": ["type", "id", "name", "params"]
       },
       "ToolResultPart": {
         "type": "object",
@@ -15940,8 +15911,7 @@
           "result": {},
           "providerExecuted": { "anyOf": [{ "type": "boolean" }, { "type": "null" }] }
         },
-        "required": ["type", "id", "name", "isFailure", "result"],
-        "additionalProperties": false
+        "required": ["type", "id", "name", "isFailure", "result"]
       },
       "ToolApprovalRequestPart": {
         "type": "object",
@@ -15957,8 +15927,7 @@
           "approvalId": { "type": "string" },
           "toolCallId": { "type": "string" }
         },
-        "required": ["type", "approvalId", "toolCallId"],
-        "additionalProperties": false
+        "required": ["type", "approvalId", "toolCallId"]
       },
       "AssistantMessage": {
         "type": "object",
@@ -15990,8 +15959,7 @@
             ]
           }
         },
-        "required": ["role", "content"],
-        "additionalProperties": false
+        "required": ["role", "content"]
       },
       "ToolApprovalResponsePart": {
         "type": "object",
@@ -16008,8 +15976,7 @@
           "approved": { "type": "boolean" },
           "reason": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
         },
-        "required": ["type", "approvalId", "approved"],
-        "additionalProperties": false
+        "required": ["type", "approvalId", "approved"]
       },
       "ToolMessage": {
         "type": "object",
@@ -16032,8 +15999,7 @@
             }
           }
         },
-        "required": ["role", "content"],
-        "additionalProperties": false
+        "required": ["role", "content"]
       },
       "PromptEncoded": {
         "type": "object",
@@ -16050,8 +16016,7 @@
             }
           }
         },
-        "required": ["content"],
-        "additionalProperties": false
+        "required": ["content"]
       },
       "generalist_server_ForbiddenEncoded": {
         "type": "object",
