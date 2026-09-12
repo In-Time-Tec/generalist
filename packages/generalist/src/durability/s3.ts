@@ -211,12 +211,18 @@ const sdkClient = (options: ConnectionOptions): Client & MaintenanceClient => {
 }
 
 const checkKey = (operation: string, key: string): void => {
-  if (key.length === 0 || /(?:^|\/)\.{1,2}(?:\/|$)/.test(key)) {
+  if (
+    key.length === 0 ||
+    key.startsWith("/") ||
+    key.endsWith("/") ||
+    key.includes("//") ||
+    /(?:^|\/)\.{1,2}(?:\/|$)/.test(key)
+  ) {
     throw failure(
       operation,
       key,
       "invalid-response",
-      "Object keys must be nonempty and contain no dot-only path segments.",
+      "Object keys must be nonempty, must not begin or end with '/', and must contain no empty or dot-only path segments.",
     )
   }
 }
