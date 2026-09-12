@@ -10,7 +10,7 @@ import {
   ProgramRunner,
   CodeExecutor,
 } from "../../../src/index.js"
-import { Deferred, Effect, Exit, Fiber, Function, Layer, Schema, Scope } from "effect"
+import { Cause, Deferred, Effect, Exit, Fiber, Function, Layer, Option, Schema, Scope } from "effect"
 import { expect } from "vitest"
 
 const Input = Schema.Struct({ value: Schema.Finite })
@@ -306,6 +306,133 @@ it.effect("accepts an exact operation repeat and rejects changed content as repl
         expect(divergence.operation).toBe("changed")
         expect(divergence.expected).not.toBe(divergence.actual)
       }
+    }),
+  ),
+)
+
+it.effect("fails JSON-invalid capability arguments and log data as typed ProgramSchemaFailure", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const cases: ReadonlyArray<{
+        readonly name: string
+        readonly boundary: ProgramCapabilities.ProgramSchemaFailure["boundary"]
+        readonly capability?: string
+        readonly call: (
+          capabilities: ProgramCapabilities.Service,
+        ) => Effect.Effect<unknown, ProgramCapabilities.CapabilityFailure>
+      }> = [
+        {
+          name: "callTool undefined",
+          boundary: "tool-input",
+          capability: "increment",
+          call: (capabilities) =>
+            capabilities.callTool({ operation: "argsUndefined", tool: "increment", input: undefined }),
+        },
+        {
+          name: "callTool function",
+          boundary: "tool-input",
+          capability: "increment",
+          call: (capabilities) =>
+            capabilities.callTool({ operation: "argsFunction", tool: "increment", input: () => undefined }),
+        },
+        {
+          name: "callTool NaN",
+          boundary: "tool-input",
+          capability: "increment",
+          call: (capabilities) => capabilities.callTool({ operation: "argsNan", tool: "increment", input: Number.NaN }),
+        },
+        {
+          name: "callTool BigInt",
+          boundary: "tool-input",
+          capability: "increment",
+          call: (capabilities) => capabilities.callTool({ operation: "argsBigint", tool: "increment", input: 1n }),
+        },
+        {
+          name: "callStep NaN",
+          boundary: "step-input",
+          capability: "double",
+          call: (capabilities) => capabilities.callStep({ operation: "stepNan", step: "double", input: Number.NaN }),
+        },
+        {
+          name: "runAgent function",
+          boundary: "agent-input",
+          capability: "worker",
+          call: (capabilities) =>
+            capabilities.runAgent({ operation: "agentFunction", selection: "worker", input: () => undefined }),
+        },
+        {
+          name: "mapAgents nested undefined",
+          boundary: "agent-input",
+          capability: "worker",
+          call: (capabilities) =>
+            capabilities.mapAgents({
+              operation: "mapUndefined",
+              selection: "worker",
+              members: [{ member: "member", input: { nested: undefined } }],
+            }),
+        },
+        {
+          name: "fanOutAgents NaN",
+          boundary: "agent-input",
+          call: (capabilities) =>
+            capabilities.fanOutAgents({
+              operation: "fanOutNan",
+              members: [{ member: "member", selection: "worker", input: Number.NaN }],
+            }),
+        },
+        {
+          name: "log nested undefined",
+          boundary: "program-output",
+          capability: "log",
+          call: (capabilities) =>
+            capabilities.log({
+              operation: "argsLog",
+              level: "info",
+              message: "malformed",
+              // oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion, typescript/no-unsafe-type-assertion -- SAFETY: Deliberately JSON-invalid log data crosses the capability boundary so the runner must reject it; it never enters production state.
+              data: { nested: undefined } as never,
+            }),
+        },
+      ]
+
+      for (const entry of cases) {
+        const exit = yield* AgentProgram.run(program("malformed capability arguments"), { value: 1 }).pipe(
+          runWith(() =>
+            Effect.gen(function* () {
+              const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+              return yield* entry.call(capabilities)
+            }),
+          ),
+          Effect.exit,
+        )
+        expect(Exit.isFailure(exit), entry.name).toBe(true)
+        if (Exit.isSuccess(exit)) continue
+        expect(exit.cause.reasons.find(Cause.isDieReason), entry.name).toBeUndefined()
+        const failure = Cause.findErrorOption(exit.cause)
+        expect(Option.isSome(failure), entry.name).toBe(true)
+        if (Option.isNone(failure)) continue
+        expect(failure.value, entry.name).toBeInstanceOf(ProgramCapabilities.ProgramSchemaFailure)
+        if (!Schema.is(ProgramCapabilities.ProgramSchemaFailure)(failure.value)) continue
+        expect(failure.value.boundary, entry.name).toBe(entry.boundary)
+        expect(failure.value.capability, entry.name).toBe(entry.capability)
+      }
+
+      const control = yield* AgentProgram.run(program("valid capability arguments"), { value: 1 }).pipe(
+        runWith(() =>
+          Effect.gen(function* () {
+            const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+            const output = yield* capabilities.callTool({ operation: "argsControl", tool: "increment", input: 1 })
+            yield* capabilities.log({
+              operation: "argsLogControl",
+              level: "info",
+              message: "valid",
+              data: { ok: true },
+            })
+            return { value: output }
+          }),
+        ),
+      )
+      expect(control.value).toBe(2)
     }),
   ),
 )
