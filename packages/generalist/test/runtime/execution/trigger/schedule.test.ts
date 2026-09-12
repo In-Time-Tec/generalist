@@ -1,4 +1,4 @@
-import { objectRuntimeLayer } from "../object.js"
+import { objectRuntimeLayer, makeObjectStorage } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Queue, Stream } from "effect"
 import { TestClock } from "effect/testing"
@@ -13,6 +13,13 @@ const usage = Response.Usage.make({
   outputTokens: { total: 1, text: 1, reasoning: undefined },
 })
 const agent = Agent.make({ name: "schedule-test", toolkit: Toolkit.empty })
+const unusedModel = Layer.effect(
+  LanguageModel.LanguageModel,
+  LanguageModel.make({
+    generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+    streamText: () => Stream.empty,
+  }),
+)
 const fixture = Effect.gen(function* () {
   const calls = yield* Queue.unbounded<void>()
   const model = Layer.effect(
@@ -92,6 +99,57 @@ it.effect("registers a stable schedule idempotently", () =>
         expect(yield* runtime.list({ limit: 10 })).toHaveLength(1)
       }),
     )
+  }),
+)
+
+it.effect("re-registers a stable schedule id on a fresh host after wall-clock time passes", () =>
+  Effect.gen(function* () {
+    const storage = makeObjectStorage()
+    const hostLayer = (workerId: string) =>
+      objectRuntimeLayer({ addresses: [], workerId }, storage).pipe(
+        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      )
+    const options = {
+      rrule: "FREQ=DAILY;BYHOUR=1",
+      sessionId: "stable-restart-session",
+      scheduleId: "schedule_stable_restart",
+    } as const
+    const first = yield* provideScoped(
+      Layer.merge(hostLayer("stable-restart-a"), unusedModel),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        yield* runtime.register(agent)
+        return yield* runtime.schedule(agent, "run", options)
+      }),
+    )
+
+    // 30 minutes later the recomputed nextAt is still 1970-01-01T01:00:00.000Z, so only the
+    // registration clock (createdAt) differs from the retained command input.
+    yield* TestClock.adjust("30 minutes")
+
+    const retry = yield* provideScoped(
+      Layer.merge(hostLayer("stable-restart-b"), unusedModel),
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        yield* runtime.register(agent)
+        const reregistered = yield* runtime.schedule(agent, "run", options)
+        const changedRule = yield* runtime
+          .schedule(agent, "run", { ...options, rrule: "FREQ=MINUTELY" })
+          .pipe(Effect.flip)
+        const changedInput = yield* runtime.schedule(agent, "changed", options).pipe(Effect.flip)
+        return { reregistered, changedRule, changedInput }
+      }),
+    )
+
+    expect(retry.reregistered).toEqual(first)
+    expect(retry.changedRule).toMatchObject({
+      _tag: "generalist/durability/DurabilityFailure",
+      reason: "input-conflict",
+    })
+    expect(retry.changedInput).toMatchObject({
+      _tag: "generalist/durability/DurabilityFailure",
+      reason: "input-conflict",
+    })
   }),
 )
 

@@ -53,6 +53,17 @@ const Settlement = Schema.Struct({ placementId: Schema.String, settlementId: Sch
 const SettlementAcknowledgement = Schema.Struct({ placementId: Schema.String, settlementId: Schema.String })
 const key = (...parts: readonly (string | number)[]) => JSON.stringify(parts)
 
+/**
+ * A schedule's durable identity is the caller's stable definition: schedule id, normalized
+ * recurrence, and captured definition. `nextAt`, `occurrence`, `status`, and `createdAt` are
+ * derived from the registration clock, so projecting them to fixed values keeps the journal
+ * input digest time-independent — otherwise a restart re-asserting the same schedule conflicts
+ * with its own retained receipt.
+ */
+const scheduleDigestInput = ([record]: readonly [ScheduleRecord]): readonly [ScheduleRecord] => [
+  { ...record, nextAt: "", occurrence: 0, status: "active", createdAt: "" },
+]
+
 export const commands = {
   respond: {
     tag: "respond",
@@ -101,6 +112,7 @@ export const commands = {
     input: Schema.Tuple([ScheduleRecord]),
     receipt: ScheduleReceipt,
     identity: ([input]: readonly [ScheduleRecord]) => input.scheduleId,
+    digestInput: scheduleDigestInput,
   },
   claimSchedules: {
     tag: "claimSchedules",
