@@ -207,6 +207,23 @@ describe("executable identity", () => {
     }
   })
 
+  it("rejects a compaction identity whose reserve does not fit its window", () => {
+    const compaction: AgentManifest.CompactionIdentity = {
+      service: Pins.makeCapability({ compaction: "default" }),
+      summaryModel: Pins.makeModel({ implementation: "summary" }),
+      contextWindow: 10_000,
+      reserveTokens: 16_384,
+      keepRecentTokens: 1_000,
+      strategyIdentity: "default:v1",
+      summaryPromptIdentity: "summary:v1",
+    }
+    expect(() => base({ compaction })).toThrow(/reserveTokens must be less than contextWindow/)
+    expect(() => base({ compaction: { ...compaction, reserveTokens: 10_000 } })).toThrow(
+      /reserveTokens must be less than contextWindow/,
+    )
+    expect(() => base({ compaction: { ...compaction, reserveTokens: 9_999 } })).not.toThrow()
+  })
+
   it("builds from a live Agent only with exact caller-supplied tool pins", () => {
     const agent = Agent.make({
       name: "assistant",

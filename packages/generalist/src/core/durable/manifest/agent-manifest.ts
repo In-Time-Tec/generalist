@@ -143,7 +143,12 @@ export const CompactionIdentity: Schema.Codec<CompactionIdentity, CompactionIden
   keepRecentTokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   strategyIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
   summaryPromptIdentity: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
-})
+}).check(
+  Schema.makeFilter(
+    ({ contextWindow, reserveTokens }) =>
+      reserveTokens < contextWindow || "CompactionIdentity.reserveTokens must be less than contextWindow",
+  ),
+)
 const ProgramSelectionId = Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128))
 const ProgramAuthorityNamedCapability = namedCapabilityWith(ProgramSelectionId)
 const ProgramAuthorityAgentCapability = Schema.Struct({

@@ -325,7 +325,7 @@ export interface RunOptions {
   readonly toolProgress?: ProgressOverflowPolicy
   /** Finite process-local input policy for this Run. */
   readonly steering?: import("../turn/steering.js").Options
-  /** Context-window hint for optional compaction. */
+  /** Context-window hint for optional compaction; a configured reserveTokens must be less than contextWindow. */
   readonly compaction?: {
     readonly contextWindow?: number
     readonly reserveTokens?: number

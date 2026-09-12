@@ -12,6 +12,11 @@ const invalidNonNegativeSafeInteger = (value: number | undefined) =>
 const invalidPositiveFinite = (value: number | undefined) =>
   value !== undefined && (!Number.isFinite(value) || value <= 0)
 
+const reserveExceedsWindow = (compaction: RunOptions["compaction"]): boolean =>
+  compaction?.contextWindow !== undefined &&
+  compaction.reserveTokens !== undefined &&
+  compaction.reserveTokens >= compaction.contextWindow
+
 const numericOptionFailures = (options: RunOptions): ReadonlyArray<AgentError | undefined> => [
   invalidNonNegativeFinite(options.toolOutputMaxBytes)
     ? AgentError.make({ message: "RunOptions.toolOutputMaxBytes must be a non-negative finite number", turn: 0 })
@@ -28,6 +33,12 @@ const numericOptionFailures = (options: RunOptions): ReadonlyArray<AgentError | 
   invalidNonNegativeSafeInteger(options.compaction?.reserveTokens)
     ? AgentError.make({
         message: "RunOptions.compaction.reserveTokens must be a non-negative safe integer",
+        turn: 0,
+      })
+    : undefined,
+  reserveExceedsWindow(options.compaction)
+    ? AgentError.make({
+        message: "RunOptions.compaction.reserveTokens must be less than contextWindow",
         turn: 0,
       })
     : undefined,

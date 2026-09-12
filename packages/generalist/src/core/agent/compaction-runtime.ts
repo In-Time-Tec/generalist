@@ -4,6 +4,7 @@ import { AiError, Chat, Model, Prompt, Tokenizer } from "effect/unstable/ai"
 import { conservativeContextWindow, contextWindow as catalogContextWindow } from "../../ai/model-catalog.js"
 import { AgentError, MiddlewareViolation } from "./event.js"
 import { Compaction, defaultReserveTokens, Result as CompactionResult, type Usage } from "../turn/compaction.js"
+import { usableReserveTokens } from "../turn/compaction-service.js"
 import { diagnose as diagnoseSessionSync } from "../context/session-sync.js"
 import { SessionSyncInternals } from "./session/sync.js"
 import {
@@ -244,7 +245,7 @@ export const make = (context: CompactionContext) => {
       return {
         contextTokens,
         contextWindow,
-        reserveTokens: options.compaction?.reserveTokens ?? defaultReserveTokens,
+        reserveTokens: usableReserveTokens(contextWindow, options.compaction?.reserveTokens ?? defaultReserveTokens),
       }
     })
   }

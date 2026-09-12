@@ -1,4 +1,4 @@
-import { Context, type Effect, type Option, Schema } from "effect"
+import { Context, Function, Schema, type Effect, type Option } from "effect"
 import { LanguageModel, Prompt } from "effect/unstable/ai"
 import type { Entry } from "../context/session.js"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
@@ -13,6 +13,17 @@ export interface Usage {
 
 /** Default recent-session suffix target kept verbatim. */
 export const defaultKeepRecentTokens = 20_000
+
+/**
+ * Resolve a reserve that always leaves a positive proactive budget.
+ * A reserve at or above the resolved window cannot be satisfied by any prompt, so it falls back to zero.
+ */
+export const usableReserveTokens: {
+  (contextWindow: number, reserveTokens: number): number
+  (reserveTokens: number): (contextWindow: number) => number
+} = Function.dual(2, (contextWindow: number, reserveTokens: number): number =>
+  Number.isFinite(contextWindow) && reserveTokens >= contextWindow ? 0 : reserveTokens,
+)
 
 /** What to keep verbatim and what the summary replaces. */
 export interface Plan {
