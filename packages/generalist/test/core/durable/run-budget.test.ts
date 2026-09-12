@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Cause, Effect, Exit, Schema } from "effect"
 import { RunBudget } from "../../../src/index.js"
 
 const schemaError = (build: () => void): boolean => {
@@ -58,6 +58,37 @@ describe("RunBudget", () => {
       const reserved = yield* RunBudget.reserveChild(RunBudget.make({ tokens: 10, children: 1 }), { tokens: 6 })
       const child = yield* RunBudget.charge(reserved.child, { tokens: 2 })
       expect(RunBudget.refundUnused(reserved.parent, child).remaining).toEqual({ tokens: 8, children: 0 })
+    }),
+  )
+
+  it.effect("fails malformed child grants with a typed error and preserves narrowing controls", () =>
+    Effect.gen(function* () {
+      const parent = RunBudget.make({ tokens: 10 })
+      const child = RunBudget.make({ tokens: 5 })
+      for (const narrower of [{ tokens: -1 }, { tokens: Number.NaN }, { tokens: Number.POSITIVE_INFINITY }]) {
+        const exit = yield* Effect.exit(RunBudget.narrowChild(parent, child, narrower))
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) {
+          expect(exit.cause.reasons.every(Cause.isFailReason)).toBe(true)
+          const reason = exit.cause.reasons[0]
+          if (reason === undefined || !Cause.isFailReason(reason)) {
+            throw new Error(`expected a typed RunBudgetInvalid failure, received ${reason?._tag ?? "no reason"}`)
+          }
+          expect(reason.error._tag).toBe("generalist/core/RunBudgetInvalid")
+        }
+      }
+
+      const reserveMalformed = yield* RunBudget.reserveChild(parent, { tokens: Number.NaN }).pipe(Effect.flip)
+      expect(reserveMalformed._tag).toBe("generalist/core/RunBudgetInvalid")
+
+      const reserved = yield* RunBudget.reserveChild(parent, { tokens: 6 })
+      const narrowed = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { tokens: 2 })
+      expect(narrowed.parent.remaining.tokens).toBe(8)
+      expect(narrowed.child.allocation.tokens).toBe(2)
+      expect(narrowed.child.remaining.tokens).toBe(2)
+
+      const widened = yield* RunBudget.narrowChild(reserved.parent, reserved.child, { tokens: 7 }).pipe(Effect.flip)
+      expect(widened._tag).toBe("generalist/core/RunBudgetInvalid")
     }),
   )
 
