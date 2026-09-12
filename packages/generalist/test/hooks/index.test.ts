@@ -497,6 +497,28 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
       ] as const,
   )
 
+  ItLayer.make(it, "rejects a decision outside the event's allowed set as HookFailed", () => {
+    const declaration: Hooks.Declaration = {
+      event: "RunEnd",
+      key: "test.hooks.index.onRunEnd.3",
+      version: "1",
+      replayPolicy: "never",
+      hook: () => Effect.succeed(Hooks.Ask()),
+    }
+    return [
+      Layer.mergeAll(
+        modelLayer(() => Stream.make(textDelta("model output"))),
+        ModelMiddleware.layerIdentity,
+        Hooks.layer([declaration]),
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Agent.run(Agent.make({ name: "out-of-set-run-end" }), "input").pipe(Effect.flip)
+
+        expect(failure).toMatchObject({ _tag: "generalist/core/HookFailed", event: "RunEnd" })
+      }),
+    ] as const
+  })
+
   it.effect("replays a journaled Block without invoking the hook again", () =>
     Effect.gen(function* () {
       const logicalOperationId = "hook-replay"

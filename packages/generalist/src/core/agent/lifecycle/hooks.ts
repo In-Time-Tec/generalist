@@ -5,6 +5,7 @@ import {
   Continue,
   chainPin,
   Decision,
+  DecisionByEvent,
   HookFailed,
   Hooks,
   type Checkpoint as HookCheckpoint,
@@ -67,7 +68,7 @@ const invoke = <Input>(
     Effect.flatMap((decision) =>
       decision === undefined
         ? Effect.succeed<HookDecision>(Continue())
-        : Schema.decodeEffect(Decision)(decision).pipe(
+        : Schema.decodeEffect(DecisionByEvent[declaration.event])(decision).pipe(
             Effect.mapError((cause) =>
               HookFailed.make({
                 event: declaration.event,
@@ -78,6 +79,22 @@ const invoke = <Input>(
     ),
   )
 }
+
+/** Recorded decisions cross the checkpoint boundary; re-validate them against the event's allowed set. */
+const recordedDecision = (event: HookEvent, decision: HookDecision): Effect.Effect<HookDecision, DriverStateInvalid> =>
+  Schema.decodeEffect(DecisionByEvent[event])(decision).pipe(
+    Effect.mapError(() =>
+      DriverStateInvalid.make({
+        message: `Recorded ${event} hook decision is outside the event's allowed set`,
+      }),
+    ),
+  )
+
+const recordedDecisions = (
+  event: HookEvent,
+  decisions: ReadonlyArray<HookDecision>,
+): Effect.Effect<ReadonlyArray<HookDecision>, DriverStateInvalid> =>
+  Effect.forEach(decisions, (decision) => recordedDecision(event, decision))
 
 // SAFETY: typed prompt hook constructors only admit Replace<Prompt.RawInput>; replay restores that recorded value.
 const replacementPrompt = (value: typeof Schema.Unknown.Type): Prompt.Prompt => Prompt.make(value as Prompt.RawInput)
@@ -177,8 +194,10 @@ export const evaluate = <
 > =>
   Effect.gen(function* () {
     const { interpreter, chain, recorded, declarations, logicalOperationId } = yield* prepare(options)
-    if (recorded?.complete === true) return apply(options.input, recorded.decisions, options.applyDecision)
-    const decisions = [...(recorded?.decisions ?? [])]
+    if (recorded?.complete === true) {
+      return apply(options.input, yield* recordedDecisions(options.event, recorded.decisions), options.applyDecision)
+    }
+    const decisions = [...(yield* recordedDecisions(options.event, recorded?.decisions ?? []))]
     if (declarations.length === 0) return apply(options.input, decisions, options.applyDecision)
     if (decisions.length > declarations.length) {
       return yield* DriverStateInvalid.make({
@@ -195,7 +214,7 @@ export const evaluate = <
         outputSchema: options.outputSchema,
       })
       const effect = invoke(declaration, current, operationKey)
-      const decision = yield* Option.isSome(interpreter)
+      const outcome = yield* Option.isSome(interpreter)
         ? interpreter.value.run(
             {
               kind: "hook",
@@ -214,6 +233,7 @@ export const evaluate = <
             effect,
           )
         : effect
+      const decision = yield* recordedDecision(options.event, outcome)
       decisions.push(decision)
       current = options.applyDecision(current, decision)
       if (Option.isSome(interpreter)) {
@@ -225,7 +245,11 @@ export const evaluate = <
           complete: decision._tag === "Block" || index === declarations.length - 1,
         })
         if (checkpoint.decisions.length !== decisions.length) {
-          return apply(options.input, checkpoint.decisions, options.applyDecision)
+          return apply(
+            options.input,
+            yield* recordedDecisions(options.event, checkpoint.decisions),
+            options.applyDecision,
+          )
         }
       }
       if (decision._tag === "Block") return apply(options.input, decisions, options.applyDecision)

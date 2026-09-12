@@ -1,7 +1,17 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Layer, Ref, Schema } from "effect"
-import { Prompt } from "effect/unstable/ai"
-import { AddContext, Continue, type Declaration, Hooks, layer, make, onRunStart } from "../../../../src/hooks/index.js"
+import { Prompt, Response } from "effect/unstable/ai"
+import {
+  AddContext,
+  Ask,
+  chainPin,
+  Continue,
+  type Declaration,
+  Hooks,
+  layer,
+  make,
+  onRunStart,
+} from "../../../../src/hooks/index.js"
 import { evaluate } from "../../../../src/core/agent/lifecycle/hooks.js"
 import {
   DriverInterpreter,
@@ -292,5 +302,215 @@ it.effect("does not checkpoint a decision after its outcome journal rejects comp
     expect(yield* interpreter.checkpoint).toEqual(checkpoint)
     expect(calls).toBe(1)
     expect(writes).toBe(1)
+  }),
+)
+
+it.effect("rejects Ask at RunEnd without journaling it as a completed decision", () =>
+  Effect.gen(function* () {
+    const input = yield* setup
+    const interpreter = yield* makeInterpreter(input)
+    const declaration: Declaration = {
+      event: "RunEnd",
+      key: "out-of-set-ask",
+      version: "1",
+      replayPolicy: "never",
+      hook: () => Effect.succeed(Ask()),
+    }
+    const failure = yield* evaluate({
+      key: "hook:run:end",
+      event: "RunEnd",
+      input: {
+        runId: "ephemeral-core-run",
+        agentName: "hook-recovery",
+        turns: 1,
+        text: "done",
+        output: "done",
+        transcript: Prompt.make("input"),
+      },
+      applyDecision: (current) => current,
+    }).pipe(
+      Effect.provideService(DriverInterpreter, interpreter),
+      Effect.provideService(Hooks, make({ declarations: [declaration] })),
+      Effect.flip,
+    )
+    expect(failure).toMatchObject({ _tag: "generalist/core/HookFailed", event: "RunEnd" })
+    expect(yield* interpreter.recorded).toMatchObject([{ outcome: { _tag: "Failed" } }])
+    expect((yield* interpreter.checkpoint).state).toMatchObject({
+      hooks: [{ key: "hook:run:end", event: "RunEnd", decisions: [], complete: false }],
+    })
+  }),
+)
+
+it.effect("rejects AddContext at ToolResult without journaling it as a completed decision", () =>
+  Effect.gen(function* () {
+    const input = yield* setup
+    const interpreter = yield* makeInterpreter(input)
+    const call = Response.toolCallPart({
+      id: "call-1",
+      name: "echo",
+      params: { text: "original" },
+      providerExecuted: false,
+    })
+    const declaration: Declaration = {
+      event: "ToolResult",
+      key: "out-of-set-addcontext",
+      version: "1",
+      replayPolicy: "never",
+      hook: () => Effect.succeed(AddContext("tool-result-context")),
+    }
+    const failure = yield* evaluate({
+      key: "hook:tool:0:call-1:result",
+      event: "ToolResult",
+      input: {
+        runId: "ephemeral-core-run",
+        agentName: "hook-recovery",
+        turn: 0,
+        tool: "echo",
+        args: { text: "original" },
+        call,
+        result: "echoed",
+      },
+      applyDecision: (current) => current,
+    }).pipe(
+      Effect.provideService(DriverInterpreter, interpreter),
+      Effect.provideService(Hooks, make({ declarations: [declaration] })),
+      Effect.flip,
+    )
+    expect(failure).toMatchObject({ _tag: "generalist/core/HookFailed", event: "ToolResult" })
+    expect((yield* interpreter.checkpoint).state).toMatchObject({
+      hooks: [{ key: "hook:tool:0:call-1:result", event: "ToolResult", decisions: [], complete: false }],
+    })
+  }),
+)
+
+it.effect("rejects an out-of-set decision already recorded as complete", () =>
+  Effect.gen(function* () {
+    const input = yield* setup
+    const declaration: Declaration = {
+      event: "RunEnd",
+      key: "recorded-ask",
+      version: "1",
+      replayPolicy: "never",
+      hook: () => Effect.succeed(Continue()),
+    }
+    const seeded = yield* makeInterpreter(input)
+    yield* seeded.recordHookDecisions({
+      chain: chainPin([declaration]),
+      key: "hook:run:end",
+      event: "RunEnd",
+      decisions: [Ask()],
+      complete: true,
+    })
+    const reopened = yield* makeInterpreter({ ...input, initial: yield* seeded.checkpoint })
+    const failure = yield* evaluate({
+      key: "hook:run:end",
+      event: "RunEnd",
+      input: {
+        runId: "ephemeral-core-run",
+        agentName: "hook-recovery",
+        turns: 1,
+        text: "done",
+        output: "done",
+        transcript: Prompt.make("input"),
+      },
+      applyDecision: (current) => current,
+    }).pipe(
+      Effect.provideService(DriverInterpreter, reopened),
+      Effect.provideService(Hooks, make({ declarations: [declaration] })),
+      Effect.flip,
+    )
+    expect(failure).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+    expect(failure.message).toContain("RunEnd")
+  }),
+)
+
+it.effect("rejects an out-of-set decision in an incomplete recorded prefix", () =>
+  Effect.gen(function* () {
+    const input = yield* setup
+    const declaration: Declaration = {
+      event: "RunEnd",
+      key: "recorded-prefix-ask",
+      version: "1",
+      replayPolicy: "never",
+      hook: () => Effect.succeed(Continue()),
+    }
+    const seeded = yield* makeInterpreter(input)
+    yield* seeded.recordHookDecisions({
+      chain: chainPin([declaration]),
+      key: "hook:run:end",
+      event: "RunEnd",
+      decisions: [Ask()],
+      complete: false,
+    })
+    const reopened = yield* makeInterpreter({ ...input, initial: yield* seeded.checkpoint })
+    const failure = yield* evaluate({
+      key: "hook:run:end",
+      event: "RunEnd",
+      input: {
+        runId: "ephemeral-core-run",
+        agentName: "hook-recovery",
+        turns: 1,
+        text: "done",
+        output: "done",
+        transcript: Prompt.make("input"),
+      },
+      applyDecision: (current) => current,
+    }).pipe(
+      Effect.provideService(DriverInterpreter, reopened),
+      Effect.provideService(Hooks, make({ declarations: [declaration] })),
+      Effect.flip,
+    )
+    expect(failure).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+    expect(failure.message).toContain("RunEnd")
+  }),
+)
+
+it.effect("rejects an out-of-set decision replayed from the operation journal", () =>
+  Effect.gen(function* () {
+    const input = yield* setup
+    const declaration: Declaration = {
+      event: "RunStart",
+      key: "journal-ask",
+      version: "1",
+      replayPolicy: "never",
+      hook: () => Effect.succeed(Continue()),
+    }
+    const evaluateRunStart = (interpreter: typeof DriverInterpreter.Service) =>
+      evaluate({
+        key: "hook:run:start",
+        event: "RunStart",
+        input: { runId: "ephemeral-core-run", agentName: "hook-recovery", input: Prompt.make("input") },
+        applyDecision: (current) => current,
+      }).pipe(
+        Effect.provideService(DriverInterpreter, interpreter),
+        Effect.provideService(Hooks, make({ declarations: [declaration] })),
+      )
+    let operationKey: string | undefined
+    const first = yield* makeInterpreter({
+      ...input,
+      journal: {
+        ...journalNoop,
+        onScheduled: (operation) =>
+          Effect.sync(() => {
+            operationKey = operation.key
+          }),
+        onCompleted: () => Effect.interrupt,
+      },
+    })
+    yield* Effect.exit(evaluateRunStart(first))
+    expect(operationKey).toBeDefined()
+    if (operationKey === undefined) return
+    const outcomes = new Map<string, OperationOutcome>([[operationKey, { _tag: "Succeeded", value: Ask() }]])
+    const reopened = yield* makeInterpreter({
+      ...input,
+      initial: yield* first.checkpoint,
+      journal: {
+        ...journalNoop,
+        onScheduled: (operation) => Effect.succeed(outcomes.get(operation.key)),
+      },
+    })
+    const failure = yield* evaluateRunStart(reopened).pipe(Effect.flip)
+    expect(failure).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+    expect(failure.message).toContain("RunStart")
   }),
 )
