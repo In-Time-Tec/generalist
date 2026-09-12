@@ -51,6 +51,34 @@ const scheduled = (context: Context, error: InvalidToolCallParameters): Effect.E
     ),
   )
 
+/**
+ * Whether a released part is content a correction retry would duplicate.
+ * `text-start`/`text-end` and `reasoning-start`/`reasoning-end` are lifecycle
+ * markers without content, and metadata plus `tool-params-*` staging never
+ * becomes transcript content on their own, so they do not count as escaped
+ * output. Non-empty text or reasoning and any escaped tool call remain strict
+ * correction barriers.
+ */
+const blocksCorrection = (part: StreamTextPart): boolean => {
+  switch (part.type) {
+    case "response-metadata":
+    case "text-start":
+    case "text-end":
+    case "reasoning-start":
+    case "reasoning-end":
+    case "tool-params-start":
+    case "tool-params-delta":
+    case "tool-params-end":
+      return false
+    case "text-delta":
+      return part.delta.length > 0
+    case "reasoning-delta":
+      return part.delta.length > 0
+    default:
+      return true
+  }
+}
+
 const correctLoop = (
   context: Context,
   model: LanguageModel.Service,
@@ -60,11 +88,21 @@ const correctLoop = (
   Stream.suspend(() => {
     let consumed = false
     return invokeStreamText(model, options).pipe(
-      Stream.tap((part) =>
-        Effect.sync(() => {
-          if (part.type !== "response-metadata") consumed = true
-        }),
-      ),
+      Stream.flatMap((part): Stream.Stream<StreamTextPart, AiError.AiError | InvalidToolCallParameters> => {
+        if (
+          !consumed &&
+          corrections < context.correctionLimit &&
+          part.type === "error" &&
+          isInvalidToolCallParameters(part.error)
+        ) {
+          // A released lifecycle marker lets the resilience wrapper turn the
+          // discarded attempt's validation failure into an in-band error
+          // part. Surface it as the attempt failure so correction can retry.
+          return Stream.fail(part.error)
+        }
+        if (blocksCorrection(part)) consumed = true
+        return Stream.make(part)
+      }),
       Stream.catchCause((cause) => {
         if (consumed || Cause.hasInterrupts(cause) || Cause.hasDies(cause)) return Stream.failCause(cause)
         const failure = singleFailure(cause)

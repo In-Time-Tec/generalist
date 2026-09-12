@@ -110,6 +110,22 @@ const healthy = Stream.make(
   Response.makePart("finish", { reason: "stop", usage: successfulUsage, response: undefined }),
 )
 
+const lifecycleThenInvalidToolParts = (
+  lifecycle: Response.StreamPartEncoded,
+): Stream.Stream<Response.StreamPartEncoded, AiError.AiError> =>
+  Stream.make(
+    { type: "response-metadata", id: "discarded-lifecycle", modelId: "test" },
+    lifecycle,
+    { type: "tool-call", id: "call-1", name: "lookup", params: { value: 1 } },
+    Response.makePart("finish", { reason: "tool-calls", usage: invalidUsage, response: undefined }),
+  )
+
+const textThenInvalidToolParts = Stream.make(
+  { type: "text-delta", id: "text", delta: "partial " },
+  { type: "tool-call", id: "call-1", name: "lookup", params: { value: 1 } },
+  Response.makePart("finish", { reason: "tool-calls", usage: invalidUsage, response: undefined }),
+)
+
 const resilience = ModelResilience.layer({ retrySchedule: Schedule.recurs(3) })
 
 const agent = Agent.make({ name: "no-replay-agent", toolkit })
@@ -168,6 +184,61 @@ describe("agent model stream replay safety", () => {
       })
       expect(completedCall?._tag === "ModelCallCompleted" && completedCall.usage).toEqual(successfulUsage)
       expect(completedAttempts.map((event) => event.usage)).toEqual([successfulUsage])
+    }),
+  )
+
+  it.effect("corrects a pre-output invalid tool call released behind a lifecycle marker", () =>
+    Effect.gen(function* () {
+      for (const lifecycle of [
+        { type: "text-start", id: "text" },
+        { type: "reasoning-start", id: "reasoning" },
+      ] satisfies ReadonlyArray<Response.StreamPartEncoded>) {
+        const model = scriptedModel([lifecycleThenInvalidToolParts(lifecycle), healthy], true)
+        const events = yield* runAgent(
+          model.layer,
+          ModelResilience.layer({
+            retrySchedule: Schedule.recurs(0),
+            invalidToolCallCorrectionLimit: 1,
+          }),
+        )
+        const label = `after ${lifecycle.type}`
+        const completed = events.at(-1)
+
+        expect(model.attempts(), label).toBe(2)
+        expect(completed?._tag === "Completed" && completed.text, label).toBe("recovered")
+        expect(
+          Array.from(events)
+            .filter((event) => event._tag === "ModelRetryScheduled")
+            .map((event) => event.reason),
+          label,
+        ).toEqual(["invalid-tool-call-correction"])
+        const failedAttempt = Array.from(events).find((event) => event._tag === "ModelAttemptFailed")
+        expect(failedAttempt?._tag === "ModelAttemptFailed" && failedAttempt.providerUsage, label).toEqual({
+          inputTokens: 7,
+          outputTokens: 3,
+        })
+      }
+    }),
+  )
+
+  it.effect("does not correct invalid parameters after text escaped behind a lifecycle marker", () =>
+    Effect.gen(function* () {
+      const model = scriptedModel([textThenInvalidToolParts, healthy], true)
+      const failure = yield* runAgent(
+        model.layer,
+        ModelResilience.layer({
+          retrySchedule: Schedule.recurs(0),
+          invalidToolCallCorrectionLimit: 1,
+        }),
+      ).pipe(Effect.flip)
+
+      expect(model.attempts()).toBe(1)
+      expect(Schema.is(AgentEvent.AgentError)(failure)).toBe(true)
+      expect(
+        Schema.is(ModelToolCallValidation.InvalidToolCallParameters)(
+          Schema.is(AgentEvent.AgentError)(failure) ? failure.cause : undefined,
+        ),
+      ).toBe(true)
     }),
   )
 
