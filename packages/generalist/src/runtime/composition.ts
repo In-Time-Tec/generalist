@@ -1,12 +1,35 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context, effecttsgo/unsafe-effect-type-assertion, anti-slop/no-unknown-parameters, typescript/no-unsafe-type-assertion, typescript/no-unsafe-argument, typescript/no-unsafe-return, typescript/no-unsafe-call, typescript/no-unsafe-member-access -- Runtime.layer erases heterogeneous Agent declarations behind AgentRegistry and restores each exact contract through the distributive AgentServices helper. */
-import { Context, type Crypto, type Duration, Effect, Exit, Layer, Option, Schema, Scope, Types } from "effect"
-import type { Tool } from "effect/unstable/ai"
+import {
+  Context,
+  type Crypto,
+  type Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Predicate,
+  Schema,
+  Scope,
+  Types,
+} from "effect"
+import type { Prompt, Tool } from "effect/unstable/ai"
 import type { Agent, Any as AnyAgent, ClosedServices } from "../core/agent/lifecycle/definition.js"
 import type { ObjectStore } from "../durability/object-store.js"
 import type { ActivationFailure, Options as RuntimeOptions } from "../durability/internal/runtime.js"
 import { activate as activateRuntime } from "../durability/activation.js"
-import { layer as reconstructedLayer } from "./state/layer.js"
-import { Runtime } from "./service.js"
+import { layer as reconstructedLayer, RuntimeLifecycle, type RuntimeLifecycleService } from "./state/layer.js"
+import {
+  Runtime,
+  type RunHandle,
+  type RunSendError,
+  type RunSendOptions,
+  type SendError,
+  type SendFunction,
+  type SendInput,
+  type Service as RuntimeService,
+} from "./service.js"
+import type { RunReceipt } from "./run.js"
+import type { SteeringReceipt } from "./run/steering.js"
 import {
   ExecutableResolver,
   type Input as ResolverInput,
@@ -433,6 +456,80 @@ const makeResolver = (
   return service
 }
 
+const guardRunHandle = <Output>(lifecycle: RuntimeLifecycleService, handle: RunHandle<Output>): RunHandle<Output> => ({
+  ...handle,
+  send: (message, options) => lifecycle.run(handle.send(message, options)),
+})
+
+const guardSend = (runtime: RuntimeService, lifecycle: RuntimeLifecycleService): SendFunction => {
+  function send(
+    runId: string,
+    prompt: Prompt.Prompt | string,
+    options?: RunSendOptions,
+  ): Effect.Effect<SteeringReceipt, RunSendError>
+  function send(input: SendInput): Effect.Effect<RunReceipt, SendError>
+  function send(
+    input: SendInput | string,
+    prompt?: Prompt.Prompt | string,
+    options?: RunSendOptions,
+  ): Effect.Effect<RunReceipt | SteeringReceipt, SendError | RunSendError> {
+    return Predicate.isString(input)
+      ? lifecycle.run(runtime.send(input, prompt ?? "", options))
+      : lifecycle.run(runtime.send(input))
+  }
+  return send
+}
+
+const guardOperator = (
+  operator: RuntimeService["operator"],
+  lifecycle: RuntimeLifecycleService,
+): RuntimeService["operator"] => ({
+  ...operator,
+  retry: (runId, identity, commandId) => lifecycle.run(operator.retry(runId, identity, commandId)),
+  wake: (runId, identity, commandId) => lifecycle.run(operator.wake(runId, identity, commandId)),
+  resolveUnknown: (runId, operationId, resolution, identity, commandId) =>
+    lifecycle.run(operator.resolveUnknown(runId, operationId, resolution, identity, commandId)),
+  resolveApproval: (token, decision, identity, commandId) =>
+    lifecycle.run(operator.resolveApproval(token, decision, identity, commandId)),
+  extendBudget: (runId, delta, identity, commandId) =>
+    lifecycle.run(operator.extendBudget(runId, delta, identity, commandId)),
+})
+
+const guardRuntime = (runtime: RuntimeService, lifecycle: RuntimeLifecycleService): RuntimeService => {
+  const guarded: RuntimeService = {
+    ...runtime,
+    operator: guardOperator(runtime.operator, lifecycle),
+    activate: (input) => lifecycle.run(runtime.activate(input)),
+    admit: (input) => lifecycle.run(runtime.admit(input)),
+    fanOut: (input) => lifecycle.run(runtime.fanOut(input)),
+    fork: (runId, options) =>
+      lifecycle.run(runtime.fork(runId, options)).pipe(Effect.map((handle) => guardRunHandle(lifecycle, handle))),
+    getRun: (runId) => runtime.getRun(runId).pipe(Effect.map((handle) => guardRunHandle(lifecycle, handle))),
+    controlSession: (input) => lifecycle.run(runtime.controlSession(input)),
+    messageSessionInput: (input) => lifecycle.run(runtime.messageSessionInput(input)),
+    respond: (input) => lifecycle.run(runtime.respond(input)),
+    respondApproval: (input) => lifecycle.run(runtime.respondApproval(input)),
+    rewind: (runId, options) => lifecycle.run(runtime.rewind(runId, options)),
+    resolveOperation: (input) => lifecycle.run(runtime.resolveOperation(input)),
+    schedule: (agent, input, options) => lifecycle.run(runtime.schedule(agent, input, options)),
+    send: guardSend(runtime, lifecycle),
+    sendMessage: (input) => lifecycle.run(runtime.sendMessage(input)),
+    signal: (input) => lifecycle.run(runtime.signal(input)),
+    spawn: (input) => lifecycle.run(runtime.spawn(input)),
+    start: (agent, input, options) =>
+      lifecycle
+        .run(runtime.start(agent, input, options))
+        .pipe(Effect.map((handle) => guardRunHandle(lifecycle, handle))),
+    startExecution: (input) => lifecycle.run(runtime.startExecution(input)),
+    startTool: (tool, input, options) => lifecycle.run(runtime.startTool(tool, input, options)),
+    startToolEncoded: (tool, input, options) => lifecycle.run(runtime.startToolEncoded(tool, input, options)),
+    submitSessionInput: (input) => lifecycle.run(runtime.submitSessionInput(input)),
+    extendBudget: (input) => lifecycle.run(runtime.extendBudget(input)),
+    wake: (input) => lifecycle.run(runtime.wake(input)),
+  }
+  return guarded
+}
+
 const make = (options: AnyOptions) =>
   Layer.unwrap(
     Effect.gen(function* () {
@@ -458,6 +555,7 @@ const make = (options: AnyOptions) =>
         Effect.provide(Context.merge(storage, Context.make(ExecutableResolver, resolver))),
       )
       const runtime = Context.get(built, Runtime)
+      const lifecycle = Context.get(built, RuntimeLifecycle)
       const declared = Object.values(options.agents)
       const registrationContext = Context.merge(environment, services)
       for (const agent of declared) {
@@ -477,13 +575,17 @@ const make = (options: AnyOptions) =>
         )
       }
       yield* activateRuntime.pipe(Effect.provide(built))
-      return Layer.succeed(Runtime, runtime)
+      return Layer.succeed(Runtime, guardRuntime(runtime, lifecycle))
     }),
   )
 
 /**
  * Compose declared Agents, their service Layer, storage, and namespace into one Runtime Layer.
- * Declaration performs no I/O; acquisition validates, derives the executable closure, registers it,
- * and acquires execution authority.
+ * Declaration performs no I/O. Scoped acquisition validates the declaration, builds storage and
+ * Agent services, registers every declared Agent, acquires the fenced execution lease, installs the
+ * scheduler and ownership monitor, and only then publishes `Runtime.Runtime`: the acquired Runtime
+ * is ready without `Durability.activate`. A failed acquisition closes every acquired resource in
+ * reverse order. Ownership loss retires the incarnation (owned requests interrupted and awaited,
+ * scheduler calls fail `RuntimeOwnershipLost`); scope close retires it (`RuntimeRetired`).
  */
 export const layer: LayerFactory = make

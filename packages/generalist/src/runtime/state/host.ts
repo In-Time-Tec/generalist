@@ -98,7 +98,14 @@ export type {
 export type { SteeringReceipt } from "../run/steering.js"
 export { ScheduleInvalid, ScheduleReceipt } from "../execution/trigger/schedule.js"
 export { WakeDisposition, WakeEventInvalid } from "../execution/trigger/wake.js"
-export { RevisionMismatch, RevisionUnavailable, RuntimeOptionsInvalid } from "../errors.js"
+export {
+  RevisionMismatch,
+  RevisionUnavailable,
+  RuntimeOptionsInvalid,
+  RuntimeOwnershipLost,
+  RuntimeRetired,
+} from "../errors.js"
+export type { RuntimeAvailabilityError, RuntimeLifecycleError } from "../errors.js"
 export {
   layer,
   type AcquisitionError,

@@ -3,7 +3,7 @@ import { Prompt } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../core/agent/service.js"
 import type { HostSession, SessionError } from "../runtime/session/host.js"
 import type { Service as RuntimeService } from "../runtime/service.js"
-import { PayloadTooLarge, UnknownAgent } from "../runtime/errors.js"
+import { PayloadTooLarge, type RuntimeLifecycleError, UnknownAgent } from "../runtime/errors.js"
 import { SessionQueueConflict, type PendingInput, type QueueReceipt } from "../runtime/session/queue.js"
 import { AgentNotRegistered } from "./errors.js"
 import { generateId } from "../core/model/telemetry/events.js"
@@ -21,7 +21,14 @@ export interface QueueEditOptions extends QueueCommandOptions {
   readonly expectedRevision: number
   readonly agent?: string
 }
-export type QueueError = SessionError | SessionQueueConflict | AgentNotRegistered | UnknownAgent | PayloadTooLarge
+export type QueueError =
+  | SessionError
+  | RuntimeLifecycleError
+  | SessionQueueConflict
+  | AgentNotRegistered
+  | UnknownAgent
+  | PayloadTooLarge
+export type SessionControlError = SessionError | RuntimeLifecycleError
 
 export const create =
   ({
@@ -48,9 +55,9 @@ export interface SessionHandle extends Omit<HostSession, "queue"> {
     input: Prompt.Prompt | string,
     options: QueueCommandOptions,
   ) => Effect.Effect<QueueReceipt, QueueError, SessionSender>
-  readonly stop: (options: QueueCommandOptions) => Effect.Effect<void, SessionError>
-  readonly close: (options: QueueCommandOptions) => Effect.Effect<void, SessionError>
-  readonly resume: (options: QueueCommandOptions) => Effect.Effect<void, SessionError>
+  readonly stop: (options: QueueCommandOptions) => Effect.Effect<void, SessionControlError>
+  readonly close: (options: QueueCommandOptions) => Effect.Effect<void, SessionControlError>
+  readonly resume: (options: QueueCommandOptions) => Effect.Effect<void, SessionControlError>
   readonly inspect: Effect.Effect<HostSession, SessionError>
   readonly submit: (
     input: Prompt.Prompt | string,

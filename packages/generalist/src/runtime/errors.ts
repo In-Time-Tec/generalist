@@ -374,6 +374,37 @@ export class RuntimeUnavailable extends ActionableTaggedError<RuntimeUnavailable
   },
 ) {}
 
+/** Execution authority for this Runtime incarnation ended before the operation could proceed. */
+export class RuntimeOwnershipLost extends ActionableTaggedError<RuntimeOwnershipLost>()(
+  "generalist/runtime/RuntimeOwnershipLost",
+  {
+    namespace: Schema.Struct({
+      environment: Schema.String,
+      tenant: Schema.String,
+      partition: Schema.String,
+    }),
+    incarnation: Schema.String,
+    reason: Schema.Literals(["lease-expired", "replaced", "store-unavailable", "scheduler-failed"]),
+    hint: errorHint(
+      "Acquire a fresh Runtime.Layer to regain execution authority; durable work is recovered by the next owner.",
+    ),
+  },
+) {}
+
+/** The Runtime scope closed, so this incarnation can no longer admit or schedule work. */
+export class RuntimeRetired extends ActionableTaggedError<RuntimeRetired>()("generalist/runtime/RuntimeRetired", {
+  namespace: Schema.Struct({
+    environment: Schema.String,
+    tenant: Schema.String,
+    partition: Schema.String,
+  }),
+  incarnation: Schema.String,
+  hint: errorHint("Build the Runtime.Layer again to acquire a fresh incarnation for this namespace."),
+}) {}
+
+export type RuntimeLifecycleError = RuntimeOwnershipLost | RuntimeRetired
+export type RuntimeAvailabilityError = RuntimeUnavailable | RuntimeLifecycleError
+
 /** A caller-supplied value violates the enforced durable payload bound. */
 export class PayloadTooLarge extends ActionableTaggedError<PayloadTooLarge>()("generalist/runtime/PayloadTooLarge", {
   boundary: Schema.String,
