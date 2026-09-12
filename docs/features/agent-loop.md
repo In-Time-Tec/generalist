@@ -109,7 +109,7 @@ terminal unstructured turn
 - Default resilience retries rate-limit, internal, and transport failures five times — six attempts total — on a 500 ms exponential schedule with ±20% jitter.
 - A supplied `ModelResilience` replaces defaults; `ModelResilience.none` disables retries; every accepted retry emits `ModelRetryScheduled` with category and delay.
 - A clean stream end without `finish` is `ModelStreamTruncated` with category `truncated-stream`; an idle deadline may produce `ModelStreamTimeout` with category `timeout`.
-- `streamIdleTimeout` is opt-in; there is no hidden deadline; metadata is withheld and cannot block retry, but reasoning, text, or tool-call output does because replay would duplicate output.
+- `streamIdleTimeout` is opt-in; there is no hidden deadline; withheld metadata and lifecycle start markers cannot block retry, but replayable output — non-empty text or reasoning content, open tool-call parameters, or a validated tool call — does because replay would duplicate it.
 - Metadata and errors from discarded attempts never escape.
 - `invalidToolCallCorrectionLimit` is a safe integer from 0 through 2 and applies only to Generalist's pre-output, schema-backed `InvalidToolCallParameters`; generic `AiError.InvalidOutputError` and raw JSON Schema dynamic tools are excluded.
 - Correction exposes the exact permissive provider JSON Schema, validates with original Effect schemas, and releases only decoded calls; invalid attempts discard metadata and `tool-params-*` staging parts but retain terminal usage.
@@ -118,7 +118,7 @@ terminal unstructured turn
 - Every loop model call emits call, attempt, retry, and compaction lifecycle events; one `modelCallId` spans attempts, while `modelAttemptId` and zero-based `attempt` identify each invocation and `ModelPart`.
 - Purposes are `conversation`, `structured-output`, or `compaction-summary`; `ModelPart` is process-local, while Runtime stores normalized completion or terminal interruption.
 - Effect Clock timestamps mark actual lifecycle boundaries; events stay causal and flush at the next boundary or stream end; external interruption withholds in-flight telemetry from that consumer.
-- Instrumented streams discard empty `text-delta` parts before model middleware and `ModelPart` publication. `ModelAttemptFirstOutput { kind: "text" }` marks the first non-empty `text` or `text-delta`; `text-start` is lifecycle, not visible output.
+- Instrumented streams discard empty `text-delta` parts before model middleware and `ModelPart` publication. `ModelAttemptFirstOutput` marks the first non-empty `text`/`text-delta` (`kind: "text"`) or `reasoning`/`reasoning-delta` (`kind: "reasoning"`) content; `text-start` and `reasoning-start` are lifecycle, not visible output.
 - Completed attempts require `finish`, usage, `usageAt`, and finish reason; provider-specific usage/cost is preserved, normalization diagnostics may be added under `generalist` metadata, and absent IDs/model/tier/metadata mean unknown, not zero.
 - Failure categories are bounded and provider-neutral; attempt/call failures include classification, and output-blocked retries preserve attempt classification while the call reports `terminal`.
 - Delivery IDs are stable through checkpoint/replay; an optional sink receives immutable ordered `{ sessionId, events }` batches with backpressure before live emission.

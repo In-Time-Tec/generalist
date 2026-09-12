@@ -120,6 +120,22 @@ const emittedOutput = (observation: Observation): EmittedOutput => {
     : { _tag: "DisplayOnly", characters: observation.characters }
 }
 
+/**
+ * Track whether one attempt's parts have made `EmittedOutput` replayable.
+ * The returned function observes parts in order and reports `false` for
+ * withheld metadata and lifecycle markers, `true` once non-empty text or
+ * reasoning content, open tool-call parameters, or a validated tool call is
+ * observed. Retrying after any `true` part would duplicate the consumer's
+ * transcript.
+ */
+export const trackEmittedOutput = (): ((part: Response.AnyPart) => boolean) => {
+  const observation = makeObservation()
+  return (part) => {
+    observe(observation, part)
+    return emittedOutput(observation)._tag !== "Nothing"
+  }
+}
+
 /** Provenance stamped onto a termination failure. */
 export interface Origin {
   readonly turn: number

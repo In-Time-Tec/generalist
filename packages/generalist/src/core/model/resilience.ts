@@ -7,7 +7,7 @@ import {
   promoteResponseFailure,
   promoteStreamFailures,
 } from "./response/failure.js"
-import { isTerminationFailure } from "./stream-termination.js"
+import { isTerminationFailure, trackEmittedOutput } from "./stream-termination.js"
 import { ActionableTaggedError, errorHint } from "../error-hint.js"
 export { defaultResolveFailure }
 export type { FailureInput, FailureResolver } from "./response/failure.js"
@@ -124,15 +124,15 @@ const retryEffect = <A, E, R>(effect: () => Effect.Effect<A, E, R>, resilience: 
 const retryStreamSchedule = (resilience: Policy): Schedule.Schedule<unknown, unknown> =>
   resilience.retrySchedule.pipe(Schedule.while(({ input }) => resilience.classify(input) === "transient"))
 
-const retryStream = <A, B, E, R>(
+const retryStream = <A extends Response.AnyPart, B, E, R>(
   stream: () => Stream.Stream<A, E, R>,
   onEmittedFailure: (error: E) => B,
   resilience: Policy,
-  consumesReplay: (value: A) => boolean,
 ): Stream.Stream<A | B, E, R> =>
   Stream.suspend(() => {
     let consumed = false
     let held: Array<A | B> = []
+    const emitted = trackEmittedOutput()
     const release = (): ReadonlyArray<A | B> => {
       const pending = held
       held = []
@@ -140,7 +140,7 @@ const retryStream = <A, B, E, R>(
     }
     return stream().pipe(
       Stream.flatMap((value): Stream.Stream<A | B> => {
-        if (!consumesReplay(value)) {
+        if (!emitted(value)) {
           held.push(value)
           return Stream.empty
         }
@@ -198,7 +198,6 @@ export const apply: {
                 () => promoteStreamFailures(invoke(), validated.resolve),
                 (error) => Response.makePart("error", { error }),
                 validated,
-                (part) => part.type !== "response-metadata",
               ),
             ),
           ),

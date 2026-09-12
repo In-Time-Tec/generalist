@@ -418,6 +418,38 @@ describe("model instrumentation", () => {
     }),
   )
 
+  it.effect("treats lifecycle and empty parts as non-output for first-output telemetry", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let calls = 0
+      const wrapped = yield* instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return calls === 1
+              ? Stream.make(
+                  Response.makePart("reasoning-start", { id: "r1" }),
+                  Response.makePart("text-start", { id: "t1" }),
+                  Response.makePart("reasoning-delta", { id: "r1", delta: "" }),
+                  Response.makePart("text-delta", { id: "t1", delta: "" }),
+                  finishPart,
+                )
+              : Stream.make(Response.makePart("reasoning-delta", { id: "r1", delta: "thinking" }), finishPart)
+          },
+        }),
+        { emit, turn: 0 },
+      )
+
+      yield* Stream.runDrain(wrapped.streamText({ prompt: "lifecycle only" }))
+      yield* Stream.runDrain(wrapped.streamText({ prompt: "reasoning content" }))
+
+      const firstOutputs = byTag(events, "ModelAttemptFirstOutput")
+      const attempts = byTag(events, "ModelAttemptStarted")
+      expect(firstOutputs.map((event) => event.kind)).toEqual(["reasoning"])
+      expect(firstOutputs[0]?.modelAttemptId).toBe(attempts[1]?.modelAttemptId)
+    }),
+  )
+
   it.effect("corrects invalid tool output inside one logical call with visible attempt telemetry", () =>
     Effect.gen(function* () {
       const { events, emit } = makeCollector()
@@ -963,6 +995,55 @@ describe("model instrumentation", () => {
       const [failed] = byTag(events, "ModelAttemptFailed")
       const [retry] = byTag(events, "ModelRetryScheduled")
       expect(calls).toBe(2)
+      expect(attempts).toHaveLength(2)
+      expect(new Set(attempts.map((attempt) => attempt.modelCallId)).size).toBe(1)
+      expect(failed?.category).toBe("timeout")
+      expect(failed?.classification).toBe("transient")
+      expect(retry?.reason).toBe("provider-resilience")
+      expect(retry?.category).toBe("timeout")
+      expect(byTag(events, "ModelCallCompleted")).toHaveLength(1)
+    }),
+  )
+
+  it.live("retries an explicit stream timeout after a lifecycle-only prefix", () =>
+    Effect.gen(function* () {
+      const { events, emit } = makeCollector()
+      let calls = 0
+      const wrapped = yield* instrument(
+        languageModel({
+          streamText: () => {
+            calls += 1
+            return calls === 1
+              ? Stream.fromIterable([
+                  Response.makePart("response-metadata", {
+                    id: "discarded",
+                    modelId: "scripted",
+                    timestamp: undefined,
+                    request: undefined,
+                  }),
+                  Response.makePart("reasoning-start", { id: "reasoning" }),
+                  Response.makePart("text-start", { id: "text" }),
+                ]).pipe(Stream.concat(Stream.never))
+              : Stream.make(Response.makePart("text-delta", { id: "t1", delta: "ok" }), finishPart)
+          },
+        }),
+        {
+          emit,
+          turn: 0,
+          resilience: makeResilience({
+            retrySchedule: Schedule.recurs(1),
+            streamIdleTimeout: "10 millis",
+          }),
+        },
+      )
+
+      const parts = yield* Stream.runCollect(wrapped.streamText({ prompt: "wait" }))
+
+      expect(calls).toBe(2)
+      expect(parts.map((part) => part.type)).toEqual(["text-delta", "finish"])
+      const attempts = byTag(events, "ModelAttemptStarted")
+      const [failed] = byTag(events, "ModelAttemptFailed")
+      const [retry] = byTag(events, "ModelRetryScheduled")
       expect(attempts).toHaveLength(2)
       expect(new Set(attempts.map((attempt) => attempt.modelCallId)).size).toBe(1)
       expect(failed?.category).toBe("timeout")
