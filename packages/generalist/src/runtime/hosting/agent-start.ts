@@ -21,7 +21,7 @@ import type {
 } from "../service.js"
 import type { SteeringReceipt } from "../run/steering.js"
 import { make as makeBudget } from "../../core/durable/run-budget.js"
-import { nextAt, parseRRule } from "../execution/trigger/schedule.js"
+import { formatRRule, nextAt, parseRRule } from "../execution/trigger/schedule.js"
 import { normalizePrompt } from "../state/prompt.js"
 
 const decodeEvent = <OutputCodec extends Schema.Top>(schema: OutputCodec, event: RunEvent) => {
@@ -124,9 +124,10 @@ export const make = (options: {
       const scheduleId = scheduleOptions.scheduleId ?? `schedule_${yield* generateId}`
       const now = yield* Clock.currentTimeMillis
       const createdAt = DateTime.formatIso(DateTime.makeUnsafe(now))
+      const firstAt = yield* nextAt(rule, now)
       return yield* options.store.registerSchedule({
         scheduleId,
-        rrule: `FREQ=${rule.frequency}${rule.interval === 1 ? "" : `;INTERVAL=${rule.interval}`}${rule.hour === undefined ? "" : `;BYHOUR=${rule.hour}`}`,
+        rrule: formatRRule(rule),
         rule,
         definition: {
           executable: registration.value.executable,
@@ -135,7 +136,7 @@ export const make = (options: {
           prompt: normalizePrompt(encoded),
           budget: scheduleOptions.budget ?? makeBudget(agent.budget ?? {}),
         },
-        nextAt: nextAt(rule, now),
+        nextAt: firstAt,
         occurrence: 0,
         status: "active",
         createdAt,

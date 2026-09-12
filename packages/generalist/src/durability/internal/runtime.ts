@@ -16,6 +16,7 @@ import {
   Schema,
 } from "effect"
 import type { LayerOptions, StartExecutionError } from "../../runtime/service.js"
+import type { ScheduleInvalid } from "../../runtime/execution/trigger/schedule.js"
 import { DurabilityFailure } from "../errors.js"
 import { make as makeJournal, type Head, type Options as JournalOptions } from "./journal.js"
 import { make as makeCodec, decodeReceipt, encodeCommandValue } from "./runtime-state.js"
@@ -47,7 +48,7 @@ export interface Options extends LayerOptions, JournalOptions {
   readonly ownershipLeaseMillis?: number
 }
 
-export type ActivationFailure = DurabilityFailure | RuntimeUnavailable | StartExecutionError
+export type ActivationFailure = DurabilityFailure | RuntimeUnavailable | StartExecutionError | ScheduleInvalid
 
 /** The returned fiber reports ownership failure and is interrupted with the caller's scope. */
 export class Activation extends Context.Service<

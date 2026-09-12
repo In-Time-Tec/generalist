@@ -1,4 +1,4 @@
-import { Clock, DateTime, Effect } from "effect"
+import { Clock, DateTime, Effect, Schema } from "effect"
 import { RuntimeUnavailable } from "../../errors.js"
 import { RunStore, type Service as RunStoreService } from "../../run/store.js"
 import { Runtime, type Service as RuntimeService } from "../../service.js"
@@ -7,10 +7,16 @@ import { nextAt, type ClaimedSchedule } from "./schedule.js"
 const timeoutBatch = 64
 const scheduleBatch = 16
 const leaseMillis = 30_000
+const encodeAdvanceIdentity = Schema.encodeSync(
+  Schema.fromJsonString(Schema.Tuple([Schema.String, Schema.String, Schema.Int])),
+)
 
 const fire = (store: RunStoreService, runtime: RuntimeService, ownerId: string, schedule: ClaimedSchedule) =>
-  runtime
-    .startExecution({
+  Effect.gen(function* () {
+    // Resolve the following instant before admitting the Run: an unrepresentable
+    // recurrence fails typed without leaving an admitted Run that can never advance.
+    const following = yield* nextAt(schedule.rule, DateTime.toEpochMillis(DateTime.makeUnsafe(schedule.nextAt)))
+    yield* runtime.startExecution({
       executable: schedule.definition.executable,
       registrations: schedule.definition.registrations,
       sessionId: schedule.definition.sessionId,
@@ -19,17 +25,14 @@ const fire = (store: RunStoreService, runtime: RuntimeService, ownerId: string, 
       prompt: schedule.definition.prompt,
       budget: schedule.definition.budget,
     })
-    .pipe(
-      Effect.andThen(
-        store.advanceSchedule({
-          commandId: `schedule-advance:${JSON.stringify([ownerId, schedule.scheduleId, schedule.occurrence])}`,
-          scheduleId: schedule.scheduleId,
-          ownerId,
-          occurrence: schedule.occurrence,
-          nextAt: nextAt(schedule.rule, DateTime.toEpochMillis(DateTime.makeUnsafe(schedule.nextAt))),
-        }),
-      ),
-    )
+    yield* store.advanceSchedule({
+      commandId: `schedule-advance:${encodeAdvanceIdentity([ownerId, schedule.scheduleId, schedule.occurrence])}`,
+      scheduleId: schedule.scheduleId,
+      ownerId,
+      occurrence: schedule.occurrence,
+      nextAt: following,
+    })
+  })
 
 /** Construct inert trigger control; only an activated host invokes its bounded drain. */
 export const make = (ownerId: string) =>
