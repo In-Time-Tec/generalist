@@ -361,6 +361,14 @@ export class DuplicateToolCallId extends ActionableTaggedError<DuplicateToolCall
   },
 ) {}
 
+/** A suspension reused one wait identity for more than one authored call. */
+export class DuplicateWaitId extends ActionableTaggedError<DuplicateWaitId>()("generalist/core/DuplicateWaitId", {
+  waitId: Schema.String,
+  firstIndex: Schema.Finite,
+  duplicateIndex: Schema.Finite,
+  hint: errorHint("Return a unique token for every concurrent permission ask or approval request."),
+}) {}
+
 /** An explicitly failing tool progress queue reached capacity. */
 export class ProgressOverflow extends ActionableTaggedError<ProgressOverflow>()("generalist/core/ProgressOverflow", {
   turn: Schema.Finite,

@@ -1,12 +1,13 @@
 import { Equal, Function, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
-import type { AgentSuspended } from "./event.js"
+import { DuplicateWaitId, type AgentSuspended } from "./event.js"
 import {
   canonicalCall,
   waits as checkpointWaits,
   type CanonicalToolCall,
   type ToolBatchCheckpoint,
   type ToolBatchResolution,
+  type ToolBatchWait,
 } from "./tools/checkpoint.js"
 import { successResult, type AnyToolCall, type PendingToolResult } from "./tools/result.js"
 import type { ResumeResolution } from "./lifecycle/resume.js"
@@ -119,6 +120,19 @@ export const suspensionCheckpoint: {
     return checkpoint === undefined ? undefined : { ...checkpoint, suspension }
   },
 )
+
+/** The first wait identity reused across authored calls in one suspension, if any. */
+export const duplicateWaitId = (waits: ReadonlyArray<ToolBatchWait>): DuplicateWaitId | undefined => {
+  const firstIndexes = new Map<string, number>()
+  for (const [index, wait] of waits.entries()) {
+    const firstIndex = firstIndexes.get(wait.waitId)
+    if (firstIndex !== undefined) {
+      return DuplicateWaitId.make({ waitId: wait.waitId, firstIndex, duplicateIndex: index })
+    }
+    firstIndexes.set(wait.waitId, index)
+  }
+  return undefined
+}
 
 export const validResolutions: {
   (resolutions: ReadonlyArray<ToolBatchResolution>): (suspension: AgentSuspended) => boolean

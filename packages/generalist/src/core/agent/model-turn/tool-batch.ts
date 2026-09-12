@@ -1,6 +1,7 @@
 import { Effect, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { AgentSuspended, type Event } from "../event.js"
+import { duplicateWaitId } from "../suspension.js"
 import type { AnyToolCall, PendingToolResult } from "../tools/result.js"
 import type { ToolSchedulingPolicy } from "../service.js"
 import { schedule } from "../tools/scheduler.js"
@@ -62,6 +63,8 @@ export const scheduleBatch = <E, R>(input: {
             }
             const openWaits = waits(driverState.toolBatch)
             if (openWaits.length > 0) {
+              const duplicate = duplicateWaitId(openWaits)
+              if (duplicate !== undefined) return yield* duplicate
               return yield* AgentSuspended.make({ checkpoint: driverState.toolBatch, waits: openWaits })
             }
           }),

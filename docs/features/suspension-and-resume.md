@@ -79,6 +79,7 @@ Every response, approval, signal, timer, child, external child, fan-out, or canc
 ## Invariants
 
 - Waits and checkpoint calls remain in model-authored order; every call has exactly one state: `Ready`, `Scheduled`, `Waiting`, `Completed`, `Unknown`, or `Cancelled`.
+- A suspension carries distinct wait identities; reused wait IDs fail typed with `DuplicateWaitId` before `AgentSuspended` is emitted.
 - The schema-backed batch checkpoint is the sole reconstruction authority; Session is only a model-transcript projection.
 - `Scheduled` records admission, operation digest, and replay policy—not a live fiber—and charges a call exactly once; recovery neither charges nor authorizes it again.
 - `Scheduled`, `Waiting`, and `Completed` never re-enter authorization; `Waiting` and `Completed` never re-enter tool execution.
