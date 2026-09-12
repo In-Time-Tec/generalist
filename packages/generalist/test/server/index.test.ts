@@ -56,6 +56,20 @@ const runScheduler = (runId: string, commandId: string) =>
     yield* executor.execute(yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId }))
   })
 
+const readSse = (response: Response, contains: string) =>
+  Effect.gen(function* () {
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+    let text = ""
+    while (!text.includes(contains)) {
+      const chunk = yield* Effect.promise(() => reader.read())
+      if (chunk.done) break
+      text += decoder.decode(chunk.value, { stream: true })
+    }
+    yield* Effect.promise(() => reader.cancel())
+    return text
+  })
+
 layer(services)("Server", (it) => {
   it.effect("commits editable Session instructions through the authenticated client", () =>
     Effect.scoped(
@@ -629,6 +643,66 @@ layer(services)("Server", (it) => {
         const emojiResponse = yield* download(emojiFilename.sha256)
         expect(emojiResponse.status).toBe(200)
         expect(emojiResponse.headers.get("x-filename")).toBe("emoji %F0%9F%98%80.txt")
+      }),
+    ),
+  )
+
+  it.effect("resolves Last-Event-ID before decoding the cursor query", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "server-cursor-precedence" })
+        const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            authorization: { tenantId: "test", authorize: () => Effect.succeed(true) },
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("secret")),
+              principal: { id: "test-controller", tenantId: "test", role: "controller" },
+            }),
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+        const session = yield* host.sessions.create({ id: "session:cursor-precedence" })
+        yield* host.runs.start(session.id, agent, "precedence run")
+        const request = (path: string, headers: Record<string, string> = {}) =>
+          Effect.promise(() =>
+            app.handler(
+              new Request(`http://generalist.test${path}`, {
+                headers: { authorization: "Bearer secret", ...headers },
+              }),
+            ),
+          )
+
+        const overridden = yield* request(`/sessions/${session.id}/events?cursor=not-a-cursor`, {
+          "last-event-id": "-1",
+        })
+        expect(overridden.status).toBe(200)
+        expect(yield* readSse(overridden, "event: RunStarted")).toContain("event: RunStarted")
+
+        const validOverride = yield* request(`/sessions/${session.id}/events?cursor=999`, {
+          "last-event-id": "-1",
+        })
+        expect(validOverride.status).toBe(200)
+        expect(yield* readSse(validOverride, "event: RunStarted")).toContain("event: RunStarted")
+
+        const queryOnly = yield* request(`/sessions/${session.id}/events?cursor=-1`)
+        expect(queryOnly.status).toBe(200)
+        yield* Effect.promise(() => queryOnly.body!.cancel())
+
+        const malformedQuery = yield* request(`/sessions/${session.id}/events?cursor=not-a-cursor`)
+        expect(malformedQuery.status).toBe(400)
+        expect(yield* Effect.promise(() => malformedQuery.json())).toMatchObject({
+          _tag: "generalist/server/InvalidCursor",
+          cursor: "not-a-cursor",
+        })
+
+        const malformedHeader = yield* request(`/sessions/${session.id}/events?cursor=-1`, {
+          "last-event-id": "not-a-cursor",
+        })
+        expect(malformedHeader.status).toBe(400)
+        expect(yield* Effect.promise(() => malformedHeader.text())).toBe("")
       }),
     ),
   )

@@ -11,7 +11,7 @@ import { RunInspection, RunReceipt } from "../runtime/run.js"
 import { RuntimeInspectionResponse } from "../runtime/inspection.js"
 import type { RuntimeInspection } from "../runtime/service.js"
 import { Authentication } from "./auth.js"
-import { apiErrors, artifactApiErrors, hostTransportErrors } from "./errors.js"
+import { apiErrors, artifactApiErrors, hostTransportErrors, InvalidCursor } from "./errors.js"
 import { CursorFromString } from "./wire.js"
 import { MailboxEntry } from "../runtime/messaging/mailbox.js"
 import { SteeringReceipt } from "../runtime/run/steering.js"
@@ -194,10 +194,16 @@ const tools: HttpApiGroup.HttpApiGroup<"tools", typeof startTool | typeof inspec
 
 const subscribeEvents = HttpApiEndpoint.get("subscribe", "/sessions/:id/events", {
   params: { id: Schema.String },
-  query: { cursor: Schema.optionalKey(CursorFromString) },
+  query: {
+    cursor: Schema.optionalKey(
+      Schema.String.annotate({
+        description: "Integer Host cursor. Ignored when the Last-Event-ID header is present.",
+      }),
+    ),
+  },
   headers: { "last-event-id": Schema.optionalKey(CursorFromString) },
   success: eventStream,
-  error: apiErrors,
+  error: [...apiErrors, InvalidCursor],
 })
 const connectEvents = HttpApiEndpoint.get("connect", "/sessions/:id/ws", {
   params: { id: Schema.String },

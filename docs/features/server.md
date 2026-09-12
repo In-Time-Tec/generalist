@@ -123,7 +123,7 @@ Future ingress features add one HttpApi group to `Server.api` and one matching i
 
 ## SSE and WebSocket
 
-Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter. Authorization is rechecked before each committed event and preview delivery, so a revoked resource closes its stream instead of retaining opening-time authority.
+Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter; a malformed cursor query is ignored when the header is present, while a malformed winning source is rejected with `400` before the stream opens. Authorization is rechecked before each committed event and preview delivery, so a revoked resource closes its stream instead of retaining opening-time authority.
 
 `Conversation` events carry committed conversation changes alongside the Run lifecycle wrappers. Both advance the same Session cursor. A Conversation event has `sessionId`, `cursor`, and `update`; it is not a Run event and has no `runId` or `event` field. Host filters some Runtime Run events, so visible cursor values need not be consecutive.
 

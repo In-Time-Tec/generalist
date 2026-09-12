@@ -70,6 +70,16 @@ export class RequestFailed extends ActionableTaggedError<RequestFailed>()(
   { httpApiStatus: 409 },
 ) {}
 
+/** The authoritative replay cursor did not match the integer wire encoding. */
+export class InvalidCursor extends ActionableTaggedError<InvalidCursor>()(
+  "generalist/server/InvalidCursor",
+  {
+    cursor: Schema.String,
+    hint: errorHint("Send an integer cursor in Last-Event-ID or the cursor query parameter."),
+  },
+  { httpApiStatus: 400 },
+) {}
+
 /** Client transport framing, encoding, or connection operation failed. */
 export class TransportError extends ActionableTaggedError<TransportError>()("generalist/server/TransportError", {
   message: Schema.String,
@@ -158,7 +168,7 @@ export const artifactApiErrors = [
 ] as const
 
 /** Errors encoded by the declared HttpApi endpoints and SSE stream. */
-export const ApiError = Schema.Union([...apiErrors, ...artifactApiErrors])
+export const ApiError = Schema.Union([...apiErrors, ...artifactApiErrors, InvalidCursor])
 export type ApiError = typeof ApiError.Type
 
 const dedicatedErrors = Schema.Union([
