@@ -57,19 +57,23 @@ const samePayload = (entry: Entry, input: AppendInput): boolean => payloadEquiva
 
 const counterAfterExplicit = (counter: number, id: string): number => {
   const numeric = Number(id)
-  return Number.isSafeInteger(numeric) && numeric >= 0 && String(numeric) === id
+  return Number.isSafeInteger(numeric) && numeric >= 0 && numeric < Number.MAX_SAFE_INTEGER && String(numeric) === id
     ? Math.max(counter, numeric + 1)
     : counter
 }
 
-const nextFreeId = (session: RuntimeSession): string => {
+const nextFreeId = (session: RuntimeSession): string | SessionStoreError => {
   let counter = session.counter
-  while (session.entries.has(String(counter))) counter += 1
-  return String(counter)
+  while (counter < Number.MAX_SAFE_INTEGER) {
+    const id = String(counter)
+    if (!session.entries.has(id)) return id
+    counter += 1
+  }
+  return SessionStoreError.make({ reason: "unavailable", message: "Generated Session entry ID range is exhausted" })
 }
 
 const isAppendSuccess = (
-  value: readonly [Entry, RuntimeSession] | SessionConflict,
+  value: readonly [Entry, RuntimeSession] | SessionConflict | SessionStoreError,
 ): value is readonly [Entry, RuntimeSession] => Array.isArray(value)
 
 const existingAppend = (
@@ -93,7 +97,7 @@ const append = (
   session: RuntimeSession,
   input: AppendInput,
   options: AppendOptions,
-): readonly [Entry, RuntimeSession] | SessionConflict => {
+): readonly [Entry, RuntimeSession] | SessionConflict | SessionStoreError => {
   const existing = existingAppend(session, input, options)
   if (existing !== undefined) return existing
   if (options.expectedLeafId !== undefined && options.expectedLeafId !== session.leaf) {
@@ -103,6 +107,7 @@ const append = (
     )
   }
   const id = options.id ?? nextFreeId(session)
+  if (Schema.is(SessionStoreError)(id)) return id
   const entry = entryFromInput(input, id, session.leaf)
   const entries = new Map(session.entries).set(id, entry)
   return [
@@ -400,6 +405,7 @@ export const claimedStore = (config: {
     reserveEntryId: (commandId) =>
       claimedUpdate(modifyState, commands.reserveEntryId, [claim, commandId], (session) => {
         const id = nextFreeId(session)
+        if (Schema.is(SessionStoreError)(id)) return Effect.fail(id)
         return Effect.succeed([id, { ...session, counter: Number(id) + 1 }] as const)
       }),
     append: (authoredInput, appendOptions) =>
