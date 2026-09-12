@@ -7,6 +7,7 @@ import {
   copiedSession,
   rewoundSession,
   leafAt,
+  sessionLeafAt,
   addTreeRoot,
   restoreRewoundOrigin,
 } from "./history.js"
@@ -174,7 +175,7 @@ const forkEffect = (state: RuntimeState, input: ForkRunInput) =>
         ? undefined
         : copiedSession({
             session: sourceSession,
-            leaf: leafAt(events),
+            leaf: sessionLeafAt({ operations: selection.source, events, cutoff: selection.cutoff }),
             checkpoint: run.checkpoint,
             initialComponents: source.initialSessionComponents,
           })
@@ -364,7 +365,7 @@ const rewindEffect = (state: RuntimeState, input: RewindRunInput) =>
         source.message.sessionId,
         yield* rewoundSession({
           session: sourceSession,
-          leaf: leafAt(events),
+          leaf: sessionLeafAt({ operations: selection.source, events, cutoff: input.toSequence }),
           checkpoint: rewound.checkpoint,
           initialComponents: source.initialSessionComponents,
         }),
