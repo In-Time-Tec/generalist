@@ -55,11 +55,17 @@ const onActivePath = (session: RuntimeSession, id: string): boolean => {
 
 const samePayload = (entry: Entry, input: AppendInput): boolean => payloadEquivalence(entry, input)
 
-const nextCounter = (counter: number, id: string): number => {
+const counterAfterExplicit = (counter: number, id: string): number => {
   const numeric = Number(id)
   return Number.isSafeInteger(numeric) && numeric >= 0 && String(numeric) === id
-    ? Math.max(counter + 1, numeric + 1)
-    : counter + 1
+    ? Math.max(counter, numeric + 1)
+    : counter
+}
+
+const nextFreeId = (session: RuntimeSession): string => {
+  let counter = session.counter
+  while (session.entries.has(String(counter))) counter += 1
+  return String(counter)
 }
 
 const isAppendSuccess = (
@@ -96,7 +102,7 @@ const append = (
       `Expected Session leaf ${String(options.expectedLeafId)} but found ${String(session.leaf)}`,
     )
   }
-  const id = options.id ?? String(session.counter)
+  const id = options.id ?? nextFreeId(session)
   const entry = entryFromInput(input, id, session.leaf)
   const entries = new Map(session.entries).set(id, entry)
   return [
@@ -106,7 +112,7 @@ const append = (
       entries,
       order: [...session.order, id],
       leaf: id,
-      counter: nextCounter(session.counter, id),
+      counter: counterAfterExplicit(session.counter + 1, id),
     },
   ]
 }
@@ -392,9 +398,10 @@ export const claimedStore = (config: {
   const reads = reader({ readState, sessionId })
   return {
     reserveEntryId: (commandId) =>
-      claimedUpdate(modifyState, commands.reserveEntryId, [claim, commandId], (session) =>
-        Effect.succeed([String(session.counter), { ...session, counter: session.counter + 1 }] as const),
-      ),
+      claimedUpdate(modifyState, commands.reserveEntryId, [claim, commandId], (session) => {
+        const id = nextFreeId(session)
+        return Effect.succeed([id, { ...session, counter: Number(id) + 1 }] as const)
+      }),
     append: (authoredInput, appendOptions) =>
       claimedUpdate(
         modifyState,
@@ -468,6 +475,7 @@ export const claimedStore = (config: {
             entries: new Map(session.entries).set(checkpoint.id, checkpoint),
             order: [...session.order, checkpoint.id],
             leaf: checkpoint.id,
+            counter: counterAfterExplicit(session.counter, checkpoint.id),
           }
           return [
             { _tag: "Appended" as const, checkpoint, leafId: checkpoint.id } satisfies CheckpointAppend,

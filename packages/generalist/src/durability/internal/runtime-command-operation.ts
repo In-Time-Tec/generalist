@@ -11,7 +11,7 @@ import { ExecutableRegistration } from "../../runtime/executable/registration.js
 import type { DurableAgentLoopEvent, EmittableAgentLoopEvent } from "../../runtime/execution/agent/event.js"
 import { ExecutionCheckpoint, ExecutionResult, ExecutionSuspension } from "../../runtime/execution/state.js"
 import { Message } from "../../runtime/messaging/message.js"
-import { OperationKind, OperationStatus, ReplayPolicy } from "../../runtime/operation/record.js"
+import { OperationKind, OperationStatus, ReplayPolicy, RetryReason } from "../../runtime/operation/record.js"
 import { OperationResolution, ResolveOperationInput } from "../../runtime/operation/resolution.js"
 import { ProgramOperationKind, ProgramOperationRecord } from "../../runtime/program/store.js"
 import { AgentLoopEventSchema, CompletedModelResponse, RunFailure } from "../../runtime/run/event.js"
@@ -296,7 +296,7 @@ export const commands: Commands = {
   },
   expireRunningOperation: {
     tag: "expireRunningOperation" as const,
-    input: Schema.Tuple([IdentifiedOperation]),
+    input: Schema.Tuple([Schema.Struct({ ...IdentifiedOperation.fields, reason: Schema.optionalKey(RetryReason) })]),
     receipt: Schema.Struct({ record: Operation, outcome: Schema.Union([Schema.Literal("retried"), OperationStatus]) }),
     identity: ([input]) => input.commandId,
   },

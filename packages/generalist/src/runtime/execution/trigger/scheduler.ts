@@ -1,4 +1,5 @@
 import { Clock, DateTime, Effect, Schema } from "effect"
+import type { ActivationFailure } from "../../../durability/internal/runtime.js"
 import { RuntimeUnavailable } from "../../errors.js"
 import { RunStore, type Service as RunStoreService } from "../../run/store.js"
 import { Runtime, type Service as RuntimeService } from "../../service.js"
@@ -34,8 +35,13 @@ const fire = (store: RunStoreService, runtime: RuntimeService, ownerId: string, 
     })
   })
 
-/** Construct inert trigger control; only an activated host invokes its bounded drain. */
-export const make = (ownerId: string) =>
+export const make = ({
+  ownerId,
+  nextScheduleAt,
+}: {
+  readonly ownerId: string
+  readonly nextScheduleAt: Effect.Effect<number | undefined, ActivationFailure>
+}) =>
   Effect.gen(function* () {
     const store = yield* RunStore
     const runtime = yield* Runtime
@@ -43,7 +49,7 @@ export const make = (ownerId: string) =>
     let schedulesFirst = false
     const drain = (fuel = timeoutBatch + scheduleBatch) => {
       const commandId = `${ownerId}:schedule-claim:${++commandCounter}`
-      // Preparation belongs to this logical drain invocation, including Effect retries.
+      let claimAttempted = false
       schedulesFirst = !schedulesFirst
       const timeoutLimit = fuel === 1 ? Number(!schedulesFirst) : Math.min(timeoutBatch, Math.ceil(fuel / 2))
       const claimLimit = Math.min(scheduleBatch, fuel - timeoutLimit)
@@ -69,15 +75,16 @@ export const make = (ownerId: string) =>
               ),
           { discard: true },
         )
-        const claimed =
-          claimLimit === 0
-            ? []
-            : yield* store.claimSchedules({
-                commandId,
-                ownerId,
-                leaseMillis,
-                limit: claimLimit,
-              })
+        let claimed: ReadonlyArray<ClaimedSchedule> = []
+        if (claimLimit > 0) {
+          if (!claimAttempted) {
+            const next = yield* nextScheduleAt
+            claimAttempted = next !== undefined && next <= now
+          }
+          if (claimAttempted) {
+            claimed = yield* store.claimSchedules({ commandId, ownerId, leaseMillis, limit: claimLimit })
+          }
+        }
         yield* Effect.forEach(claimed, (record) => fire(store, runtime, ownerId, record), {
           concurrency: 1,
           discard: true,

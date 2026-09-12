@@ -5,7 +5,8 @@ import type { Outcome } from "../../core/tools/tool-executor.js"
 import type { Service as RunStoreService } from "../run/store.js"
 import type { RunSnapshot } from "../run.js"
 import { make as makeAddress } from "../address.js"
-import { make as makeMessage } from "../messaging/message.js"
+import { make as makeMessage, type Metadata } from "../messaging/message.js"
+import { AdmissionExhausted } from "../../core/durable/driver/operation-outcome.js"
 import { normalizePrompt } from "../state/prompt.js"
 import { childRunIdFor, fanOutIdFor } from "./fan-out-internal.js"
 import { fanOutMemberSessionId } from "./session.js"
@@ -53,13 +54,13 @@ export const make = (store: RunStoreService): Service => {
     parentToolCallId: string
     operationKey?: string
   }
-  interface ChildMetadata extends Record<string, unknown> {
+  interface ChildMetadata extends Metadata {
     runtimeChildTool: true
     parentRunId: string
     parentToolCallId: string
     childLabel?: string
   }
-  interface GroupMetadata extends Record<string, unknown> {
+  interface GroupMetadata extends Metadata {
     runtimeChildGroup: true
     parentRunId: string
     parentToolCallId: string
@@ -119,7 +120,13 @@ export const make = (store: RunStoreService): Service => {
         }
         const admissionWithLabel: typeof admission & { label?: string } = admission
         if (input.label !== undefined) admissionWithLabel.label = input.label
-        const receipt = yield* store.admitSpawn(admissionWithLabel)
+        const receipt = yield* store
+          .admitSpawn(admissionWithLabel)
+          .pipe(
+            Effect.catchTag("generalist/core/RunBudgetExhausted", (error) =>
+              Effect.fail(AdmissionExhausted.make(error)),
+            ),
+          )
         const snapshot = yield* store.snapshot(receipt.runId)
         const result = childResultFromSnapshot(receipt.runId, snapshot)
         if (result === undefined) return { _tag: "Suspend" as const, token: receipt.runId }
@@ -158,56 +165,60 @@ export const make = (store: RunStoreService): Service => {
           `group member '${member.key}'`,
         )
       }
-      const receipt = yield* store.admitFanOut({
-        fanOutId: groupId,
-        parentRunId: input.parentRunId,
-        idempotencyKey,
-        ...Object.assign(
-          {},
-          input.concurrency === undefined
-            ? undefined
-            : { concurrency: Math.min(input.concurrency, input.members.length) },
-        ),
-        ...Object.assign({}, input.budgetDivisor === undefined ? undefined : { budgetDivisor: input.budgetDivisor }),
-        join: input.join,
-        remainder: input.remainder,
-        members: input.members.map((member, ordinal) => {
-          const metadata: GroupMetadata = {
-            runtimeChildGroup: true,
-            parentRunId: input.parentRunId,
-            parentToolCallId: input.toolCallId,
-            childGroupId: groupId,
-            childGroupKey: member.key,
-            childInheritancePolicy: Schema.decodeSync(Schema.Json)(
-              Schema.encodeSync(Inheritance)(inheritance(member.inherit)),
-            ),
-            parentAgentName: agentName,
-          }
-          if (inheritance(member.inherit).tasks === "read") {
-            metadata.parentTasks = Schema.decodeSync(Schema.Json)(Schema.encodeSync(TaskItems)(input.tasks ?? []))
-          }
-          if (member.label !== undefined) metadata.childGroupLabel = member.label
-          const origin: Origin = { parentToolCallId: input.toolCallId }
-          if (input.operationKey !== undefined) origin.operationKey = input.operationKey
-          const admitted = {
-            ordinal,
-            key: member.key,
-            childRunId: childRunIdFor(groupId, ordinal),
-            selection: member.selection,
-            prompt:
-              member.history === undefined
-                ? normalizePrompt(member.prompt)
-                : Prompt.concat(member.history, Prompt.make(normalizePrompt(member.prompt))),
-            sessionId: fanOutMemberSessionId({ fanOutId: groupId, key: member.key }),
-            metadata,
-            origin,
-            inherit: inheritance(member.inherit),
-          }
-          const admittedWithLabel: typeof admitted & { label?: string } = admitted
-          if (member.label !== undefined) admittedWithLabel.label = member.label
-          return admittedWithLabel
-        }),
-      })
+      const receipt = yield* store
+        .admitFanOut({
+          fanOutId: groupId,
+          parentRunId: input.parentRunId,
+          idempotencyKey,
+          ...Object.assign(
+            {},
+            input.concurrency === undefined
+              ? undefined
+              : { concurrency: Math.min(input.concurrency, input.members.length) },
+          ),
+          ...Object.assign({}, input.budgetDivisor === undefined ? undefined : { budgetDivisor: input.budgetDivisor }),
+          join: input.join,
+          remainder: input.remainder,
+          members: input.members.map((member, ordinal) => {
+            const metadata: GroupMetadata = {
+              runtimeChildGroup: true,
+              parentRunId: input.parentRunId,
+              parentToolCallId: input.toolCallId,
+              childGroupId: groupId,
+              childGroupKey: member.key,
+              childInheritancePolicy: Schema.decodeSync(Schema.Json)(
+                Schema.encodeSync(Inheritance)(inheritance(member.inherit)),
+              ),
+              parentAgentName: agentName,
+            }
+            if (inheritance(member.inherit).tasks === "read") {
+              metadata.parentTasks = Schema.decodeSync(Schema.Json)(Schema.encodeSync(TaskItems)(input.tasks ?? []))
+            }
+            if (member.label !== undefined) metadata.childGroupLabel = member.label
+            const origin: Origin = { parentToolCallId: input.toolCallId }
+            if (input.operationKey !== undefined) origin.operationKey = input.operationKey
+            const admitted = {
+              ordinal,
+              key: member.key,
+              childRunId: childRunIdFor(groupId, ordinal),
+              selection: member.selection,
+              prompt:
+                member.history === undefined
+                  ? normalizePrompt(member.prompt)
+                  : Prompt.concat(member.history, Prompt.make(normalizePrompt(member.prompt))),
+              sessionId: fanOutMemberSessionId({ fanOutId: groupId, key: member.key }),
+              metadata,
+              origin,
+              inherit: inheritance(member.inherit),
+            }
+            const admittedWithLabel: typeof admitted & { label?: string } = admitted
+            if (member.label !== undefined) admittedWithLabel.label = member.label
+            return admittedWithLabel
+          }),
+        })
+        .pipe(
+          Effect.catchTag("generalist/core/RunBudgetExhausted", (error) => Effect.fail(AdmissionExhausted.make(error))),
+        )
       const inspection = yield* store.inspectFanOut(receipt.fanOutId)
       const result: GroupReceipt = {
         groupId: receipt.fanOutId,

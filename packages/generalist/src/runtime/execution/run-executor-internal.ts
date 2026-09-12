@@ -410,6 +410,22 @@ const makeFor = (
                             yield* Ref.update(activeOperationIds, (current) => new Set(current).add(record.operationId))
                             return undefined
                           }).pipe(Effect.mapError((error) => journalFailure("schedule", operation.key, error))),
+                        onAdmissionExhausted: (operation) =>
+                          Effect.gen(function* () {
+                            const record = yield* store.getOperationByKey({ runId, operationKey: operation.key })
+                            if (record === undefined || record.status !== "running") return
+                            yield* store.expireRunningOperation({
+                              ...claim,
+                              operationId: record.operationId,
+                              commandId: commandIdentity([
+                                "requeue-exhausted-operation",
+                                claim.runId,
+                                claim.attemptFence,
+                                record.operationId,
+                              ]),
+                              reason: "child-admission-rejected",
+                            })
+                          }).pipe(Effect.mapError((error) => journalFailure("exhaustion", operation.key, error))),
                         onCompleted: (operation, outcome, checkpoint) =>
                           Effect.gen(function* () {
                             const persisted = yield* store.getOperationByKey({ runId, operationKey: operation.key })

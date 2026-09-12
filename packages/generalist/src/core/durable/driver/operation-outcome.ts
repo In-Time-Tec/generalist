@@ -1,7 +1,11 @@
 import { Cause, Exit, Schema } from "effect"
 import { HookFailed } from "../../../hooks/index.js"
 import { Suspended } from "../../tools/nested-operation.js"
+import { Exhausted } from "../run-budget.js"
 import type { DriverOperation, OperationOutcome } from "./contract.js"
+
+export class AdmissionExhausted extends Exhausted {}
+export const isAdmissionExhausted = Schema.is(Schema.instanceOf(AdmissionExhausted))
 
 const outcomeFromExit = <E>(operation: DriverOperation, exit: Exit.Exit<unknown, E>): OperationOutcome | undefined => {
   if (Exit.isSuccess(exit)) return { _tag: "Succeeded", value: exit.value }

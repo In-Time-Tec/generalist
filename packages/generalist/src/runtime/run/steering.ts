@@ -16,6 +16,7 @@ import { Message } from "../messaging/message.js"
 import type { AdmitSteeringInput, Service as RunStoreService, SteeringAdmission } from "./store.js"
 import type { RunSendError, RunSendOptions } from "../service.js"
 import { requireAgentOrProgram } from "../executable/manifest-internal.js"
+import { RuntimeUnavailable } from "../errors.js"
 
 export const AdmissionPolicy = Schema.Literals(["steer", "interrupt", "rollback", "reject"])
 export type AdmissionPolicy = typeof AdmissionPolicy.Type
@@ -144,15 +145,23 @@ export const make = (services: Options) =>
         const from = options.from ?? { system: true }
         yield* authorizeSource(runId, from)
         const idempotencyKey = options.idempotencyKey ?? `inbox:${yield* generateId}`
+        const admissionDigest = yield* Effect.try({
+          try: () =>
+            digest({
+              prompt,
+              policy,
+              from,
+              ...(options.addressed === undefined ? undefined : { addressed: options.addressed }),
+            }),
+          catch: () =>
+            RuntimeUnavailable.make({
+              message: "Message identity rejected: metadata is not JSON-serializable",
+            }),
+        })
         const admission: AdmitSteeringInput = {
           runId,
           idempotencyKey,
-          digest: digest({
-            prompt,
-            policy,
-            from,
-            ...(options.addressed === undefined ? undefined : { addressed: options.addressed }),
-          }),
+          digest: admissionDigest,
           prompt,
           policy,
           from,

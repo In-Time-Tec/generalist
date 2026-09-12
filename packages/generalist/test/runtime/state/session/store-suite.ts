@@ -328,3 +328,88 @@ it.live("pages a fixed object leaf across reopen and bounds effective reads at p
     )
   })
 })
+
+it.live("skips an unreserved numeric checkpoint id for reservations and generated appends", () => {
+  const sessionId = "object:unreserved-checkpoint-id"
+
+  return Effect.gen(function* () {
+    const storage = yield* makeSimulator()
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const { store } = yield* claimedSession(sessionId, objectWorkerId, "unreserved-checkpoint:first")
+        const reserved = yield* store.reserveEntryId("reserve")
+        expect(reserved).toBe("0")
+        const checkpoint = yield* store.appendCheckpoint({
+          id: "1",
+          parentId: yield* store.leaf,
+          projectedHistory: Prompt.fromMessages([user("projection")]),
+          telemetry: [],
+        })
+        expect(checkpoint._tag).toBe("Appended")
+        const reservedAgain = yield* store.reserveEntryId("reserve-again")
+        expect(reservedAgain).toBe("2")
+        const generated = yield* store.append(
+          { _tag: "Message", message: user("generated append") },
+          { commandId: "generated-append" },
+        )
+        expect(generated.id).toBe("3")
+        expect((yield* store.entry("1"))?._tag).toBe("Compaction")
+      }),
+    )
+
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const reader = yield* sessionReader(sessionId)
+        expect((yield* reader.entry("1"))?._tag).toBe("Compaction")
+        expect((yield* reader.entry("3"))?._tag).toBe("Message")
+        expect((yield* reader.path()).map((entry) => entry.id)).toEqual(["1", "3"])
+      }),
+    )
+  })
+})
+
+it.live("skips an offset unreserved numeric checkpoint id for generated appends", () => {
+  const sessionId = "object:unreserved-checkpoint-offset"
+
+  return Effect.gen(function* () {
+    const storage = yield* makeSimulator()
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const { store } = yield* claimedSession(sessionId, objectWorkerId, "unreserved-offset:first")
+        const checkpoint = yield* store.appendCheckpoint({
+          id: "4",
+          parentId: yield* store.leaf,
+          projectedHistory: Prompt.fromMessages([user("offset projection")]),
+          telemetry: [],
+        })
+        expect(checkpoint._tag).toBe("Appended")
+        const generatedIds: Array<string> = []
+        for (let index = 0; index < 5; index += 1) {
+          generatedIds.push(
+            (yield* store.append(
+              { _tag: "Message", message: user(`generated-${index}`) },
+              { commandId: `generated-${index}` },
+            )).id,
+          )
+        }
+        expect(generatedIds).not.toContain("4")
+        expect(new Set(generatedIds).size).toBe(generatedIds.length)
+        const reserved = yield* store.reserveEntryId("offset-reserve")
+        expect(generatedIds).not.toContain(reserved)
+        expect((yield* store.entry("4"))?._tag).toBe("Compaction")
+      }),
+    )
+
+    yield* withObject(
+      storage,
+      Effect.gen(function* () {
+        const reader = yield* sessionReader(sessionId)
+        expect((yield* reader.entry("4"))?._tag).toBe("Compaction")
+        expect(yield* reader.path()).toHaveLength(6)
+      }),
+    )
+  })
+})

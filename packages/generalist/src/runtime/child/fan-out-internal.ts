@@ -1,6 +1,7 @@
 import { digest as pinDigest } from "../../core/durable/pin.js"
 import { Function, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import type { Metadata } from "../messaging/message.js"
 import type { ExecutableRef } from "../executable/manifest.js"
 import type { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 import { promptDigestValue } from "../run/prompt-digest.js"
@@ -18,7 +19,7 @@ export interface FanOutMemberInput {
   readonly label?: string
   readonly prompt: Prompt.Prompt | Prompt.RawInput
   readonly sessionId?: string
-  readonly metadata?: Readonly<Record<string, typeof Schema.Unknown.Type>>
+  readonly metadata?: Metadata
   readonly origin?: FanOutMemberOrigin
   readonly inherit?: InheritanceOptions
 }
@@ -45,7 +46,7 @@ export interface StoredFanOutMember {
   readonly executableRef: ExecutableRef
   readonly prompt: Prompt.Prompt
   readonly sessionId: string
-  readonly metadata: Readonly<Record<string, typeof Schema.Unknown.Type>>
+  readonly metadata: Metadata
   readonly origin?: FanOutMemberOrigin
   readonly inherit: Inheritance
 }

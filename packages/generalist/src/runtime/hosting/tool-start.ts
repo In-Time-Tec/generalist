@@ -8,6 +8,7 @@ import { origin } from "../cursor.js"
 import { ExecutableRegistrationInvalid, RunKindUnsupported, RuntimeUnavailable } from "../errors.js"
 import { capture, type RegisteredTool } from "../executable/registered-tool.js"
 import type { RegisteredAgents } from "../executable/registered-agent.js"
+import { Metadata } from "../messaging/message.js"
 import type { Service as RunStore } from "../run/store.js"
 import type {
   Service,
@@ -126,6 +127,16 @@ export const make = (options: {
     Effect.gen(function* () {
       const commandId = startOptions.commandId ?? `tool_${yield* generateId}`
       if (startOptions.parentRunId !== undefined) yield* options.store.inspect(startOptions.parentRunId)
+      const metadata = yield* Schema.decodeUnknownEffect(Metadata)({
+        tool: {
+          input: encoded,
+          ...(startOptions.parentRunId === undefined ? undefined : { parentRunId: startOptions.parentRunId }),
+        },
+      }).pipe(
+        Effect.mapError(() =>
+          ExecutableRegistrationInvalid.make({ message: `Tool ${tool.name} input is not JSON-serializable` }),
+        ),
+      )
       const receipt = yield* options.admitStart(
         {
           executable: registration.resolution.attestation,
@@ -133,12 +144,7 @@ export const make = (options: {
           sessionId: `tool:${digest([startOptions.parentRunId ?? null, commandId])}`,
           idempotencyKey: commandId,
           prompt: "",
-          metadata: {
-            tool: {
-              input: encoded,
-              ...(startOptions.parentRunId === undefined ? undefined : { parentRunId: startOptions.parentRunId }),
-            },
-          },
+          metadata,
         },
         true,
       )

@@ -1,9 +1,13 @@
 import "../suites/send-attestation-suite.js"
 import { expect, layer } from "@effect/vitest"
-import { Effect, Stream } from "effect"
+import { DateTime, Effect, Stream } from "effect"
 import { Address, Errors, Runtime, RunStore } from "../../../../../src/runtime/index.js"
+import { DurabilityFailure } from "../../../../../src/durability/errors.js"
 import { assistantAddress, completedResult, objectLayer, textPrompt } from "../../../execution/fixtures.js"
 import { objectWorkerId } from "../../../execution/object.js"
+
+const nonJsonMetadata = { a: 0 }
+Reflect.set(nonJsonMetadata, "a", DateTime.toDate(DateTime.makeUnsafe(0)))
 
 layer(objectLayer)("Runtime send", (it) => {
   it.effect("admits a message and starts the lane head", () =>
@@ -43,6 +47,23 @@ layer(objectLayer)("Runtime send", (it) => {
         })
         .pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.AddressNotFound)
+    }),
+  )
+
+  it.effect("fails typed for non-JSON metadata", () =>
+    Effect.gen(function* () {
+      const runtime = yield* Runtime.Runtime
+      const error = yield* runtime
+        .send({
+          to: assistantAddress,
+          sessionId: "session:metadata",
+          idempotencyKey: "metadata",
+          prompt: textPrompt("hello"),
+          metadata: nonJsonMetadata,
+        })
+        .pipe(Effect.flip)
+      expect(error).toBeInstanceOf(DurabilityFailure)
+      expect(error).toMatchObject({ reason: "encoding" })
     }),
   )
 

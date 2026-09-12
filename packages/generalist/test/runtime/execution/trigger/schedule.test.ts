@@ -5,6 +5,9 @@ import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent } from "generalist"
 import { ExecutableResolver, LocalScheduler, RunStore, Runtime } from "generalist/runtime"
+import { DurabilityFailure } from "../../../../src/durability/errors.js"
+import { make as makeTriggerScheduler } from "../../../../src/runtime/execution/trigger/scheduler.js"
+import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { provideScoped } from "../scoped-provide.js"
 
@@ -39,6 +42,7 @@ const fixture = (schedulerMode: "poll" | "external" = "poll") =>
     )
     return {
       called: Queue.take(calls),
+      model,
       layer: Layer.mergeAll(
         objectRuntimeLayer({ addresses: [], schedulerMode, scheduler: { pollInterval: "100 millis" } }).pipe(
           Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
@@ -48,6 +52,103 @@ const fixture = (schedulerMode: "poll" | "external" = "poll") =>
       ),
     }
   })
+
+it.effect("does not persist empty automatic schedule claims while idle or before a schedule is due", () =>
+  Effect.gen(function* () {
+    const state = yield* fixture("external")
+    const bucket = yield* makeSimulator()
+    let writes = 0
+    const storage = {
+      faults: bucket.faults,
+      maintenance: bucket.maintenance,
+      store: {
+        ...bucket.store,
+        create: (key: string, bytes: Uint8Array) =>
+          Effect.suspend(() => {
+            writes++
+            return bucket.store.create(key, bytes)
+          }),
+      },
+    }
+    const layer = Layer.mergeAll(
+      objectRuntimeLayer({ addresses: [], schedulerMode: "external" }, storage).pipe(
+        Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
+      ),
+      state.model,
+      allowAllAuthorization,
+    )
+    yield* provideScoped(
+      layer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const scheduler = yield* LocalScheduler.LocalScheduler
+        const activatedWrites = writes
+        for (let index = 0; index < 16; index++) yield* scheduler.tick
+        expect(writes - activatedWrites).toBe(0)
+
+        yield* runtime.register(agent)
+        yield* runtime.schedule(agent, "not due yet", {
+          rrule: "FREQ=HOURLY",
+          sessionId: "future-schedule",
+        })
+        const registeredWrites = writes
+        for (let index = 0; index < 16; index++) yield* scheduler.drain()
+        expect(writes - registeredWrites).toBe(0)
+        expect(yield* runtime.list({ limit: 10 })).toHaveLength(0)
+      }),
+    )
+  }),
+)
+
+it.effect("reconciles an attempted claim after its retained lease moves the next due time forward", () =>
+  Effect.gen(function* () {
+    const state = yield* fixture("external")
+    yield* provideScoped(
+      state.layer,
+      Effect.gen(function* () {
+        const runtime = yield* Runtime.Runtime
+        const store = yield* RunStore.RunStore
+        yield* runtime.register(agent)
+        yield* runtime.schedule(agent, "retained claim", {
+          rrule: "FREQ=SECONDLY",
+          sessionId: "ambiguous-claim",
+        })
+        yield* TestClock.adjust("1 second")
+        let nextScheduleAt = 1_000
+        let loseResponse = true
+        const commandIds: Array<string> = []
+        const triggers = yield* makeTriggerScheduler({
+          ownerId: "claim-owner",
+          nextScheduleAt: Effect.sync(() => nextScheduleAt),
+        }).pipe(
+          Effect.provideService(RunStore.RunStore, {
+            ...store,
+            claimSchedules: (input) =>
+              store.claimSchedules(input).pipe(
+                Effect.flatMap((claimed) => {
+                  commandIds.push(input.commandId)
+                  nextScheduleAt = 31_000
+                  if (loseResponse) {
+                    loseResponse = false
+                    return DurabilityFailure.make({ reason: "indeterminate", message: "claim reply lost" })
+                  }
+                  return Effect.succeed(claimed)
+                }),
+              ),
+          }),
+        )
+        const attempt = triggers.drain()
+        expect(yield* attempt.pipe(Effect.flip)).toMatchObject({ reason: "indeterminate" })
+        expect(yield* attempt).toMatchObject({ processed: 1 })
+        expect(commandIds).toHaveLength(2)
+        expect(commandIds[1]).toBe(commandIds[0])
+        expect(yield* runtime.list({ limit: 10 })).toHaveLength(1)
+        expect(yield* triggers.drain()).toEqual({ processed: 0, hasMore: false })
+        expect(commandIds).toHaveLength(2)
+      }),
+    )
+  }),
+)
 
 it.effect("fires fixed UTC recurrences from the Runtime-scoped scheduler under TestClock", () =>
   Effect.gen(function* () {

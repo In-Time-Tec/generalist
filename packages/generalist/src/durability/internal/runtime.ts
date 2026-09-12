@@ -28,6 +28,7 @@ import { emptyState, type RuntimeState } from "../../runtime/state/projection.js
 import { PreparedObservation, occurredAtMillis, type Observations } from "../../runtime/state/observation.js"
 import { shutdownStore } from "../../runtime/state/store/events.js"
 import { activationOf } from "../../runtime/state/store/admission/activation.js"
+import { nextClaimAt } from "../../runtime/state/store/trigger/schedule.js"
 import { RuntimeUnavailable } from "../../runtime/errors.js"
 
 const ReceiptEnvelope = Schema.Struct({
@@ -73,6 +74,7 @@ export class StoreActivation extends Context.Service<
       Scope.Scope
     >
     readonly nextDueAt: Effect.Effect<number | undefined, ActivationFailure>
+    readonly nextScheduleAt: Effect.Effect<number | undefined, ActivationFailure>
   }
 >()("generalist/durability/internal/runtime/StoreActivation") {}
 
@@ -466,15 +468,8 @@ export const make = (options: Options) =>
             include(DateTime.toEpochMillis(DateTime.makeUnsafe(wait.reason.deadline)))
           }
         }
-        for (const schedule of state.schedules.values()) {
-          const claim = state.scheduleClaims.get(schedule.scheduleId)
-          include(
-            Math.max(
-              DateTime.toEpochMillis(DateTime.makeUnsafe(schedule.nextAt)),
-              claim === undefined ? 0 : DateTime.toEpochMillis(DateTime.makeUnsafe(claim.leaseExpiresAt)),
-            ),
-          )
-        }
+        const scheduleAt = nextClaimAt(state)
+        if (scheduleAt !== undefined) include(scheduleAt)
         return next
       }),
     )
@@ -486,7 +481,7 @@ export const make = (options: Options) =>
       hasAdmissionKey,
       modifyState,
       lookupReceipt: journal.lookupReceipt,
-      activation: StoreActivation.of({ acquire, nextDueAt }),
+      activation: StoreActivation.of({ acquire, nextDueAt, nextScheduleAt: readState.pipe(Effect.map(nextClaimAt)) }),
       ownership: {
         require: (workerId: string) =>
           Effect.suspend(() =>

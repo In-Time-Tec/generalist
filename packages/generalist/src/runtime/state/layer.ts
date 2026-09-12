@@ -73,7 +73,10 @@ export const layer = (
             ...options.scheduler,
             commandIdPrefix: lease.incarnation,
           })
-          const triggers = yield* makeTriggerScheduler(`trigger:${lease.incarnation}`)
+          const triggers = yield* makeTriggerScheduler({
+            ownerId: `trigger:${lease.incarnation}`,
+            nextScheduleAt: ownership.nextScheduleAt,
+          })
           const drainLock = yield* Semaphore.make(1)
           const requests = yield* FiberSet.make<unknown, ActivationFailure>()
           const owned = <A, E extends ActivationFailure, R>(effect: Effect.Effect<A, E, R>) =>
