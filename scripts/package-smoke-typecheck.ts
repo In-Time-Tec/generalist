@@ -357,6 +357,113 @@ type ComponentAgentServices = Assert<Equal<EffectServices<typeof componentRun>, 
 type TestingRuntimeDriver = Assert<Equal<typeof Testing.runtimeDriver, typeof import("generalist/testing/runtime-driver").runtimeDriver>>
 type TasksCanonical = Assert<Equal<typeof Tasks, typeof import("generalist/tasks")>>
 type MemoryCanonical = Assert<Equal<LayerShape<typeof Memory.layerNoop>, readonly [Memory.Memory, never, never]>>
+type MemoryRetainedSurface = readonly [
+  Memory.Metadata,
+  Memory.Key,
+  Memory.OperationRef,
+  Memory.Version,
+  Memory.ItemPart,
+  Memory.Item,
+  Memory.RecallInput,
+  Memory.RememberInput,
+  Memory.ForgetInput,
+  Memory.HistoryEntry,
+  Memory.RevertInput,
+  Memory.MemoryError,
+  Memory.Service,
+  typeof Memory.OperationRef,
+  typeof Memory.Version,
+  typeof Memory.MemoryError,
+  typeof Memory.Memory,
+  typeof Memory.merge,
+  typeof Memory.layerNoop,
+  typeof Memory.layerTest,
+]
+type MemoryProvenanceInternal = Assert<
+  Equal<
+    Extract<
+      keyof typeof Memory,
+      | "itemFromPromptPart"
+      | "messageFromRecall"
+      | "isMessageFromRecall"
+      | "replaceRecalledMessage"
+      | "recalledMessageIdentity"
+      | "projectTranscript"
+    >,
+    never
+  >
+>
+type HandoffRetainedSurface = readonly [
+  Handoff.DelegateOptions,
+  Handoff.HandoffToolOptions,
+  Handoff.FanOutChild,
+  Handoff.FanOutJoin,
+  Handoff.FanOutRemainder,
+  Handoff.FanOutAllSuccessOptions,
+  Handoff.FanOutCollectOptions,
+  Handoff.FanOutOptions,
+  Handoff.FanOutMemberResult,
+  Handoff.FanOutUnsatisfied,
+  Handoff.Supervisor<never>,
+  Handoff.SupervisorOptions,
+  Handoff.Registration,
+  Handoff.Target,
+  Handoff.Catalog,
+  typeof Handoff.FanOutUnsatisfied,
+  typeof Handoff.Catalog,
+  typeof Handoff.delegateTool,
+  typeof Handoff.transferTool,
+  typeof Handoff.fanOut,
+  typeof Handoff.supervisor,
+  typeof Handoff.target,
+  typeof Handoff.layerCatalog,
+  typeof Handoff.defaultContextProjection,
+  typeof Handoff.filterContextProjection,
+  typeof Handoff.Input,
+  Handoff.Input,
+  typeof Handoff.Output,
+  Handoff.Output,
+  typeof Handoff.ProjectionInvalid,
+  Handoff.ProjectionInvalid,
+  typeof Handoff.Rejected,
+  Handoff.Rejected,
+  typeof Handoff.register,
+  typeof Handoff.RegistrationError,
+  Handoff.RegistrationError,
+]
+type HandoffContinuationInternal = Assert<
+  Equal<
+    Extract<
+      keyof typeof Handoff,
+      | "Commit"
+      | "ControlState"
+      | "HandoffRunState"
+      | "toControlState"
+      | "fromControlState"
+      | "takePendingContinuation"
+      | "initialHandoffRunState"
+      | "edgeCount"
+      | "incrementEdge"
+    >,
+    never
+  >
+>
+const packageMemoryService: Memory.Service = {
+  recall: () => Effect.succeed([]),
+  remember: () => Effect.void,
+  forget: () => Effect.void,
+  history: () => Effect.succeed([]),
+  revert: () => Effect.void,
+}
+const packageMemoryLayer = Memory.layerTest(packageMemoryService)
+const mergedPackageMemoryService = Memory.merge(packageMemoryService, packageMemoryService)
+const packageHandoffTarget = Handoff.target(Agent.make({ name: "package-handoff-target" }))
+const packageHandoffCatalog = Handoff.layerCatalog([packageHandoffTarget])
+const packageHandoffTransfer = Handoff.transferTool(packageHandoffTarget)
+void packageMemoryLayer
+void mergedPackageMemoryService
+void packageHandoffCatalog
+void packageHandoffTransfer
 type MiddlewareCanonical = Assert<
   Equal<LayerShape<typeof ModelMiddleware.layerIdentity>, readonly [ModelMiddleware.ModelMiddleware, never, never]>
 >
@@ -601,6 +708,27 @@ const connectOptions: MCPConnectOptions = {
 const routed: Effect.Effect<MCPTools, MCPClient.MCPConnectionFailed | OAuth.OAuthProviderError, Scope.Scope> =
   mcpConnect(connectOptions)
 void routed
+`
+
+export const packageSmokeInternalContracts = `import { Handoff, Memory } from "generalist"
+void Memory.itemFromPromptPart
+void Memory.messageFromRecall
+void Memory.isMessageFromRecall
+void Memory.replaceRecalledMessage
+void Memory.recalledMessageIdentity
+void Memory.projectTranscript
+void Handoff.Commit
+void Handoff.ControlState
+void Handoff.toControlState
+void Handoff.fromControlState
+void Handoff.takePendingContinuation
+void Handoff.initialHandoffRunState
+void Handoff.edgeLabel
+void Handoff.edgeCount
+void Handoff.incrementEdge
+type HandoffRunState = Handoff.HandoffRunState
+type HandoffFrame = Handoff.HandoffFrame
+type HandoffEdgeCount = Handoff.HandoffEdgeCount
 `
 
 export const packageSmokeTypecheckFailures = (): string => `import { Effect } from "effect"

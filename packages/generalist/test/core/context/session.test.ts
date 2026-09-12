@@ -2,7 +2,8 @@ import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { Memory, ModelTelemetry, Session } from "../../../src/index"
+import { ModelTelemetry, Session } from "../../../src/index"
+import { messageFromRecall } from "../../../src/core/context/memory-provenance.js"
 import { ItLayer } from "../it-layer.js"
 
 const user = (text: string): Prompt.Message =>
@@ -263,7 +264,7 @@ describe("Session", () => {
           yield* store.append(
             {
               _tag: "Message",
-              message: Memory.messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
+              message: messageFromRecall([Prompt.makePart("text", { text: "recalled" })]),
             },
             { commandId: "fixture-248" },
           )

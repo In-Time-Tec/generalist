@@ -14,6 +14,7 @@ import {
 } from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { close } from "../../../src/core/agent/closure.js"
+import { Commit } from "../../../src/core/agent/handoff/state.js"
 import { layer as deterministicLayer } from "../../../src/ai/provider/deterministic.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
@@ -68,7 +69,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
       ],
     })
     let handoffCheckpoint: DurableDriver.DriverCheckpoint | undefined
-    let handoffCommit: Handoff.Commit | undefined
+    let handoffCommit: Commit | undefined
     let calls = 0
     const journal = Layer.succeed(DurableDriver.DriverJournal, {
       onScheduled: () => Effect.void,
@@ -80,7 +81,7 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         Effect.sync(() => {
           if (operation.kind === "handoff" && outcome._tag === "Succeeded") {
             handoffCheckpoint = checkpoint
-            handoffCommit = Schema.decodeUnknownOption(Handoff.Commit)(outcome.value).pipe(Option.getOrUndefined)
+            handoffCommit = Schema.decodeUnknownOption(Commit)(outcome.value).pipe(Option.getOrUndefined)
           }
         }),
       onCheckpoint: () => Effect.void,

@@ -2,7 +2,11 @@ import { layer } from "@effect/platform-bun/BunServices"
 import { Config, Console, Effect, Equal, FileSystem, ManagedRuntime, Option, Path, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { CryptoHasher, version as bunVersion } from "bun"
-import { packageSmokeTypecheck, packageSmokeTypecheckFailures } from "./package-smoke-typecheck.js"
+import {
+  packageSmokeInternalContracts,
+  packageSmokeTypecheck,
+  packageSmokeTypecheckFailures,
+} from "./package-smoke-typecheck.js"
 import { componentConsumer } from "./package-smoke-components.js"
 import { backgroundToolConsumer } from "./package-smoke-background-tools.js"
 import { auditInstalledDependencyGraph } from "./package-smoke-dependency-graph.js"
@@ -110,13 +114,35 @@ const run = Effect.fn("PackageSmoke.run")(function* (
   return stdout
 })
 
+const internalContractNames = [
+  "itemFromPromptPart",
+  "messageFromRecall",
+  "isMessageFromRecall",
+  "replaceRecalledMessage",
+  "recalledMessageIdentity",
+  "projectTranscript",
+  "Commit",
+  "ControlState",
+  "HandoffRunState",
+  "HandoffFrame",
+  "HandoffEdgeCount",
+  "toControlState",
+  "fromControlState",
+  "takePendingContinuation",
+  "initialHandoffRunState",
+  "edgeLabel",
+  "edgeCount",
+  "incrementEdge",
+] as const
+
 const expectTypecheckFailure = Effect.fn("PackageSmoke.expectTypecheckFailure")(function* (
   cwd: string,
   filename: string,
   expected: ReadonlyArray<string>,
+  command: "bun" | "npx" = "bun",
 ) {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-  const handle = yield* spawner.spawn(ChildProcess.make("bun", ["tsc", "--noEmit", "--project", filename], { cwd }))
+  const handle = yield* spawner.spawn(ChildProcess.make(command, ["tsc", "--noEmit", "--project", filename], { cwd }))
   const [stdout, stderr, exitCode] = yield* Effect.all(
     [
       Stream.mkString(Stream.decodeText(handle.stdout)),
@@ -958,6 +984,24 @@ const program = Effect.gen(function* () {
       include: ["typecheck-failures.ts"],
     }),
   )
+  yield* fileSystem.writeFileString(
+    path.join(consumerDirectory, "internal-contracts.tsconfig.json"),
+    encodeJson({
+      compilerOptions: {
+        strict: true,
+        skipLibCheck: true,
+        noEmit: true,
+        module: "NodeNext",
+        moduleResolution: "NodeNext",
+        target: "ES2024",
+      },
+      include: ["internal-contracts.ts"],
+    }),
+  )
+  yield* fileSystem.writeFileString(
+    path.join(consumerDirectory, "internal-contracts.ts"),
+    packageSmokeInternalContracts,
+  )
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "components.mjs"), componentConsumer)
   yield* fileSystem.writeFileString(path.join(consumerDirectory, "background-tools.mjs"), backgroundToolConsumer)
   yield* fileSystem.writeFileString(
@@ -986,7 +1030,7 @@ for (const specifier of forbidden) {
 }
 const { A2A } = await import("generalist/unstable/a2a")
 const { AGUI } = await import("generalist/unstable/ag-ui")
-const { Agent, Approvals, Memory, ModelMiddleware, ModelRegistry, Permissions, Session } = await import("generalist")
+const { Agent, Approvals, Handoff, Memory, ModelMiddleware, ModelRegistry, Permissions, Session } = await import("generalist")
 const { Host } = await import("generalist/host")
 const { VectorStore } = await import("generalist/memory")
 const { State, Store } = await import("generalist/instructions")
@@ -1004,6 +1048,29 @@ const { Config, Crypto, Effect, Layer, Schema } = await import("effect")
 const { Tool, Toolkit } = await import("effect/unstable/ai")
 const AccountAuth = await import("generalist/unstable/providers/openai-account-auth")
 if ("HostedCatalog" in skills) throw new Error("HostedCatalog must remain internal")
+if (
+  [
+    "itemFromPromptPart",
+    "messageFromRecall",
+    "isMessageFromRecall",
+    "replaceRecalledMessage",
+    "recalledMessageIdentity",
+    "projectTranscript",
+  ].some((name) => name in Memory) ||
+  [
+    "Commit",
+    "ControlState",
+    "HandoffRunState",
+    "toControlState",
+    "fromControlState",
+    "takePendingContinuation",
+    "initialHandoffRunState",
+    "edgeCount",
+    "incrementEdge",
+  ].some((name) => name in Handoff)
+) {
+  throw new Error("Memory provenance and Handoff continuation internals must not be public")
+}
 for (const name of [
   "issuer",
   "clientId",
@@ -1128,6 +1195,7 @@ console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
   }
   yield* verifyInstalledDependencyGraph(consumerDirectory, minimumConsumerProfiles)
   yield* run("bun", ["tsc", "--noEmit"], consumerDirectory)
+  yield* expectTypecheckFailure(consumerDirectory, "internal-contracts.tsconfig.json", internalContractNames)
   yield* expectTypecheckFailure(consumerDirectory, "tsconfig-failures.json", [
     "has no exported member 'defaults'",
     "WorkingRequirement",
@@ -1162,6 +1230,8 @@ console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
     "package.json",
     "tsconfig.json",
     "typecheck.ts",
+    "internal-contracts.tsconfig.json",
+    "internal-contracts.ts",
     "tsconfig-failures.json",
     "typecheck-failures.ts",
     "runtime.mjs",
@@ -1184,12 +1254,18 @@ console.log(\`imported \${runtimeSpecifiers.length} Host exports\`)
   }
   yield* verifyInstalledDependencyGraph(npmConsumerDirectory, minimumConsumerProfiles)
   yield* run("npx", ["tsc", "--noEmit"], npmConsumerDirectory)
-  yield* expectTypecheckFailure(npmConsumerDirectory, "tsconfig-failures.json", [
-    "has no exported member 'defaults'",
-    "WorkingRequirement",
-    "SummaryRequirement",
-    "Property '[ConsolidationProposerTypeId]' is missing",
-  ])
+  yield* expectTypecheckFailure(npmConsumerDirectory, "internal-contracts.tsconfig.json", internalContractNames, "npx")
+  yield* expectTypecheckFailure(
+    npmConsumerDirectory,
+    "tsconfig-failures.json",
+    [
+      "has no exported member 'defaults'",
+      "WorkingRequirement",
+      "SummaryRequirement",
+      "Property '[ConsolidationProposerTypeId]' is missing",
+    ],
+    "npx",
+  )
   yield* run("env", ["-u", "NODE_PATH", "-u", "NODE_OPTIONS", "node", "runtime.mjs"], npmConsumerDirectory)
   if (
     (yield* fileSystem.readFileString(path.join(npmConsumerDirectory, "package-lock.json"))).includes(

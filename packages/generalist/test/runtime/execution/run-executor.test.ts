@@ -18,7 +18,6 @@ import {
   ProgramCapabilities,
   CodeExecutor,
   Session,
-  Handoff,
   RunBudget,
   ToolContext,
   ToolExecutor,
@@ -47,6 +46,7 @@ import {
 } from "./fixtures.js"
 import { provideScoped } from "./scoped-provide.js"
 import { ActiveExecutions, layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
+import { Commit } from "../../../src/core/agent/handoff/state.js"
 
 const testExecutable = pinnedTestExecutable
 
@@ -2842,7 +2842,7 @@ describe("RunExecutor", () => {
         operationId: operation.operationId,
       })
       const projectedHistory = Prompt.make("projected-for-specialist")
-      const commit: Handoff.Commit = {
+      const commit: Commit = {
         _tag: "Commit",
         state: {
           root: assistant.name,

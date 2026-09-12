@@ -1,6 +1,7 @@
 import { Function, Schema, type Stream } from "effect"
 import { AgentSuspended, type Event, type SteeringDrained, ToolNameCollision } from "../event.js"
-import { type Item, type Key, messageFromRecall } from "../../context/memory.js"
+import type { Item, Key } from "../../context/memory.js"
+import { messageFromRecall } from "../../context/memory-provenance.js"
 import { inputDigest } from "../../durable/driver/contract.js"
 import type { Input } from "../../turn/steering.js"
 import { StopReason } from "../../turn/policy.js"
