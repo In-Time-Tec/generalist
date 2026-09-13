@@ -1,4 +1,5 @@
 /* oxlint-disable typescript/no-unsafe-argument, typescript/no-unsafe-member-access, typescript/no-unsafe-return -- Effect AI's heterogeneous Tool.Any erases its name and schema parameters to any; validation establishes the Tool identity before these fields are retained. */
+import { CodeExecutor, Identity, declareIdentity } from "./code-executor.js"
 import { Brand, Effect, Function, Predicate, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import type {
@@ -7,7 +8,7 @@ import type {
   Requirements as AgentRequirements,
 } from "../agent/lifecycle/definition.js"
 import type { ToolContext } from "../tools/tool-context.js"
-import * as CodeExecutor from "./code-executor.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 import type { ProgramAuthorizationFailure } from "./capabilities.js"
 import { ProgramReplayPolicy } from "./handlers.js"
 
@@ -90,7 +91,7 @@ export interface Options<
   readonly tools: Tools
   readonly agents: Agents
   readonly steps: Steps
-  readonly executor: CodeExecutor.Identity
+  readonly executor: Identity
   readonly maxSourceBytes: number
   readonly budget: Budget
 }
@@ -122,9 +123,21 @@ type GrantedAgent<C> = C extends { readonly agents: ReadonlyArray<AgentGrant<Any
   : never
 type GrantedStep<C> = C extends { readonly steps: ReadonlyArray<StepDeclaration> } ? C["steps"][number] : never
 
-type GrantedAgentRequirements<A extends AnyAgent> =
-  A["toolkit"] extends Toolkit.Toolkit<infer Tools>
-    ? AgentClosedServices<Tools, AgentRequirements<A>, A["input"], A["output"]> | A["input"]["DecodingServices"]
+type GrantedToolServices<C> = [GrantedTool<C>] extends [never]
+  ? never
+  : Exclude<Tool.HandlerServices<GrantedTool<C>>, ToolContext>
+type GrantedToolHandlers<C> = [GrantedTool<C>] extends [never]
+  ? never
+  : Tool.HandlersFor<{
+      readonly [Name in Tool.Name<GrantedTool<C>>]: Extract<GrantedTool<C>, { readonly name: Name }>
+    }>
+
+type GrantedAgentRequirements<A> = [A] extends [never]
+  ? never
+  : A extends AnyAgent
+    ? A["toolkit"] extends Toolkit.Toolkit<infer Tools>
+      ? AgentClosedServices<Tools, AgentRequirements<A>, A["input"], A["output"]> | A["input"]["DecodingServices"]
+      : never
     : never
 
 type StepCodecRequirements<S> = S extends {
@@ -137,11 +150,9 @@ type StepCodecRequirements<S> = S extends {
 
 /** Services inferred from one declaration without widening its handlers or step environments. */
 export type Requirements<C> =
-  | (C extends AnyOptions ? CodeExecutor.CodeExecutor : never)
-  | Exclude<Tool.HandlerServices<GrantedTool<C>>, ToolContext>
-  | Tool.HandlersFor<{
-      readonly [Name in Tool.Name<GrantedTool<C>>]: Extract<GrantedTool<C>, { readonly name: Name }>
-  }>
+  | (C extends AnyOptions ? CodeExecutor : never)
+  | GrantedToolServices<C>
+  | GrantedToolHandlers<C>
   | GrantedAgentRequirements<Extract<GrantedAgent<C>, AnyAgent>>
   | StepRequirements<GrantedStep<C>>
   | StepCodecRequirements<GrantedStep<C>>
@@ -156,11 +167,21 @@ export interface AgentOptionsWithCodeMode<
 }
 
 /** A code-mode declaration is malformed and cannot be registered. */
-export class DeclarationError extends Schema.TaggedError<DeclarationError>()("generalist/code-mode/DeclarationError", {
-  field: Schema.Literals(["tools", "agents", "steps", "executor", "maxSourceBytes", "budget"]),
-  reason: Schema.Literals(["duplicate-name", "identity-invalid", "version-invalid", "limit-invalid", "not-agent-tool"]),
-  name: Schema.optionalKey(Schema.String),
-}) {}
+export class DeclarationError extends ActionableTaggedError<DeclarationError>()(
+  "generalist/code-mode/DeclarationError",
+  {
+    field: Schema.Literals(["tools", "agents", "steps", "executor", "maxSourceBytes", "budget"]),
+    reason: Schema.Literals([
+      "duplicate-name",
+      "identity-invalid",
+      "version-invalid",
+      "limit-invalid",
+      "not-agent-tool",
+    ]),
+    name: Schema.optionalKey(Schema.String),
+    hint: errorHint("Correct the declaration field so identities, versions, limits, and names are valid and unique."),
+  },
+) {}
 
 const BudgetFields = [
   "agentRuns",
@@ -174,7 +195,7 @@ const BudgetFields = [
 
 /** @internal Immutable declaration snapshot retained by one registered revision. */
 export interface ValidatedOptions extends Omit<AnyOptions, "executor" | "budget" | "steps"> {
-  readonly executor: CodeExecutor.Identity
+  readonly executor: Identity
   readonly budget: Readonly<Budget>
   readonly steps: ReadonlyArray<Step<string, Schema.Top, Schema.Top, Schema.Top, unknown>>
 }
@@ -258,9 +279,9 @@ export const validateOptions: {
   (options: AnyOptions): (toolkit: Toolkit.Any) => ValidatedOptions
   (toolkit: Toolkit.Any, options: AnyOptions): ValidatedOptions
 } = Function.dual(2, (toolkit: Toolkit.Any, options: AnyOptions): ValidatedOptions => {
-  let executor: CodeExecutor.Identity
+  let executor: Identity
   try {
-    executor = CodeExecutor.declareIdentity(options.executor)
+    executor = declareIdentity(options.executor)
   } catch {
     throw declarationFailure("executor", "identity-invalid")
   }

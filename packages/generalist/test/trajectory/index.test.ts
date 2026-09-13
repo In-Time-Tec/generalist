@@ -1,3 +1,4 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
@@ -5,7 +6,6 @@ import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "../../src/index.js"
 import { outputMatches, score } from "../../src/eval/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import type { RunSnapshot } from "../../src/runtime/run.js"
@@ -263,7 +263,7 @@ it.live("projects a decoded null terminal output as null through JSONL and eval"
     const projected = yield* provideScoped(
       Layer.mergeAll(runtimeLayer, fixture.layer, Permissions.layerAllowAll, Approvals.layerAutoApprove),
       Effect.gen(function* () {
-        const durable = yield* Runtime.Runtime
+        const durable = yield* Runtime
         yield* durable.register(agent)
         const handle = yield* durable.start(agent, "start", {
           sessionId: "session:trajectory-null-output",
@@ -313,7 +313,7 @@ it.live("exports usage from a reopened object journal as one decodable JSONL lin
     const recordedRunId = yield* provideScoped(
       firstRuntimeLayer,
       Effect.gen(function* () {
-        const durableRuntime = yield* Runtime.Runtime
+        const durableRuntime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         const context = yield* Layer.build(Layer.merge(model, Permissions.layerAllowAll))
@@ -337,7 +337,7 @@ it.live("exports usage from a reopened object journal as one decodable JSONL lin
     yield* provideScoped(
       secondRuntimeLayer,
       Effect.gen(function* () {
-        const reopenedRuntime = yield* Runtime.Runtime
+        const reopenedRuntime = yield* Runtime
         const trajectory = yield* fromJournal(reopenedRuntime, recordedRunId)
         const bytes = yield* Stream.runCollect(exportTrajectory(trajectory, { format: "jsonl" }))
         const line = new TextDecoder().decode(bytes[0])

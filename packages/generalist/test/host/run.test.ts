@@ -1,9 +1,9 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, Permissions, ToolContext } from "generalist"
 import { Host, WaitInvalid, WaitResult, type HostRun } from "generalist/host"
 import { ExecutableResolver, SessionSender } from "generalist/runtime"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { TestModel } from "generalist/testing"
@@ -196,7 +196,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
       hostLayer(),
       Effect.gen(function* () {
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent, [child.name]: child } })
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const parent = yield* host.runs.get(admitted.parentId)
         waitFor = parent.wait

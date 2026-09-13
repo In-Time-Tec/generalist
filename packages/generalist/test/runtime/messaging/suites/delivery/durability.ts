@@ -1,8 +1,8 @@
+import { Runtime as RuntimeRuntime } from "../../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { AgentDirectory, Errors } from "../../../../../src/runtime/index.js"
-import * as Runtime from "../../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { assistantAddress, textPrompt } from "../../../execution/fixtures.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
@@ -18,10 +18,10 @@ const encodePrompt = (prompt: Prompt.Prompt): string => Schema.encodeSync(Schema
 export interface MessagingDurabilitySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly layers: () => {
-    readonly admit: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
-    readonly reopen: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+    readonly admit: Layer.Layer<RuntimeRuntime | RunStore | Extra, StoreError>
+    readonly reopen: Layer.Layer<RuntimeRuntime | RunStore | Extra, StoreError>
   }
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, RuntimeRuntime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -34,7 +34,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
 
   const familyIn = (sessionId: string) =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
@@ -83,7 +83,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
       const reopen = provideScoped(
         layers.reopen,
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const pending = yield* runtime.messages({ runId: parentRunId, limit: 10 })
           expect(pending).toHaveLength(1)
           expect(pending[0]?.fromRunId).toBe(childRunId)
@@ -129,7 +129,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
       const retry = provideScoped(
         layers.reopen,
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           // A sender that retried across the reopen must not create a second entry.
           const replay = yield* runtime.sendMessage({
             fromRunId: childRunId,
@@ -202,7 +202,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
       const reopen = provideScoped(
         layers.reopen,
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const error = yield* runtime
             .sendMessage({
               fromRunId: childRunId,
@@ -244,7 +244,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
       const reopen = provideScoped(
         layers.reopen,
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           yield* runtime.sendMessage({
             fromRunId: childRunId,
             to: AgentDirectory.runAddress(parentRunId),

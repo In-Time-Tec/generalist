@@ -1,7 +1,8 @@
 import { Effect, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { ToolContext } from "generalist"
-import { AgentDirectory, Errors, Mailbox, Messaging, Runtime } from "generalist/runtime"
+import { AgentDirectory, Errors, Mailbox, Messaging } from "generalist/runtime"
+import { Runtime, type SendMessageError } from "../../../packages/generalist/src/runtime/engine.js"
 
 const sendParentNote = Tool.make("send_specialist_note", {
   description: "Send one finding to the parent under a stable command identity.",
@@ -34,8 +35,8 @@ export const sendSpecialistNote = (input: {
   readonly parentRunId: string
   readonly idempotencyKey: string
   readonly message: string
-}): Effect.Effect<import("generalist/runtime").Mailbox.MessageReceipt, Runtime.SendMessageError, Runtime.Runtime> =>
-  Runtime.Runtime.use((runtime) =>
+}): Effect.Effect<import("generalist/runtime").Mailbox.MessageReceipt, SendMessageError, Runtime> =>
+  Runtime.use((runtime) =>
     runtime.sendMessage({
       fromRunId: input.fromRunId,
       to: AgentDirectory.runAddress(input.parentRunId),

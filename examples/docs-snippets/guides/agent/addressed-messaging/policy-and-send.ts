@@ -1,6 +1,7 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { Config, Effect, Layer, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
+import { ToolContext } from "generalist"
 import { type RuntimeServices, activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
 import { Address, AgentDirectory, ExecutableResolver, Mailbox, Messaging, Runtime } from "generalist/runtime"
@@ -73,7 +74,7 @@ export const ping = (input: {
   readonly targetSessionId: string
 }): Effect.Effect<Mailbox.MessageReceipt, Runtime.SendMessageError, Runtime.Runtime> =>
   Runtime.Runtime.use((runtime) =>
-    runtime.sendMessage({
+    runtime.messaging.send({
       fromRunId: input.fromRunId,
       to: Address.make(`session:${encodeURIComponent(input.targetSessionId)}`),
       idempotencyKey: `ping:${input.targetSessionId}`,
@@ -81,8 +82,9 @@ export const ping = (input: {
     }),
   )
 
-/** Every address this Run may reach: durable relations plus policy-announced, authorized peers. */
-export const reachable = (
-  runId: string,
-): Effect.Effect<ReadonlyArray<AgentDirectory.DirectoryEntry>, Runtime.DirectoryError, Runtime.Runtime> =>
-  Runtime.Runtime.use((runtime) => runtime.directory(runId))
+/** Every address the current Run may reach: durable relations plus policy-announced, authorized peers. */
+export const reachable: Effect.Effect<
+  ReadonlyArray<AgentDirectory.DirectoryEntry>,
+  Runtime.DirectoryError,
+  Messaging.AgentMessaging | ToolContext.ToolContext
+> = Messaging.AgentMessaging.use((messaging) => messaging.directory)

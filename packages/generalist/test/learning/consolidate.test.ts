@@ -1,3 +1,4 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
@@ -7,7 +8,6 @@ import { Agent, Approvals, Memory, Permissions } from "../../src/index.js"
 import { activate } from "../../src/durability/index.js"
 import { SemanticRecall, VectorStore } from "../../src/memory/index.js"
 import { ExecutableResolver, Run } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore, type Service as RunStoreService } from "../../src/runtime/run/store.js"
 import { RunExecutor, type Service as RunExecutorService } from "../../src/runtime/execution/run-executor.js"
 import { LocalScheduler } from "../../src/runtime/execution/local-scheduler.js"
@@ -48,9 +48,11 @@ const semanticMemory = SemanticRecall.layer({ limit: 20 }).pipe(
   Layer.provideMerge(embeddingLayer),
 )
 
-const runtimeLayer = objectRuntimeLayer({ addresses: [] }, undefined, false).pipe(
-  Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-)
+const runtimeLayer = objectRuntimeLayer(
+  { addresses: [], ownershipLeaseMillis: 31_536_000_000, reconcileInterval: "30 days" },
+  undefined,
+  false,
+).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)))
 
 const learningKey: Memory.Key = { agent: "learning", subject: "learning" }
 const sourceAgent = Agent.make({ name: "consolidation-source", toolkit: Toolkit.empty })
@@ -87,7 +89,7 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
   provideScoped(
     runtimeLayer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const scheduler = yield* LocalScheduler
@@ -109,22 +111,17 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
         Layer.mergeAll(sourceModel, Permissions.layerAllowAll, Approvals.layerAutoApprove),
       )
       yield* runtime.register(sourceAgent).pipe(Effect.provideContext(sourceContext))
-      const sourceRuns = yield* Effect.scoped(
-        Effect.gen(function* () {
-          yield* activate
-          const runs: Array<Memory.OperationRef["runId"]> = []
-          for (const index of [1, 2, 3]) {
-            const handle = yield* runtime.start(sourceAgent, `Episode ${index}: the preferred color is green.`, {
-              idempotencyKey: `consolidation-source-${index}`,
-              sessionId: `consolidation-source-${index}`,
-            })
-            runs.push(handle.runId)
-            yield* execute(executor, store, handle.runId, `source-${index}`)
-            expect(yield* handle.await).toBe("episode completed")
-          }
-          return runs
-        }),
-      )
+      yield* activate
+      const sourceRuns: Array<Memory.OperationRef["runId"]> = []
+      for (const index of [1, 2, 3]) {
+        const handle = yield* runtime.start(sourceAgent, `Episode ${index}: the preferred color is green.`, {
+          idempotencyKey: `consolidation-source-${index}`,
+          sessionId: `consolidation-source-${index}`,
+        })
+        sourceRuns.push(handle.runId)
+        yield* execute(executor, store, handle.runId, `source-${index}`)
+        expect(yield* handle.await).toBe("episode completed")
+      }
 
       const episodeEvidence = sourceRuns.map((runId) => ({ runId, turn: 0 }))
       const fixture = yield* TestModel.make(
@@ -169,7 +166,7 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
         budget: { tokens: 100 },
       })
       const dependencies = Layer.mergeAll(
-        Layer.succeed(Runtime.Runtime, runtime),
+        Layer.succeed(Runtime, runtime),
         memoryLayer,
         fixture.registryLayer,
         approvalLayer,
@@ -188,7 +185,7 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
       )
 
       yield* TestClock.adjust("3 hours")
-      yield* Effect.scoped(activate.pipe(Effect.andThen(scheduler.drain()), Effect.provideContext(context)))
+      yield* scheduler.drain().pipe(Effect.provideContext(context))
       const scheduled = (yield* runtime.list({ limit: 20 })).find(
         (run) => activeAgent(run) === "generalist-learning-consolidation",
       )
@@ -224,17 +221,18 @@ it.effect("runs once per UTC day with its own budget", () =>
   provideScoped(
     runtimeLayer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const scheduler = yield* LocalScheduler
       const memoryContext = yield* Layer.build(semanticMemory)
       const memory = Context.get(memoryContext, Memory.Memory)
       const fixture = yield* TestModel.make([TestModel.text("must not run")], { model: "budgeted-consolidation" })
       const dependencies = Layer.mergeAll(
-        Layer.succeed(Runtime.Runtime, runtime),
+        Layer.succeed(Runtime, runtime),
         Layer.succeed(Memory.Memory, memory),
         fixture.registryLayer,
         Approvals.layerAutoApprove,
       )
+      yield* activate
       const context = yield* Layer.build(
         Layer.mergeAll(
           dependencies,
@@ -253,10 +251,10 @@ it.effect("runs once per UTC day with its own budget", () =>
       )
 
       yield* TestClock.adjust("179 minutes")
-      yield* Effect.scoped(activate.pipe(Effect.andThen(scheduler.drain()), Effect.provideContext(context)))
+      yield* scheduler.drain().pipe(Effect.provideContext(context))
       expect(yield* runtime.list({ limit: 10 })).toHaveLength(0)
       yield* TestClock.adjust("1 minute")
-      yield* Effect.scoped(activate.pipe(Effect.andThen(scheduler.drain()), Effect.provideContext(context)))
+      yield* scheduler.drain().pipe(Effect.provideContext(context))
       const [first] = yield* runtime.list({ limit: 10 })
       if (first === undefined) return yield* Effect.die("missing first consolidation occurrence")
       expect(yield* runtime.inspect(first.runId)).toMatchObject({
@@ -267,11 +265,16 @@ it.effect("runs once per UTC day with its own budget", () =>
       expect(yield* fixture.requests).toHaveLength(0)
 
       yield* TestClock.adjust("1439 minutes")
-      yield* Effect.scoped(activate.pipe(Effect.andThen(scheduler.drain()), Effect.provideContext(context)))
+      yield* scheduler.drain().pipe(Effect.provideContext(context))
       expect(yield* runtime.list({ limit: 10 })).toHaveLength(1)
       yield* TestClock.adjust("1 minute")
-      yield* Effect.scoped(activate.pipe(Effect.andThen(scheduler.drain()), Effect.provideContext(context)))
-      expect(yield* runtime.list({ limit: 10 })).toHaveLength(2)
+      yield* scheduler.drain().pipe(Effect.provideContext(context))
+      const runs = yield* runtime.list({ limit: 10 })
+      expect(runs).toHaveLength(2)
+      for (const run of runs) {
+        yield* runtime.cancel({ runId: run.runId, commandId: `cleanup:${run.runId}` })
+      }
+      yield* scheduler.drain().pipe(Effect.provideContext(context))
     }),
   ),
 )

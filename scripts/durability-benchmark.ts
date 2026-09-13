@@ -11,7 +11,10 @@ import { sequenceName } from "../packages/generalist/src/durability/internal/pro
 import { makeTest } from "../packages/generalist/src/core/durable/manifest/executable-manifest.js"
 import { Address } from "../packages/generalist/src/runtime/address.js"
 import { RunStore, type Service as RunStoreService } from "../packages/generalist/src/runtime/run/store.js"
-import { ExecutableResolver, LocalScheduler, RunExecutor, Runtime } from "../packages/generalist/src/runtime/index.js"
+import { ExecutableResolver } from "../packages/generalist/src/runtime/index.js"
+import { Runtime } from "../packages/generalist/src/runtime/engine.js"
+import { LocalScheduler } from "../packages/generalist/src/runtime/execution/local-scheduler.js"
+import { RunExecutor } from "../packages/generalist/src/runtime/execution/run-executor.js"
 import { layerRunStore } from "../packages/generalist/src/runtime/state/store.js"
 import {
   make as makeSimulator,
@@ -241,8 +244,8 @@ const makeRuntimeWakeWorkload = (storage: Simulator, waitTimeout: Duration.Input
       const beforeHandler = handlerCalls
       const runId = yield* within(
         Effect.gen(function* () {
-          const host = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
+          const host = yield* Runtime
+          const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* host.register(runtimeAgent)
           const handle = yield* host.start(runtimeAgent, "wait", {
@@ -265,8 +268,8 @@ const makeRuntimeWakeWorkload = (storage: Simulator, waitTimeout: Duration.Input
         return yield* Effect.die(new Error("Runtime workload dispatch count diverged before reopen"))
       const [wakeElapsed, outcomeMillis] = yield* within(
         Effect.gen(function* () {
-          const host = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
+          const host = yield* Runtime
+          const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* host.register(runtimeAgent)
           if (modelCalls !== beforeModel + 1 || handlerCalls !== beforeHandler + 1)
@@ -307,8 +310,8 @@ const makeRuntimeWakeWorkload = (storage: Simulator, waitTimeout: Duration.Input
     const beforeHandler = handlerCalls
     const runId = yield* within(
       Effect.gen(function* () {
-        const host = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
+        const host = yield* Runtime
+        const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* host.register(runtimeAgent)
         const handle = yield* host.start(runtimeAgent, "wait", {
@@ -332,8 +335,8 @@ const makeRuntimeWakeWorkload = (storage: Simulator, waitTimeout: Duration.Input
     yield* Effect.sleep("1 second")
     const timeoutMillis = yield* within(
       Effect.gen(function* () {
-        const host = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const host = yield* Runtime
+        const scheduler = yield* LocalScheduler
         yield* host.register(runtimeAgent)
         if (modelCalls !== beforeModel + 1 || handlerCalls !== beforeHandler + 1)
           return yield* Effect.die(new Error("Fresh timeout host redispatched before scheduler drain"))

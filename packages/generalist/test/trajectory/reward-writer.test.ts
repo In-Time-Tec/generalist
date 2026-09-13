@@ -1,10 +1,10 @@
+import { runtime as RLExportruntime } from "generalist/unstable/rl-export"
 import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Ref } from "effect"
 import { Agent } from "generalist"
 import { ObjectStore } from "generalist/durability/object-store"
 import { Runtime } from "generalist/runtime"
-import * as RLExport from "generalist/unstable/rl-export"
 import { makeObjectStorage } from "../runtime/execution/object.js"
 import { provideScoped } from "../runtime/execution/scoped-provide.js"
 import { unusedModel } from "../runtime/run/identity.js"
@@ -40,7 +40,7 @@ describe("Runtime-owned RewardWriter", () => {
           const runtime = yield* Runtime.Runtime
           const source = yield* runtime.hold(state.assistant, "source", { idempotencyKey: "source" })
           const other = yield* runtime.hold(state.assistant, "other", { idempotencyKey: "other" })
-          const exported = yield* RLExport.runtime
+          const exported = yield* RLExportruntime
           const command = { commandId: "judge", runId: source.runId, leaf: "leaf", value: 0.5, source: "fixture" }
           yield* exported.rewards.record(command)
           const beforeRetry = yield* Ref.get(state.creates)
@@ -69,7 +69,7 @@ describe("Runtime-owned RewardWriter", () => {
             runId: "missing",
           })
           expect(
-            yield* RLExport.runtime.pipe(Effect.provideService(Runtime.Runtime, { ...runtime }), Effect.flip),
+            yield* RLExportruntime.pipe(Effect.provideService(Runtime.Runtime, { ...runtime }), Effect.flip),
           ).toMatchObject({
             _tag: "generalist/runtime/RuntimeUnavailable",
           })
@@ -86,7 +86,7 @@ describe("Runtime-owned RewardWriter", () => {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const held = yield* runtime.hold(state.assistant, "source", { idempotencyKey: "source" })
-          const exported = yield* RLExport.runtime
+          const exported = yield* RLExportruntime
           const command = { commandId: "judge", runId: held.runId, leaf: "leaf", value: 0.5, source: "fixture" }
           yield* exported.rewards.record(command)
           return { command, writer: exported.rewards }
@@ -95,7 +95,7 @@ describe("Runtime-owned RewardWriter", () => {
       yield* provideScoped(
         Runtime.layer(state.options),
         Effect.gen(function* () {
-          const current = yield* RLExport.runtime
+          const current = yield* RLExportruntime
           const before = yield* Ref.get(state.creates)
           expect(yield* saved.writer.record(saved.command).pipe(Effect.flip)).toMatchObject({
             _tag: "generalist/rl-export/RewardRuntimeUnavailable",
@@ -121,7 +121,7 @@ describe("Runtime-owned RewardWriter", () => {
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
           const held = yield* runtime.hold(state.assistant, "source", { idempotencyKey: "source" })
-          const exported = yield* RLExport.runtime
+          const exported = yield* RLExportruntime
           yield* state.simulator.faults.failNextCreate({ phase: "before", reason: "unavailable" })
           const error = yield* exported.rewards
             .record({

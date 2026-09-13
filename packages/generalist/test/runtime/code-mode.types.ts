@@ -135,10 +135,7 @@ type DirectDeclarationRequirements = CodeMode.Requirements<{
   readonly budget: CodeMode.Budget
 }>
 type _DirectAgentPropertyPreservesInputDecoding = Assert<
-  IsAssignable<
-    ReviewerInputDecoding,
-    (typeof reviewer)["input"]["DecodingServices"]
-  >
+  IsAssignable<ReviewerInputDecoding, (typeof reviewer)["input"]["DecodingServices"]>
 >
 type _DirectStepPropertyPreservesInputDecoding = Assert<
   IsAssignable<StepInputDecoding, (typeof writeReport)["input"]["DecodingServices"]>
@@ -152,12 +149,8 @@ type _DirectStepFailureEncodingIsInferred = Assert<IsAssignable<StepFailureEncod
 type _ReviewerInputDecodingStaysOnCodec = Assert<
   IsAssignable<ReviewerInputDecoding, (typeof reviewerInput)["DecodingServices"]>
 >
-type _StepInputDecodingStaysOnCodec = Assert<
-  IsAssignable<StepInputDecoding, (typeof stepInput)["DecodingServices"]>
->
-type _StepOutputEncodingStaysOnCodec = Assert<
-  IsAssignable<StepOutputEncoding, (typeof stepOutput)["EncodingServices"]>
->
+type _StepInputDecodingStaysOnCodec = Assert<IsAssignable<StepInputDecoding, (typeof stepInput)["DecodingServices"]>>
+type _StepOutputEncodingStaysOnCodec = Assert<IsAssignable<StepOutputEncoding, (typeof stepOutput)["EncodingServices"]>>
 type _StepFailureEncodingStaysOnCodec = Assert<
   IsAssignable<StepFailureEncoding, (typeof stepFailure)["EncodingServices"]>
 >
@@ -201,7 +194,12 @@ declare const selectedAgentWithTool: Agent.Agent<
 declare const codeModeStorage: Layer.Layer<ObjectStore | Crypto.Crypto>
 declare const modelRegistryAndExecutor: Layer.Layer<ModelRegistry.ModelRegistry | CodeExecutor.CodeExecutor>
 declare const modelExecutorAndStep: Layer.Layer<
-  ModelRegistry.ModelRegistry | CodeExecutor.CodeExecutor | StepDependency
+  | ModelRegistry.ModelRegistry
+  | CodeExecutor.CodeExecutor
+  | StepDependency
+  | StepInputDecoding
+  | StepOutputEncoding
+  | StepFailureEncoding
 >
 
 const selectedToolRoot = Agent.make({
@@ -225,6 +223,7 @@ const selectedToolRoot = Agent.make({
   },
 })
 
+// oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- This negative compile assertion intentionally omits a selected Agent's services.
 Runtime.layer({
   agents: { "selected-tool-root": selectedToolRoot },
   revision: "selected-tool-root-v1",
@@ -255,10 +254,12 @@ const stepCodecRoot = Agent.make({
   },
 })
 
+type _StepRootKeepsInputDecoding = Assert<IsAssignable<StepInputDecoding, Agent.Requirements<typeof stepCodecRoot>>>
+type _StepRootKeepsOutputEncoding = Assert<IsAssignable<StepOutputEncoding, Agent.Requirements<typeof stepCodecRoot>>>
+type _StepRootKeepsFailureEncoding = Assert<IsAssignable<StepFailureEncoding, Agent.Requirements<typeof stepCodecRoot>>>
 Runtime.layer({
   agents: { "step-codec-root": stepCodecRoot },
   revision: "step-codec-root-v1",
-  // @ts-expect-error step input decoding, output encoding, and failure encoding Layers cannot be omitted.
   services: modelExecutorAndStep,
   storage: codeModeStorage,
   namespace: { environment: "test", tenant: "code-mode-types", partition: "local" },

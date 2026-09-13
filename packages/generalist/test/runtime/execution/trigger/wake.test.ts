@@ -1,3 +1,4 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Clock, Effect, Layer, Schema, Stream } from "effect"
@@ -5,7 +6,6 @@ import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolContext } from "generalist"
 import { ExecutableResolver } from "generalist/runtime"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { allowAllAuthorization } from "../../../authorization.js"
@@ -66,7 +66,7 @@ const fixture = () => {
 }
 
 const suspend = Effect.fn("test.suspendAwaitEvent")(function* () {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* Runtime
   const executor = yield* RunExecutor
   const store = yield* RunStore
   yield* runtime.register(agent)
@@ -100,7 +100,7 @@ it.effect("journals, deduplicates, and resumes one matching event without redisp
   return provideScoped(
     state.layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const runId = yield* suspend()
@@ -139,7 +139,7 @@ it.effect("resumes an elapsed await with TimedOut under TestClock", () => {
   return provideScoped(
     state.layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const runId = yield* suspend()

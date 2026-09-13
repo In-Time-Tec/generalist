@@ -1,6 +1,7 @@
 /* oxlint-disable effecttsgo/async-function -- These integration tests exercise Rivet's Promise-only actor API. */
 /* oxlint-disable effecttsgo/new-promise -- raw Rivet WebSocket readiness is exposed as a Promise-only callback boundary. */
 /* oxlint-disable effecttsgo/strict-effect-provide -- the server factory is the actor's application composition root. */
+import { Runtime as RuntimeRuntime, type SendInput } from "../../../../src/runtime/engine.js"
 import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
 import {
   actor,
@@ -19,7 +20,6 @@ import { HttpBody, HttpServerRequest, HttpServerResponse } from "effect/unstable
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { Host, type MakeError } from "generalist/host"
 import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { Runtime as ApplicationRuntime } from "../../../../src/runtime/service.js"
 import { Authentication, CurrentPrincipal } from "../../../../src/server/auth.js"
 import { Unauthorized } from "../../../../src/server/errors.js"
@@ -134,20 +134,20 @@ const makeComposedDefinition = (options: RuntimeActorOptions, counters: Counters
       ),
     actions: {
       work: {
-        admitWithoutNotify: (c, input: Runtime.SendInput) =>
+        admitWithoutNotify: (c, input: SendInput) =>
           c.keepAwake(
             requireHost(c).runPromise(
-              Effect.flatMap(Runtime.Runtime, (runtime) => runtime.send(input)),
+              Effect.flatMap(RuntimeRuntime, (runtime) => runtime.send(input)),
               { signal: c.abortSignal },
             ),
           ),
-        send: (c, input: Runtime.SendInput) =>
+        send: (c, input: SendInput) =>
           c.keepAwake(
             requireHost(c).runPromise(
               Effect.gen(function* () {
                 yield* Application
                 const host = yield* ActorRuntime
-                const runtime = yield* Runtime.Runtime
+                const runtime = yield* RuntimeRuntime
                 const receipt = yield* host.guarded(runtime.send(input))
                 yield* host.notify
                 return receipt
@@ -158,7 +158,7 @@ const makeComposedDefinition = (options: RuntimeActorOptions, counters: Counters
         cancel: (c, runId: string) =>
           c.keepAwake(
             requireHost(c).runPromise(
-              Effect.flatMap(Runtime.Runtime, (runtime) => runtime.cancel({ runId, commandId: `cancel:${runId}` })),
+              Effect.flatMap(RuntimeRuntime, (runtime) => runtime.cancel({ runId, commandId: `cancel:${runId}` })),
               { signal: c.abortSignal },
             ),
           ),
@@ -175,7 +175,7 @@ const makeComposedDefinition = (options: RuntimeActorOptions, counters: Counters
               Effect.gen(function* () {
                 const host = yield* ActorRuntime
                 const application = yield* Application
-                const runtime = yield* Runtime.Runtime
+                const runtime = yield* RuntimeRuntime
                 return {
                   ownerId: host.ownerId,
                   incarnation: application.incarnation,
@@ -296,12 +296,12 @@ const addCrashWindowAction = (definition: RuntimeActorDefinition) => {
     actions: {
       ...actions,
       test: {
-        admitWithoutDoorbell: (c: Parameters<typeof send>[0], input: Runtime.SendInput) => {
+        admitWithoutDoorbell: (c: Parameters<typeof send>[0], input: SendInput) => {
           const host = c.vars.host
           if (host === undefined) throw new Error("Runtime host is not awake")
           return c.keepAwake(
             host.runtime.runPromise(
-              Effect.flatMap(Runtime.Runtime, (runtime) => runtime.send(input)),
+              Effect.flatMap(RuntimeRuntime, (runtime) => runtime.send(input)),
               { signal: c.abortSignal },
             ),
           )

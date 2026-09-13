@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Json } from "../json"
 import { Context, Deferred, Effect, Exit, Fiber, Layer, Schedule, Schema, SchemaTransformation, Stream } from "effect"
@@ -17,7 +18,6 @@ import {
   ToolPlacement,
 } from "../../../src/index"
 import { ExecutableResolver } from "../../../src/runtime/index"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
@@ -1225,7 +1225,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     let firstHistory = new Array<readonly [number, string]>()
 
     const execute = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const host = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(parent)
@@ -1256,7 +1256,7 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
     })
 
     const reopen = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "delegate", startOptions)
 

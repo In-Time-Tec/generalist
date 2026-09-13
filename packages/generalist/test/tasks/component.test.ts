@@ -1,9 +1,9 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Hooks, Permissions, Tasks } from "../../src/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/object.js"
@@ -143,7 +143,7 @@ it.effect("reopens a Tasks mutation accepted before its tool result and retries 
     )
     const runId = yield* scopedWith(first)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)
@@ -180,7 +180,7 @@ it.effect("reopens a Tasks mutation accepted before its tool result and retries 
     )
     yield* scopedWith(recovered)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)

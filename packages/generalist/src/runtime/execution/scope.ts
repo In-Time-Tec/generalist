@@ -6,6 +6,7 @@ import { encode as encodeAgentInput } from "../../core/agent/lifecycle/input.js"
 import { digest } from "../../core/durable/canonical-json.js"
 import type { Exhausted as RunBudgetExhausted } from "../../core/durable/run-budget.js"
 import type { DurabilityFailure } from "../../durability/errors.js"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { make as makeAddress } from "../address.js"
 import type { ChildParentageInvalid } from "../child/admission.js"
 import { childSessionId } from "../child/session.js"
@@ -25,7 +26,7 @@ import type { StaleClaim, StaleSessionClaim } from "../run/ownership-errors.js"
 import { normalizePrompt } from "../state/prompt.js"
 import type { Service as EngineService } from "../engine.js"
 import { Runtime, type Service as RuntimeService } from "../service.js"
-import { get as getExternalChildRuntime } from "../child/external/runtime.js"
+import { get as getExternalChildRuntime } from "../child/external/binding.js"
 import { ExternalChildStore, type Service as ExternalChildStoreService } from "../child/external/store.js"
 import type { Placement, ScopedAdmissionRequest } from "../child/external/placement.js"
 
@@ -72,25 +73,34 @@ export interface ChildInspection {
 }
 
 /** A claimed execution attempt no longer owns its Run. */
-export class ExecutionScopeRetired extends Schema.TaggedError<ExecutionScopeRetired>()(
+export class ExecutionScopeRetired extends ActionableTaggedError<ExecutionScopeRetired>()(
   "generalist/runtime/ExecutionScopeRetired",
-  { runId: Schema.String, incarnation: Schema.String },
+  {
+    runId: Schema.String,
+    incarnation: Schema.String,
+    hint: errorHint("Stop issuing commands from this retired attempt and reacquire the current execution scope."),
+  },
 ) {}
 
 /** One child command was replayed with different immutable facts. */
-export class ChildCommandConflict extends Schema.TaggedError<ChildCommandConflict>()(
+export class ChildCommandConflict extends ActionableTaggedError<ChildCommandConflict>()(
   "generalist/runtime/ChildCommandConflict",
   {
     parentRunId: Schema.String,
     commandId: Schema.String,
     existingChildRunId: Schema.String,
+    hint: errorHint("Retry the original child command unchanged, or use a new command identity for different work."),
   },
 ) {}
 
 /** The Runtime cannot authorize or reach the requested child placement. */
-export class ChildPlacementDenied extends Schema.TaggedError<ChildPlacementDenied>()(
+export class ChildPlacementDenied extends ActionableTaggedError<ChildPlacementDenied>()(
   "generalist/runtime/ChildPlacementDenied",
-  { parentRunId: Schema.String, partition: Schema.String },
+  {
+    parentRunId: Schema.String,
+    partition: Schema.String,
+    hint: errorHint("Choose a child partition authorized and reachable from the parent Runtime."),
+  },
 ) {}
 
 /** Typed failures exposed by execution-scoped child operations. */
@@ -294,10 +304,7 @@ export const issue = (options: {
           ),
         )
       })
-    const withPeer = <A, E>(
-      partition: string,
-      use: (peer: ExternalChildStoreService) => Effect.Effect<A, E>,
-    ) =>
+    const withPeer = <A, E>(partition: string, use: (peer: ExternalChildStoreService) => Effect.Effect<A, E>) =>
       Effect.scoped(
         Effect.gen(function* () {
           const peerLayer = yield* routeFor(partition)
@@ -504,9 +511,7 @@ export const issue = (options: {
               return Effect.fail(notAChild(childRunId))
             }
             if (placement.outcome !== undefined) return Effect.succeed(placement.outcome)
-            return Effect.sleep("10 millis").pipe(
-              Effect.andThen(terminalExternalPlacement(metadata, childRunId)),
-            )
+            return Effect.sleep("10 millis").pipe(Effect.andThen(terminalExternalPlacement(metadata, childRunId)))
           }),
           Effect.catchTag("generalist/runtime/ExternalChildPlacementNotFound", () =>
             Effect.fail(notAChild(childRunId)),
@@ -538,6 +543,31 @@ export const issue = (options: {
         ),
       )
     }
+    const matchesLocalCommand = (
+      existing: ExecutionRecord,
+      input: { readonly invocationId: string; readonly commandIdentity: string; readonly factsIdentity: string },
+    ): boolean =>
+      existing.parentRunId === options.claim.runId &&
+      existing.invocationId === input.invocationId &&
+      existing.message.metadata.executionScopeCommand === input.commandIdentity &&
+      existing.message.metadata.executionScopeFacts === input.factsIdentity
+    const matchesExternalCommand = (
+      placement: Placement,
+      input: {
+        readonly invocationId: string
+        readonly commandIdentity: string
+        readonly factsIdentity: string
+        readonly requestedPartition: string
+        readonly childRunId: string
+      },
+    ): boolean =>
+      placement.parentRunId === options.claim.runId &&
+      placement.invocationId === input.invocationId &&
+      placement.request.parent.partition === options.binding.partition &&
+      placement.request.ref.partition === input.requestedPartition &&
+      placement.request.ref.runId === input.childRunId &&
+      placement.request.root.message.metadata.executionScopeCommand === input.commandIdentity &&
+      placement.request.root.message.metadata.executionScopeFacts === input.factsIdentity
     const start: ChildCapabilities<Readonly<Record<string, AnyAgent>>>["start"] = (input) =>
       admissions.withPermit(
         Effect.gen(function* () {
@@ -619,12 +649,7 @@ export const issue = (options: {
             Effect.catchTag("generalist/runtime/RunNotFound", () => Effect.succeed(Option.none())),
           )
           if (Option.isSome(existing)) {
-            if (
-              existing.value.parentRunId !== options.claim.runId ||
-              existing.value.invocationId !== invocationId ||
-              existing.value.message.metadata.executionScopeCommand !== commandIdentity ||
-              existing.value.message.metadata.executionScopeFacts !== factsIdentity
-            ) {
+            if (!matchesLocalCommand(existing.value, { invocationId, commandIdentity, factsIdentity })) {
               return yield* ChildCommandConflict.make({
                 parentRunId: options.claim.runId,
                 commandId: input.commandId,
@@ -646,13 +671,13 @@ export const issue = (options: {
           if (Option.isSome(existingPlacement)) {
             const placement = existingPlacement.value
             if (
-              placement.parentRunId !== options.claim.runId ||
-              placement.invocationId !== invocationId ||
-              placement.request.parent.partition !== options.binding.partition ||
-              placement.request.ref.partition !== requestedPartition ||
-              placement.request.ref.runId !== childRunId ||
-              placement.request.root.message.metadata.executionScopeCommand !== commandIdentity ||
-              placement.request.root.message.metadata.executionScopeFacts !== factsIdentity
+              !matchesExternalCommand(placement, {
+                invocationId,
+                commandIdentity,
+                factsIdentity,
+                requestedPartition,
+                childRunId,
+              })
             ) {
               return yield* ChildCommandConflict.make({
                 parentRunId: options.claim.runId,
@@ -702,8 +727,7 @@ export const issue = (options: {
                     }),
                   "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
                   "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
-                  "generalist/runtime/PayloadTooLarge": (error) =>
-                    RuntimeUnavailable.make({ message: error.message }),
+                  "generalist/runtime/PayloadTooLarge": (error) => RuntimeUnavailable.make({ message: error.message }),
                   "generalist/durability/DurabilityFailure": (error) =>
                     error.reason === "input-conflict"
                       ? ChildCommandConflict.make({
@@ -804,11 +828,13 @@ export const issue = (options: {
                 message: "External child cancellation requires a claimed parent Session",
               })
             }
-            const placement = yield* externalRuntime.store.inspectPlacement(metadata.external.placementId).pipe(
-              Effect.catchTag("generalist/runtime/ExternalChildPlacementNotFound", () =>
-                Effect.fail(notAChild(metadata.childRunId)),
-              ),
-            )
+            const placement = yield* externalRuntime.store
+              .inspectPlacement(metadata.external.placementId)
+              .pipe(
+                Effect.catchTag("generalist/runtime/ExternalChildPlacementNotFound", () =>
+                  Effect.fail(notAChild(metadata.childRunId)),
+                ),
+              )
             if (
               placement.parentRunId !== options.claim.runId ||
               placement.request.ref.runId !== metadata.childRunId ||
@@ -850,8 +876,7 @@ export const issue = (options: {
                     }),
                   "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
                   "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
-                  "generalist/runtime/PayloadTooLarge": (error) =>
-                    RuntimeUnavailable.make({ message: error.message }),
+                  "generalist/runtime/PayloadTooLarge": (error) => RuntimeUnavailable.make({ message: error.message }),
                   "generalist/durability/DurabilityFailure": (error) =>
                     error.reason === "input-conflict"
                       ? ChildCommandConflict.make({

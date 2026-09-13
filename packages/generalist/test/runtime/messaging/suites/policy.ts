@@ -1,7 +1,7 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { AgentDirectory, Errors, Messaging } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { textPrompt } from "../../execution/fixtures.js"
 import { messagingBackend, type MessagingBackend } from "../scenario.js"
 
@@ -24,7 +24,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
   describeBackend(`cross-session addressing under host policy (${backend.name})`, () => {
     it.live("allows exactly the pair the host opted into, in that direction only", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const sender = yield* strangerFor(left)
         const target = yield* strangerFor(right)
 
@@ -53,7 +53,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
 
     it.live("still refuses a session the policy does not name", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const sender = yield* strangerFor(left)
         const other = yield* strangerFor(elsewhere)
 
@@ -72,7 +72,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
 
     it.live("never lists the sender itself even when policy announces it", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const solo = yield* strangerFor(session("self-discovery"))
         expect(yield* runtime.directory(solo.runId)).toEqual([])
       }).pipe(
@@ -87,7 +87,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
 
     it.live("lists a policy-announced cross-session peer that policy also authorizes", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const sender = yield* strangerFor(session("discovery-source"))
         const peer = yield* strangerFor(peerSession)
 
@@ -106,7 +106,7 @@ export const messagingPolicySuite = <StoreError, Extra = never>(backend: Messagi
 
     it.live("omits an announced address the policy refuses to authorize", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const sender = yield* strangerFor(session("announced-but-denied-source"))
         yield* strangerFor(peerSession)
 

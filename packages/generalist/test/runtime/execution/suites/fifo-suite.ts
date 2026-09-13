@@ -1,6 +1,6 @@
+import { Runtime as RuntimeRuntime } from "../../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Stream } from "effect"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { objectWorkerId } from "../object.js"
 import {
@@ -16,7 +16,7 @@ import {
 layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("keeps only the lane head runnable until it settles", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
@@ -50,7 +50,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
 
   it.effect("serializes one Session across different addresses without collapsing idempotency", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
@@ -85,7 +85,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
 
   it.effect("keeps successors pending across waits on the lane head", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
@@ -130,7 +130,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
 
   it.effect("lets cancel bypass the FIFO lane", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
@@ -174,7 +174,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
 
   it.effect("lets signal bypass the FIFO lane for a waiting head", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,

@@ -1,10 +1,10 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"
 import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
-import * as Runtime from "../../src/runtime/engine.js"
 import { ClientRun, ClientSession, ClientSessionRunsPage, ClientSessionSnapshot, Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { objectRuntimeLayer } from "../runtime/execution/object.js"
@@ -53,7 +53,7 @@ layer(Layer.mergeAll(objectLayer, TestModel.layer([]), Permissions.layerAllowAll
     it.effect("returns a typed unavailable response for a custom Run without an exact public revision", () =>
       Effect.scoped(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: "custom-identity-session",

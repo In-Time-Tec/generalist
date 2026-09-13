@@ -1,8 +1,8 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Scope } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Session } from "../../../../src/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import type { PathPageCursor } from "../../../../src/core/context/session-history.js"
 import { make as makeSimulator, type Simulator } from "../../../../src/testing/durability/index.js"
@@ -35,7 +35,7 @@ const withObject = <A, E, R extends RuntimeServices | Scope.Scope>(
 
 const claimedSession = (sessionId: string, ownerId: string, claimId: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const runStore = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,

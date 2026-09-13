@@ -28,11 +28,13 @@ import {
   RuntimeUnavailable,
 } from "../../../errors.js"
 import { isTerminal, type RunInspection, type RunOutcome } from "../../../run.js"
-import type {
-  ExternalRootInspection,
-  Service as ExternalChildStoreService,
-} from "../../../child/external/store.js"
-import { budgetForEvents, projectRunSnapshot, spendForEvents, type InspectionRun } from "../../../execution/inspection.js"
+import type { ExternalRootInspection, Service as ExternalChildStoreService } from "../../../child/external/store.js"
+import {
+  budgetForEvents,
+  projectRunSnapshot,
+  spendForEvents,
+  type InspectionRun,
+} from "../../../execution/inspection.js"
 import { startDigest } from "../../digest.js"
 import { admitStart } from "../admission/accept.js"
 import { activateRoot as activateAdmittedRoot } from "../admission/activation.js"
@@ -46,7 +48,7 @@ import {
 import { sessionChildGrant } from "../admission/policy.js"
 import { cancel as cancelRun, respond, suspend } from "../control.js"
 import { requireExecutionClaim } from "../claim.js"
-import { openRunWaits, type RuntimeState } from "../../projection.js"
+import { openRunWaits, type RuntimeState, type StoredRun } from "../../projection.js"
 import { containsChild, decodePinned } from "../../../executable/manifest-internal.js"
 import { digest as registrationDigest, narrow } from "../../../executable/registration.js"
 import { childGrant, Exhausted } from "../../../../core/durable/run-budget.js"
@@ -150,6 +152,38 @@ const reserve = (state: RuntimeState, input: ReserveInput) =>
     return [placement, next] as const
   })
 
+const scopedRegistrations = (parent: StoredRun, input: ScopedReserveInput) =>
+  Effect.gen(function* () {
+    const executable = yield* Effect.try({
+      try: () =>
+        decodePinned({
+          ref: input.request.root.executableRef,
+          manifest: input.request.root.executableManifest,
+        }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
+    if (!containsChild({ ref: parent.executableRef, manifest: parent.executableManifest }, executable)) {
+      return yield* RuntimeUnavailable.make({ message: "External child is not an authorized pinned child profile" })
+    }
+    const registrations = yield* narrow(executable, input.request.root.registrations).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
+    )
+    const granted = new Map(
+      parent.registrations.map((registration) => [registration.pin, registrationDigest(registration)]),
+    )
+    if (!registrations.every((registration) => granted.get(registration.pin) === registrationDigest(registration))) {
+      return yield* RuntimeUnavailable.make({ message: "External child registration differs from the parent grant" })
+    }
+    return registrations
+  })
+
+const scopedParent = (state: RuntimeState, runId: string) => {
+  const parent = state.runs.get(runId)
+  if (parent === undefined) return RunNotFound.make({ runId })
+  if (isTerminal(parent.status)) return RunTerminal.make({ runId: parent.runId, status: parent.status })
+  return Effect.succeed(parent)
+}
+
 const reserveScoped = (state: RuntimeState, input: ScopedReserveInput) =>
   Effect.gen(function* () {
     yield* requireExecutionClaim(state, input)
@@ -172,33 +206,8 @@ const reserveScoped = (state: RuntimeState, input: ScopedReserveInput) =>
     ) {
       return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
     }
-    const parent = state.runs.get(input.runId)
-    if (parent === undefined) return yield* RunNotFound.make({ runId: input.runId })
-    if (isTerminal(parent.status)) return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
-    const executable = yield* Effect.try({
-      try: () =>
-        decodePinned({
-          ref: input.request.root.executableRef,
-          manifest: input.request.root.executableManifest,
-        }),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    if (!containsChild({ ref: parent.executableRef, manifest: parent.executableManifest }, executable)) {
-      return yield* RuntimeUnavailable.make({ message: "External child is not an authorized pinned child profile" })
-    }
-    const registrations = yield* narrow(executable, input.request.root.registrations).pipe(
-      Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
-    )
-    const grantedRegistrations = new Map(
-      parent.registrations.map((registration) => [registration.pin, registrationDigest(registration)]),
-    )
-    if (
-      !registrations.every(
-        (registration) => grantedRegistrations.get(registration.pin) === registrationDigest(registration),
-      )
-    ) {
-      return yield* RuntimeUnavailable.make({ message: "External child registration differs from the parent grant" })
-    }
+    const parent = yield* scopedParent(state, input.runId)
+    const registrations = yield* scopedRegistrations(parent, input)
     const depth = parent.depth + 1
     yield* reserveSessions(state, parent, [input.request.root.message.sessionId])
     if (depth > parent.treePolicy.maxDepth) {
@@ -291,7 +300,7 @@ const reserveScoped = (state: RuntimeState, input: ScopedReserveInput) =>
       key: input.request.root.message.idempotencyKey,
       inherit: defaultInheritance,
       budget,
-      ...(typeof label === "string" ? { label } : undefined),
+      ...(Schema.is(Schema.String)(label) ? { label } : undefined),
     }
     const [, next] = yield* appendLifecycle(
       { ...state, externalChildPlacements: placements },
@@ -352,53 +361,21 @@ const cancelScoped = (state: RuntimeState, input: ScopedCancelInput) =>
     return [updated, { ...state, externalChildPlacements: placements }] as const
   })
 
-const settle = (
-  state: RuntimeState,
-  input: {
-    readonly placementId: string
-    readonly settlementId: string
-    readonly outcome: RunOutcome
-    readonly spend?: NonNullable<Placement["spend"]>
-  },
-): Effect.Effect<
-  readonly [Placement, RuntimeState],
-  ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable,
-  PreparedObservation
-> =>
+interface SettlementInput {
+  readonly placementId: string
+  readonly settlementId: string
+  readonly outcome: RunOutcome
+  readonly spend?: NonNullable<Placement["spend"]>
+}
+
+const settleParent = (state: RuntimeState, placement: Placement, input: SettlementInput) =>
   Effect.gen(function* () {
-    const placement = state.externalChildPlacements.get(input.placementId)
-    if (placement === undefined) return yield* ExternalChildPlacementNotFound.make({ placementId: input.placementId })
-    if (placement.settled) {
-      if (
-        placement.settlementId !== input.settlementId ||
-        !Equal.equals(placement.outcome, input.outcome) ||
-        !Equal.equals(placement.spend, input.spend)
-      ) {
-        return yield* ExternalChildSettlementConflict.make({
-          placementId: input.placementId,
-          settlementId: input.settlementId,
-        })
-      }
-      return [placement, state] as const
-    }
-    const updated: Placement = {
-      ...placement,
-      readiness: "settled",
-      settled: true,
-      settlementId: input.settlementId,
-      outcome: input.outcome,
-      ...(input.spend === undefined ? undefined : { spend: input.spend }),
-    }
-    const placements = new Map(state.externalChildPlacements)
-    placements.set(input.placementId, updated)
-    let next: RuntimeState = { ...state, externalChildPlacements: placements }
+    let next = state
     let parent = next.runs.get(placement.parentRunId)
     if (
       parent !== undefined &&
       !isTerminal(parent.status) &&
-      !parent.events.some(
-        (event) => event._tag === "ChildSettled" && event.childRunId === placement.request.ref.runId,
-      )
+      !parent.events.some((event) => event._tag === "ChildSettled" && event.childRunId === placement.request.ref.runId)
     ) {
       ;[, next] = yield* appendLifecycle(
         next,
@@ -436,7 +413,44 @@ const settle = (
         parent.cancelReason === undefined ? cancelInput : { ...cancelInput, reason: parent.cancelReason },
       ).pipe(Effect.mapError(() => RuntimeUnavailable.make({ message: "external parent cancellation missing" })))
     }
-    next = yield* promoteChildCapacity(next, placement.parentRunId)
+    return yield* promoteChildCapacity(next, placement.parentRunId)
+  })
+
+const settle = (
+  state: RuntimeState,
+  input: SettlementInput,
+): Effect.Effect<
+  readonly [Placement, RuntimeState],
+  ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable,
+  PreparedObservation
+> =>
+  Effect.gen(function* () {
+    const placement = state.externalChildPlacements.get(input.placementId)
+    if (placement === undefined) return yield* ExternalChildPlacementNotFound.make({ placementId: input.placementId })
+    if (placement.settled) {
+      if (
+        placement.settlementId !== input.settlementId ||
+        !Equal.equals(placement.outcome, input.outcome) ||
+        !Equal.equals(placement.spend, input.spend)
+      ) {
+        return yield* ExternalChildSettlementConflict.make({
+          placementId: input.placementId,
+          settlementId: input.settlementId,
+        })
+      }
+      return [placement, state] as const
+    }
+    const updated: Placement = {
+      ...placement,
+      readiness: "settled",
+      settled: true,
+      settlementId: input.settlementId,
+      outcome: input.outcome,
+      ...(input.spend === undefined ? undefined : { spend: input.spend }),
+    }
+    const placements = new Map(state.externalChildPlacements)
+    placements.set(input.placementId, updated)
+    const next = yield* settleParent({ ...state, externalChildPlacements: placements }, placement, input)
     return [updated, next] as const
   })
 
@@ -656,9 +670,7 @@ const placementsByParent = (state: RuntimeState, input: ParentPlacementPageInput
         ? { limit: input.limit }
         : { limit: input.limit, afterPlacementId: input.afterPlacementId }
     const page = yield* pageWindow(
-      [...state.externalChildPlacements.values()].filter(
-        (placement) => placement.parentRunId === input.parentRunId,
-      ),
+      [...state.externalChildPlacements.values()].filter((placement) => placement.parentRunId === input.parentRunId),
       pageInput,
     )
     return page.cursor === undefined ? { items: page.window } : { items: page.window, cursor: page.cursor }

@@ -1,8 +1,8 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { cancellationConvergenceSuite } from "./suites/cancellation-convergence-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
 import { assistantAddress, parentRelativeOptions, resolverLayer, textPrompt } from "../execution/fixtures.js"
@@ -21,7 +21,7 @@ const runtimeLayer = objectRuntimeLayer({ ...parentRelativeOptions, scheduler: {
 layer(runtimeLayer)("object Session cancellation", (it) => {
   it.effect("cancels every prior root tree and proves nested descendants terminal", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const scheduler = yield* LocalScheduler
       const sessionId = `thread:close:object`

@@ -1,10 +1,10 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream, type Types } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host, type SessionRunsInput, type SessionRunsPage } from "generalist/host"
 import { ExecutableResolver } from "generalist/runtime"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { HostSessionSnapshot } from "../../src/runtime/session/host.js"
 import { applyConversationUpdate } from "../../src/runtime/session/conversation.js"
@@ -106,7 +106,7 @@ export const register = ({
               expect(beforeCompletion.conversation.leafId).toBe(answer.id)
               const encoded = yield* Schema.encodeEffect(Schema.fromJsonString(HostSessionSnapshot))(beforeCompletion)
               expect(encoded).not.toContain("DO_NOT_EXPOSE")
-              const committedEvents = yield* (yield* Runtime.Runtime).sessionEvents({ sessionId: session.id }).pipe(
+              const committedEvents = yield* (yield* Runtime).sessionEvents({ sessionId: session.id }).pipe(
                 Stream.takeUntil((entry) => entry.cursor === beforeCompletion.cursor),
                 Stream.runCollect,
               )
@@ -157,7 +157,7 @@ export const register = ({
               expect(after.conversation.leafId).toBe(original.userId)
               expect(after.cursor).toBe(before.cursor + 1)
               expect(yield* store.history({ runId: run.id, cursor: -1, limit: 100 })).toEqual(history)
-              const updates = yield* (yield* Runtime.Runtime)
+              const updates = yield* (yield* Runtime)
                 .sessionEvents({ sessionId: reopened.session.id, cursor: before.cursor })
                 .pipe(Stream.take(1), Stream.runCollect)
               expect(updates[0]).toEqual({
@@ -260,7 +260,7 @@ export const register = ({
               expect(ids).toEqual(original.runIds)
               expect(new Set(ids).size).toBe(129)
               const store = yield* RunStore
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const claim = yield* store.claimExecution({
                 runId: original.runId,
                 ownerId: objectWorkerId,
@@ -377,7 +377,7 @@ export const register = ({
             expect(next[0]?.cursor).not.toBe(reopened.cursor)
             const fresh = yield* host.sessions.snapshot(original.session.id)
             expect(fresh.runs.map((run) => run.runId)).toEqual([...original.runs.map((run) => run.runId), raced.id])
-            const canonical = yield* (yield* Runtime.Runtime)
+            const canonical = yield* (yield* Runtime)
               .sessionEvents({ sessionId: original.session.id, cursor: reopened.cursor })
               .pipe(Stream.take(1), Stream.runCollect)
             expect(fresh.cursor).toBe(canonical[0]?.cursor)

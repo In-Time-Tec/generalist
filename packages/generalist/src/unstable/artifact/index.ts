@@ -28,6 +28,7 @@ import { get as getRuntimeArtifacts, type Backend } from "../../runtime/artifact
 import { make, type Document, type EditTool, type ReadTool } from "./document.js"
 import { bind as bindRegistry, make as makeRegistry } from "./registry.js"
 import { Artifacts, type OpenOptions, type Service } from "./service.js"
+import { ArtifactCapability } from "../../host/artifacts.js"
 import { Yjs } from "./yjs.js"
 
 export {
@@ -142,6 +143,7 @@ const makeService = Effect.gen(function* () {
   const lock = yield* Semaphore.make(1)
   const dependencies = backend === undefined ? undefined : { backend, blobs, registry }
   const service = Artifacts.of({
+    get: registry.get,
     open: (name, options) =>
       dependencies === undefined
         ? Effect.fail(
@@ -158,7 +160,9 @@ const makeService = Effect.gen(function* () {
 })
 
 /** Build the Artifact capability from an already-ready Runtime and BlobStore. @experimental */
-export const layer: Layer.Layer<Artifacts, never, Runtime | BlobStore> = Layer.effect(Artifacts, makeService)
+export const layer: Layer.Layer<Artifacts | ArtifactCapability, never, Runtime | BlobStore> = Layer.effectContext(
+  Effect.map(makeService, (service) => Context.make(Artifacts, service).pipe(Context.add(ArtifactCapability, service))),
+)
 
 type OpenEffect<Error, Requirements> = Effect.Effect<
   Document,

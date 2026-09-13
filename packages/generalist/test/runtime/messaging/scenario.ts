@@ -1,7 +1,7 @@
+import { type LayerOptions, Runtime as RuntimeRuntime } from "../../../src/runtime/engine.js"
 import { objectRuntimeLayer, type ObjectRuntimeOptions } from "../execution/object.js"
 import { Effect, Layer } from "effect"
-import { type AgentDirectory, type Messaging } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
+import type { AgentDirectory, Messaging } from "../../../src/runtime/index.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import type { Client, Simulator } from "../../../src/testing/durability/index.js"
 import {
@@ -21,7 +21,7 @@ const options = {
     { address: researcherAddress, executable: researcherRef, registrations: registrationsFor(researcherRef) },
   ],
   subscriberQueueCapacity: 8,
-} satisfies Runtime.LayerOptions
+} satisfies LayerOptions
 
 /** The host messaging policy a test chooses when it builds its Runtime. */
 export interface MessagingOverrides {
@@ -43,8 +43,8 @@ export const messagingLayer = (overrides: MessagingOverrides, storage?: Client |
  */
 export interface MessagingBackend<StoreError, Extra = never> {
   readonly name: string
-  readonly layer: (overrides: MessagingOverrides) => Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
+  readonly layer: (overrides: MessagingOverrides) => Layer.Layer<RuntimeRuntime | RunStore | Extra, StoreError>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, RuntimeRuntime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -53,7 +53,7 @@ export const messagingBackend = <StoreError, Extra = never>(backend: MessagingBa
   return {
     provide:
       (overrides: MessagingOverrides = {}) =>
-      <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
+      <A, E>(effect: Effect.Effect<A, E, RuntimeRuntime | RunStore | Extra>) =>
         provideScoped(backend.layer(overrides), effect),
     familyFor: (sessionId: string) => family(sessionId).pipe(Effect.tap(({ parent }) => activate(parent.runId))),
     strangerFor: (sessionId: string) => stranger(sessionId).pipe(Effect.tap((entry) => activate(entry.runId))),
@@ -68,7 +68,7 @@ export const messagingBackend = <StoreError, Extra = never>(backend: MessagingBa
  */
 export const family = (sessionId: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* RuntimeRuntime
     const store = yield* RunStore
     const parent = yield* runtime.send({
       to: assistantAddress,
@@ -102,7 +102,7 @@ export const family = (sessionId: string) =>
 /** A second, unrelated root Run: the natural negative case for relationship scope. */
 export const stranger = (sessionId: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* RuntimeRuntime
     const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,

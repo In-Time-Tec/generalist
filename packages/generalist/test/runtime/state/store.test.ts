@@ -1,10 +1,10 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor } from "../../../src/index.js"
 import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache.js"
 import { Address, Errors, ExecutableResolver, RunTree } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
@@ -39,7 +39,7 @@ layer(objectRuntimeLayer(parentRelativeOptions).pipe(Layer.provide(resolverLayer
   (suite) => {
     suite.effect("resolves selections per persisted parent closure", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const first = yield* runtime.send({
           to: assistantAddress,
           sessionId: "object:relative:first",
@@ -90,7 +90,7 @@ it.live("resumes tree replay from an opaque cursor after an object-store reopen"
   }
   const layerFor = () => objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
   const admit = Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId: "session:tree-reopen",
@@ -146,7 +146,7 @@ it.live("persists a handoff checkpoint and active pin atomically across object-s
     state: {},
   } as const
   const admit = Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,
@@ -293,7 +293,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
       ).pipe(Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)))
     const crashScope = yield* Scope.make()
     const committed = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const handoffCommitted = yield* Deferred.make<void>()
       const crashStore = RunStore.of({
@@ -427,7 +427,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
         }),
     })
     const reopen = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const host = yield* RunExecutor
       const session = yield* store.sessionReader("session:durable-handoff")
@@ -511,7 +511,7 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
     const runId = "run:object:caller"
     const waitId = "wait:object"
     const admit = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         runId,
@@ -539,7 +539,7 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
       })
     })
     const reopen = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const inspection = yield* runtime.inspect(runId)
       expect(inspection.waits).toEqual([])

@@ -1,3 +1,4 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
@@ -12,7 +13,6 @@ import {
   CodeExecutor,
 } from "../../../../src/index.js"
 import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore, type Service as RunStoreService } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import type { ToolCallInput } from "../../../../src/core/program/capabilities.js"
@@ -89,7 +89,7 @@ const makeFixture = (
 
 const execute = (address: Address.Address) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const host = yield* RunExecutor
     const receipt = yield* runtime.send({ to: address, sessionId: address, idempotencyKey: address, prompt: "run" })
@@ -226,7 +226,7 @@ describe("durable Program host boundary", () => {
       fixture.layer,
       Effect.gen(function* () {
         started = yield* Deferred.make<void>()
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         store = yield* RunStore
         const host = yield* RunExecutor
         const receipt = yield* runtime.send({

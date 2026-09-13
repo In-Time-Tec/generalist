@@ -1,3 +1,4 @@
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { objectRuntimeLayer, makeObjectStorage, objectWorkerId } from "../runtime/execution/object.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
@@ -6,7 +7,6 @@ import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Host } from "generalist/host"
 import { ExecutableResolver, Runtime } from "generalist/runtime"
-import * as RunExecutor from "../../src/runtime/execution/run-executor.js"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
 import { ObjectStore } from "../../src/durability/object-store.js"
@@ -45,7 +45,7 @@ layer(services)("Artifact Runtime fork", (it) => {
       const session = yield* host.sessions.create({ id: "session:artifact:fork" })
       const source = yield* host.runs.start(session.id, writer, "read the plan")
       const store = yield* RunStore
-      const executor = yield* RunExecutor.RunExecutor
+      const executor = yield* RunExecutor
       yield* executor.execute(
         yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId, commandId: "artifact-source-claim" }),
       )

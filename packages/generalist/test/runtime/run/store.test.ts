@@ -1,13 +1,13 @@
+import { Runtime as RuntimeRuntime } from "../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { Errors } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 
 layer(objectLayer)("Runtime idempotency", (it) => {
   it.effect("returns the original receipt for an exact duplicate", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:1",
@@ -26,7 +26,7 @@ layer(objectLayer)("Runtime idempotency", (it) => {
 
   it.effect("rejects changed input under one command identity", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:1",
@@ -58,7 +58,7 @@ layer(objectLayer)("Runtime idempotency", (it) => {
 
   it.effect("scopes idempotency keys per address and session", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const a = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:a",
@@ -77,7 +77,7 @@ layer(objectLayer)("Runtime idempotency", (it) => {
 
   it.effect("enforces a caller-supplied RunId across replay and conflicting admission", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const first = yield* runtime.send({
         runId: "run:caller:1",
         to: assistantAddress,

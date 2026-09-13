@@ -1,3 +1,4 @@
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { describe, expect, it } from "@effect/vitest"
 import {
   Address,
@@ -11,7 +12,6 @@ import {
   Steering,
   OperationResolution,
 } from "../../src/runtime/index.js"
-import * as RunExecutor from "../../src/runtime/execution/run-executor.js"
 
 const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "1" => manifest.version
 const acceptResolutionConflict = (_error: Errors.OperationResolutionConflict): void => undefined
@@ -26,7 +26,7 @@ describe("generalist/runtime public surface", () => {
     expect(RunEvent.eventIdFor).toBeDefined()
     expect(RunEvent.SteeringDiscardReason).toBeDefined()
     expect(Steering.SteeringReceipt).toBeDefined()
-    expect(RunExecutor.RunExecutor).toBeDefined()
+    expect(RunExecutor).toBeDefined()
     expect(RunTree.events).toBeDefined()
     expect(RunTree.watch).toBeDefined()
     expect(Run.ExecutionResult).toBeDefined()

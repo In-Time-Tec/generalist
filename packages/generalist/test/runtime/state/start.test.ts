@@ -1,3 +1,4 @@
+import { Runtime as RuntimeRuntime } from "../../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
@@ -5,7 +6,6 @@ import { DateTime, Effect, Layer, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
 import { Address, Errors, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
 import {
@@ -69,7 +69,7 @@ const runtimeLayer = objectRuntimeLayer({
 layer(runtimeLayer)("Runtime exact root admission", (it) => {
   it.effect("starts an unseen exact executable and returns one stable duplicate Run ID", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const input = {
         executable: assistantRef,
         registrations: registrationsFor(assistantRef),
@@ -86,7 +86,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
 
   it.effect("rejects non-JSON metadata with a declared failure instead of a SchemaError defect", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const base = {
         executable: assistantRef,
         registrations: registrationsFor(assistantRef),
@@ -111,7 +111,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
 
   it.effect("conflicts on changed prompt, executable, and registration", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const base = {
         executable: assistantRef,
         registrations: registrationsFor(assistantRef),
@@ -147,7 +147,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
 
   it.effect("admits and deduplicates typed file bytes while conflicting on changed bytes", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const input = {
         executable: assistantRef,
         registrations: registrationsFor(assistantRef),
@@ -173,7 +173,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
 
   it.effect("rejects a registration pin mismatch and a missing required pin", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const registrations = registrationsFor(assistantRef)
       const mismatch = yield* runtime
         .startExecution({
@@ -200,7 +200,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
 
   it.effect("resolves and attests the executable before admission succeeds", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const before = yield* store.list({ limit: 1000 })
       const unresolvable = yield* runtime
@@ -243,7 +243,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
 
   it.effect("admits, executes, and replays the root and child together", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const first = yield* runtime.startExecution(base)
       const duplicate = yield* runtime.startExecution(base)
@@ -301,7 +301,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
 
   it.effect("rejects a rewind on a root with admitted children without mutating the Run", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const started = yield* runtime.startExecution({
         ...base,
@@ -364,7 +364,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
 
   it.effect("rolls back all admission on an invalid selection and conflicts on changed source", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const before = yield* runtime.list({ limit: 10 })
       const invalid = yield* runtime
         .startExecution({
@@ -406,7 +406,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
 
   it.effect("admits typed file bytes in an initial child prompt", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const receipt = yield* runtime.startExecution({
         ...base,
         idempotencyKey: "initial-child-file",
@@ -440,7 +440,7 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
 
   it.effect("commits deterministic members and holds the original root result until join", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const first = yield* runtime.startExecution(input)
       const duplicate = yield* runtime.startExecution(input)
@@ -504,7 +504,7 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
 
   it.effect("admits typed file bytes in an initial fan-out member prompt", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const receipt = yield* runtime.startExecution({
         ...input,
         idempotencyKey: "initial-fan-out-file",
@@ -548,7 +548,7 @@ standalone.effect("reopens an atomic object root and initial child admission", (
     const first = yield* provideScoped(
       objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         expect(
           yield* runtime
             .startExecution({
@@ -588,7 +588,7 @@ standalone.effect("reopens an atomic object root and initial child admission", (
     const duplicate = yield* provideScoped(
       objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const receipt = yield* runtime.startExecution(input)
         expect((yield* runtime.treeCheckpoint(receipt.runId)).inspection.runs).toHaveLength(2)
         expect(
@@ -632,7 +632,7 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
     const runId = yield* provideScoped(
       objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const receipt = yield* runtime.startExecution(input)
         const execution = yield* (yield* RunStore).loadExecution(receipt.runId)
         assertFileBytes(execution.message.prompt)
@@ -667,7 +667,7 @@ standalone.effect("reloads object registrations without address binding and clos
     const receipt = yield* provideScoped(
       firstLayer,
       Effect.gen(function* () {
-        return yield* (yield* Runtime.Runtime).startExecution({
+        return yield* (yield* RuntimeRuntime).startExecution({
           executable: assistantRef,
           registrations,
           sessionId: "object-exact",
@@ -739,7 +739,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
         Layer.provide(resolverLayer),
       ),
       Effect.gen(function* () {
-        return yield* (yield* Runtime.Runtime).send({
+        return yield* (yield* RuntimeRuntime).send({
           to: address,
           sessionId: "addressed-session",
           idempotencyKey: "addressed",
@@ -810,7 +810,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
     (it) => {
       it.effect("requires both pinned compaction registrations and conflicts on changed policy", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const base = {
             executable,
             registrations,

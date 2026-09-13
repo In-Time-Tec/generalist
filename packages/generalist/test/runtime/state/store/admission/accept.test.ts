@@ -1,8 +1,8 @@
+import { Runtime as RuntimeRuntime } from "../../../../../src/runtime/engine.js"
 import "../suites/send-attestation-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { DateTime, Effect, Stream } from "effect"
 import { Address, Errors } from "../../../../../src/runtime/index.js"
-import * as Runtime from "../../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { DurabilityFailure } from "../../../../../src/durability/errors.js"
 import { assistantAddress, completedResult, objectLayer, textPrompt } from "../../../execution/fixtures.js"
@@ -14,7 +14,7 @@ Reflect.set(nonJsonMetadata, "a", DateTime.toDate(DateTime.makeUnsafe(0)))
 layer(objectLayer)("Runtime send", (it) => {
   it.effect("admits a message and starts the lane head", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -39,7 +39,7 @@ layer(objectLayer)("Runtime send", (it) => {
 
   it.effect("fails typed for unknown addresses", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const error = yield* runtime
         .send({
           to: Address.make("agent:missing"),
@@ -54,7 +54,7 @@ layer(objectLayer)("Runtime send", (it) => {
 
   it.effect("fails typed for non-JSON metadata", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const error = yield* runtime
         .send({
           to: assistantAddress,
@@ -71,7 +71,7 @@ layer(objectLayer)("Runtime send", (it) => {
 
   it.effect("completes through the test driver", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,

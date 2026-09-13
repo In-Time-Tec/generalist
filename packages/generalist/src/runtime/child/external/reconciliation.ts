@@ -16,10 +16,7 @@ export interface Options<E = never, R = never> {
 export interface PeerRoutesService {
   readonly connect: (
     partition: string,
-  ) => Effect.Effect<
-    Option.Option<Layer.Layer<ExternalChildStore, RuntimeUnavailable>>,
-    RuntimeUnavailable
-  >
+  ) => Effect.Effect<Option.Option<Layer.Layer<ExternalChildStore, RuntimeUnavailable>>, RuntimeUnavailable>
 }
 
 /** Explicit peer authorization for native cross-partition child placement. @experimental */
@@ -51,9 +48,7 @@ export const layerPeerRoutes = <E, R>(
               Option.map((peer) =>
                 peer.pipe(
                   Layer.provide(Layer.succeedContext(context)),
-                  Layer.catchCause(() =>
-                    Layer.effect(ExternalChildStore, Effect.fail(routeUnavailable(partition))),
-                  ),
+                  Layer.catchCause(() => Layer.effect(ExternalChildStore, Effect.fail(routeUnavailable(partition)))),
                 ),
               ),
             ),

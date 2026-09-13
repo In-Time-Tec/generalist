@@ -1,3 +1,4 @@
+import { Runtime as RuntimeRuntime } from "../../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
 import "./suites/host-preview-suite.js"
@@ -32,7 +33,6 @@ import {
   ExecutableResolver,
   RunEvent,
 } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore, type ExecutionClaim, type Service as RunStoreService } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
@@ -159,7 +159,7 @@ describe("RunExecutor", () => {
 
     const executeAndAcknowledge = scopedWith(layerObject())(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const receipt = yield* runtime.send({
@@ -195,7 +195,7 @@ describe("RunExecutor", () => {
 
     const reopenAndReplay = scopedWith(layerObject())(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const point = yield* runtime.acknowledged(runId)
         expect(point.sequence).toBe(acknowledgedSequence)
         const expected = full.filter((event) => event.sequence > point.sequence)
@@ -225,7 +225,7 @@ describe("RunExecutor", () => {
 
     const executeWithoutAcknowledging = scopedWith(layerObject())(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const receipt = yield* runtime.send({
@@ -249,7 +249,7 @@ describe("RunExecutor", () => {
 
     const reopenAndReplay = scopedWith(layerObject())(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const point = yield* runtime.acknowledged(runId)
         expect(point).toEqual({ runId, sequence: Cursor.origin })
         const replay = yield* runtime.events({ runId, cursor: point.sequence }).pipe(
@@ -351,7 +351,7 @@ describe("RunExecutor", () => {
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const receipt = yield* runtime.startExecution({
@@ -393,7 +393,7 @@ describe("RunExecutor", () => {
       const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* RuntimeRuntime
             const store = yield* RunStore
             if (runId === undefined) {
               runId = (yield* runtime.startExecution({
@@ -455,7 +455,7 @@ describe("RunExecutor", () => {
       const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* RuntimeRuntime
             const store = yield* RunStore
             if (runId === undefined) {
               runId = (yield* runtime.startExecution({
@@ -537,7 +537,7 @@ describe("RunExecutor", () => {
       const withWriter = <A>(body: (session: Session.SessionStore) => Effect.Effect<A>) =>
         Effect.scoped(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* RuntimeRuntime
             const store = yield* RunStore
             if (runId === undefined) {
               runId = (yield* runtime.startExecution({
@@ -628,7 +628,7 @@ describe("RunExecutor", () => {
       const turn = (idempotencyKey: string, prompt: string) =>
         Effect.scoped(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* RuntimeRuntime
             const receipt = yield* runtime.startExecution({
               executable,
               registrations,
@@ -802,7 +802,7 @@ describe("RunExecutor", () => {
         objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerResolver(resolver)))
       const receipt = yield* scopedWith(layerObject())(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           return yield* runtime.startExecution({
             executable,
             registrations,
@@ -827,7 +827,7 @@ describe("RunExecutor", () => {
       )
       const snapshot = yield* scopedWith(layerObject())(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           return yield* runtime.snapshot(receipt.runId)
         }),
       )
@@ -884,7 +884,7 @@ describe("RunExecutor", () => {
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -977,7 +977,7 @@ describe("RunExecutor", () => {
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
@@ -1074,7 +1074,7 @@ describe("RunExecutor", () => {
         }).pipe(Layer.provide(layerResolver(resolver))),
       )(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -1119,7 +1119,7 @@ describe("RunExecutor", () => {
       admissionFinalized: Ref.Ref<boolean>,
     ) =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -1268,7 +1268,7 @@ describe("RunExecutor", () => {
 
     return scopedWith(runtimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -1520,7 +1520,7 @@ describe("RunExecutor", () => {
     return Effect.gen(function* () {
       const admitted = yield* Effect.scoped(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const parent = yield* runtime.send({
@@ -1555,7 +1555,7 @@ describe("RunExecutor", () => {
 
       yield* Effect.scoped(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const group = yield* runtime.inspectFanOut(admitted.fanOutId)
@@ -1662,7 +1662,7 @@ describe("RunExecutor", () => {
       ),
     )
     return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const host = yield* RunExecutor
       const parent = yield* runtime.startExecution({
@@ -1766,7 +1766,7 @@ describe("RunExecutor", () => {
       ),
     )
     return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const host = yield* RunExecutor
       let sequence = 0
@@ -1925,7 +1925,7 @@ describe("RunExecutor", () => {
     }).pipe(Layer.provide(layerResolver(resolver)))
 
     return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const host = yield* RunExecutor
       const store = yield* RunStore
       const receipt = yield* runtime.send({
@@ -1987,7 +1987,7 @@ describe("RunExecutor", () => {
     )
 
     return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const host = yield* RunExecutor
       const store = yield* RunStore
       const receipt = yield* runtime.startExecution({
@@ -2070,7 +2070,7 @@ describe("RunExecutor", () => {
     }).pipe(Layer.provide(layerResolver(resolver)))
 
     return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const host = yield* RunExecutor
       const store = yield* RunStore
       const receipt = yield* runtime.startExecution({
@@ -2180,7 +2180,7 @@ describe("RunExecutor", () => {
       }).pipe(Layer.provide(layerResolver(resolver)))
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const scheduler = yield* LocalScheduler
@@ -2263,7 +2263,7 @@ describe("RunExecutor", () => {
         ),
       )(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -2310,7 +2310,7 @@ describe("RunExecutor", () => {
         ),
       )(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           expect((yield* runtime.inspect(runId)).status).toBe("needs-resolution")
           const history = yield* runtime.history({ runId, limit: 100 })
           expect(history.map((event) => event._tag)).toContain("OperationUnknown")
@@ -2369,7 +2369,7 @@ describe("RunExecutor", () => {
       )
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -2470,7 +2470,7 @@ describe("RunExecutor", () => {
 
       yield* scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const scheduler = yield* LocalScheduler
@@ -2596,7 +2596,7 @@ describe("RunExecutor", () => {
 
         yield* scopedWith(layer())(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* RuntimeRuntime
             const host = yield* RunExecutor
             const store = yield* RunStore
             const receipt = yield* runtime.send({
@@ -2652,7 +2652,7 @@ describe("RunExecutor", () => {
 
   it.effect("rejects stale execution checkpoint writers", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: Address.make("agent:fence"),
@@ -2758,7 +2758,7 @@ describe("RunExecutor", () => {
 
   it.effect("exposes only pre-commit or post-commit operation and checkpoint states", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: Address.make("agent:atomic-operation"),
@@ -2828,7 +2828,7 @@ describe("RunExecutor", () => {
 
   it.effect("atomically imports memory handoff projections with exact retry and divergent rollback", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: Address.make("agent:atomic-operation"),
@@ -2952,7 +2952,7 @@ describe("RunExecutor", () => {
 
   it.effect("atomically commits failed, unknown, and suspended execution state", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const checkpoint = {
         driverVersion: "1" as const,
@@ -3238,7 +3238,7 @@ describe("RunExecutor", () => {
         }).pipe(Layer.provide(resolverLayer)),
       )(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           store = yield* RunStore
           const parent = yield* runtime.send({
@@ -3491,7 +3491,7 @@ describe("RunExecutor", () => {
       const runtimeLayer = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
       return scopedWith(runtimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const host = yield* RunExecutor
           store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -3673,7 +3673,7 @@ describe("RunExecutor", () => {
             }).pipe(Effect.andThen(Errors.ExecutablePinMissing.make({ runId: input.runId, ref: input.ref }))),
     })
     return Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const host = yield* RunExecutor
       const receipt = yield* runtime.send({

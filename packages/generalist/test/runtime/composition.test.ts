@@ -285,6 +285,7 @@ describe("Runtime.layer", () => {
 
   it("fails compilation when a declared Agent service is missing", () => {
     const assistant = Agent.make({ name: "assistant-unclosed" })
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- This negative compile assertion intentionally constructs an invalid Runtime Layer.
     const unclosed = Runtime.layer<{ readonly assistant: typeof assistant }, never, never, never, never>({
       agents: { assistant },
       revision: "assistant-v1",
@@ -293,6 +294,7 @@ describe("Runtime.layer", () => {
       storage: storageLayer(),
       namespace,
     })
+    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The intentionally invalid Layer above carries its inferred missing requirement into this assertion.
     expect(unclosed).toBeDefined()
   })
 

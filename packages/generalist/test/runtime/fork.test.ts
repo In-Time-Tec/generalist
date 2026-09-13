@@ -1,3 +1,4 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, FileSystem, Layer, Option, Schema, Stream } from "effect"
@@ -5,7 +6,6 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolContext } from "../../src/index.js"
 import { Cell, CellTool, KernelPool, KernelSnapshotStore } from "../../src/repl/index.js"
 import { ExecutableResolver, RunEvent } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import {
@@ -151,7 +151,7 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
     const source = yield* scopedWith(firstLayer)(
       Effect.scoped(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* runtime.register(agent)
@@ -210,7 +210,7 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
 
     yield* scopedWith(recoveredLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)
@@ -282,7 +282,7 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
           ),
         )(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const executor = yield* RunExecutor
             yield* runtime.register(agent)
@@ -323,7 +323,7 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
           ),
         )(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const executor = yield* RunExecutor
             yield* runtime.register(agent)
@@ -395,7 +395,7 @@ it.live("restores a rewound Run from the retained Sandbox snapshot", () =>
 
         yield* scopedWith(runtimeLayer)(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const executor = yield* RunExecutor
             yield* runtime.register(agent)

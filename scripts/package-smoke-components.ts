@@ -3,7 +3,8 @@ import { Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, DurableDriver, Permissions } from "generalist"
 import * as Components from "generalist/components"
 import * as Durability from "generalist/durability"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { Host } from "generalist/host"
+import { ExecutableResolver } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import * as TestDurability from "generalist/testing/durability"
 
@@ -56,7 +57,7 @@ await Effect.runPromise(Effect.gen(function* () {
     const client = yield* bucket.connect
     const runtimeLayer = Durability.layer({
       environment: "package", tenant: "consumer", partition: "components", workerId,
-      addresses: [], schedulerMode: "external",
+      addresses: [],
     }).pipe(Layer.provide(Layer.mergeAll(
       TestDurability.layer(client), cryptoLayer, ExecutableResolver.layerStatic([]).pipe(Layer.orDie),
     )))
@@ -66,17 +67,14 @@ await Effect.runPromise(Effect.gen(function* () {
       handlers, Permissions.layerAllowAll, Approvals.layerAutoApprove, TestModel.layer(steps),
     ))
     yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const executor = yield* RunExecutor.RunExecutor
-      yield* runtime.register(agent)
+      const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
+      if (workerId === "first-host") yield* host.sessions.create({ id: "retained-counter" })
       for (const prompt of prompts) {
-        const handle = yield* runtime.start(agent, prompt, {
-          sessionId: "retained-counter", idempotencyKey: workerId + ":" + prompt,
+        const run = yield* host.runs.start("retained-counter", agent, prompt, {
+          idempotencyKey: workerId + ":" + prompt,
         })
-        const claim = yield* store.claimExecution({ runId: handle.runId, ownerId: workerId, commandId: prompt })
-        yield* executor.execute(claim)
-        const status = (yield* runtime.inspect(handle.runId)).status
+        yield* run.await
+        const status = (yield* host.runs.inspect(run.id)).status
         if (status !== "succeeded") throw new Error("Component consumer Run failed: " + status)
       }
     }).pipe(Effect.provide(services))

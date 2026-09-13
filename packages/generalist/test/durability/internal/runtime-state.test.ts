@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Queue, Schema } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
@@ -25,7 +26,6 @@ import { Address } from "../../../src/runtime/address.js"
 import { Cursor } from "../../../src/runtime/cursor.js"
 import { AgentExecutionFailure, type RuntimeUnavailable } from "../../../src/runtime/errors.js"
 import { ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { makeTest } from "../../../src/runtime/executable/manifest.js"
 import type { ExecutionCheckpoint } from "../../../src/runtime/execution/state.js"
@@ -710,7 +710,7 @@ describe("canonical runtime state", () => {
       const receipt = yield* provideScoped(
         runtimeLayer(),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const admitted = yield* runtime.send(input)
           const claim = yield* store.claimExecution({
@@ -726,7 +726,7 @@ describe("canonical runtime state", () => {
       const forked = yield* provideScoped(
         runtimeLayer(),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           expect(yield* runtime.send(input)).toEqual(receipt)
           const beforeRead = resolutions
@@ -745,7 +745,7 @@ describe("canonical runtime state", () => {
       yield* provideScoped(
         runtimeLayer(),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           expect(yield* runtime.send(input)).toEqual(receipt)
           const beforeRead = resolutions

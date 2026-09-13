@@ -6,7 +6,9 @@ import { makeCapability } from "../packages/generalist/src/core/durable/pin.js"
 import { make as makeToolManifest } from "../packages/generalist/src/core/durable/manifest/tool-manifest.js"
 import { make as makeExecutable } from "../packages/generalist/src/runtime/executable/manifest.js"
 import { layerStatic, type StaticToolExecutable } from "../packages/generalist/src/runtime/executable/resolver.js"
-import { Runtime, RunStore, RunExecutor } from "../packages/generalist/src/runtime/index.js"
+import { Runtime } from "../packages/generalist/src/runtime/engine.js"
+import { RunExecutor } from "../packages/generalist/src/runtime/execution/run-executor.js"
+import { RunStore } from "../packages/generalist/src/runtime/run/store.js"
 import { ObjectStore, type Service } from "../packages/generalist/src/durability/object-store.js"
 import { activate, layer } from "../packages/generalist/src/durability/index.js"
 import { layer as cryptoLayer } from "@effect/platform-bun/BunCrypto"
@@ -142,9 +144,9 @@ const program = Effect.gen(function* () {
   yield* within(
     Effect.gen(function* () {
       yield* activate
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const executor = yield* RunExecutor.RunExecutor
+      const runtime = yield* Runtime
+      const store = yield* RunStore
+      const executor = yield* RunExecutor
       const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
       const session = yield* host.sessions.create({ id: "coding-session" })
       const parent = yield* host.runs.start(session.id, agent, "Coordinate a fixed scripted coding workload")
@@ -237,8 +239,8 @@ const program = Effect.gen(function* () {
         )
           return yield* Effect.die("Cold recovery exceeded the fixed local regression bounds")
         const [auditElapsed] = yield* Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const runtime = yield* Runtime
+          const store = yield* RunStore
           for (const id of ids) {
             if ((yield* runtime.inspect(id)).status !== "succeeded")
               return yield* Effect.die(`Lost Tool outcome: ${id}`)
@@ -282,7 +284,7 @@ const program = Effect.gen(function* () {
   yield* within(
     Effect.gen(function* () {
       yield* activate
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       yield* runtime.cancel({ runId: pendingId, commandId: "cancel-pending", reason: "fixed-workload cancellation" })
       yield* runtime.cancel({ runId: parentId, commandId: "cancel-parent", reason: "fixed-workload retirement" })
     }),

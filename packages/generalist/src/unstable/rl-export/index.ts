@@ -13,7 +13,7 @@ import {
 } from "../../trajectory/index.js"
 import { fromTurn as modelOperation, ModelCall, TokenId } from "./model-call.js"
 import { RewardInvalid, type Service as RewardService } from "./reward.js"
-import type { RewardWriteError, RewardWriter } from "./reward-writer.js"
+import type { ExportRuntime, RewardWriteError } from "../../runtime/reward/writer.js"
 
 export * as Reward from "./reward.js"
 export { ModelCall } from "./model-call.js"
@@ -26,7 +26,7 @@ export {
   type RewardInput,
   type RewardWriteError,
   type RewardWriter,
-} from "./reward-writer.js"
+} from "../../runtime/reward/writer.js"
 
 /** Failures while projecting retained Runtime journals. @experimental */
 export type ProjectionError = FromJournalError
@@ -107,9 +107,7 @@ export interface Dag {
 }
 
 /** @experimental Cross-driver Runtime methods required by `dag`. */
-export interface DagRuntime extends JournalReader {
-  readonly rewards: RewardWriter
-}
+export type DagRuntime = ExportRuntime
 
 interface DagState {
   readonly runtime: DagRuntime

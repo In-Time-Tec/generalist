@@ -1,12 +1,11 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "../../../../src/index.js"
 import { identifyRequest } from "../../../../src/runtime/child/external/placement.js"
 import { ExternalChildStore } from "../../../../src/runtime/child/external/store.js"
 import { Address, Message } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
-import { RunStore } from "../../../../src/runtime/run/store.js"
-import type { ExecutionClaim } from "../../../../src/runtime/run/store.js"
+import { RunStore, type ExecutionClaim } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
   assistantRef,
@@ -42,9 +41,9 @@ const externalRoot = (id: string) =>
     return { placementId: `placement:${id}`, ...request, ...(yield* identifyRequest(request)) }
   })
 
-const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore | ExternalChildStore, E>) => {
+const suite = <E>(name: string, layer: Layer.Layer<Runtime | RunStore | ExternalChildStore, E>) => {
   let sequence = 0
-  const provide = <A, Failure>(effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore | ExternalChildStore>) =>
+  const provide = <A, Failure>(effect: Effect.Effect<A, Failure, Runtime | RunStore | ExternalChildStore>) =>
     provideScoped(layer, effect)
   const placement = (claim: ExecutionClaim, placementId: string) =>
     Effect.gen(function* () {
@@ -65,7 +64,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore | 
       }
     })
   const root = Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const id = `${name}:external:${sequence++}`
     return yield* runtime.send({
       to: assistantAddress,

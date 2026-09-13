@@ -1,9 +1,9 @@
-export const backgroundToolConsumer = `import { Crypto, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect"
+export const backgroundToolConsumer = `import { Crypto, Deferred, Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host, ToolIdentity } from "generalist/host"
 import * as Durability from "generalist/durability"
-import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import * as TestDurability from "generalist/testing/durability"
 
 const work = Tool.make("packed_work", { parameters: Schema.Struct({}), success: Schema.FiniteFromString })
@@ -49,7 +49,7 @@ await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
   }))
   const runtimeLayer = Durability.layer({
     environment: "package", tenant: "consumer", partition: "background", workerId: "packed-host",
-    addresses: [], schedulerMode: "external",
+    addresses: [],
   }).pipe(Layer.provide(Layer.mergeAll(
     TestDurability.layer(bucket), cryptoLayer, ExecutableResolver.layerStatic([]).pipe(Layer.orDie),
   )))
@@ -64,23 +64,14 @@ await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent }, tools: [work] })
     const session = yield* host.sessions.create({ id: "packed-session" })
     const parent = yield* host.runs.start(session.id, agent, "work")
-    const store = yield* RunStore.RunStore
-    const executor = yield* RunExecutor.RunExecutor
-    const execute = (runId) => store.claimExecution({ runId, ownerId: "packed-host", commandId: "execute:" + runId })
-      .pipe(Effect.flatMap(executor.execute))
-    const parentFiber = yield* execute(parent.id).pipe(Effect.forkChild)
-    const childId = yield* Deferred.await(admitted).pipe(Effect.raceFirst(Fiber.join(parentFiber).pipe(
-      Effect.andThen(parent.await), Effect.flatMap((value) => Effect.die("No receipt: " + value)),
+    const childId = yield* Deferred.await(admitted).pipe(Effect.raceFirst(parent.await.pipe(
+      Effect.flatMap((value) => Effect.die("No receipt: " + value)),
     )))
-    const childFiber = yield* execute(childId).pipe(Effect.forkChild)
-    yield* Fiber.join(parentFiber)
     if ((yield* parent.await) !== "continued" || calls !== 2) throw new Error("Parent did not continue")
-    if ((yield* store.inspect(childId)).status !== "running") throw new Error("Tool was not held open")
+    if ((yield* host.runs.inspect(childId)).status !== "running") throw new Error("Tool was not held open")
     yield* Deferred.succeed(release, undefined)
-    yield* Fiber.join(childFiber)
-    const history = yield* store.history({ runId: childId, cursor: -1, limit: 100 })
-    const completed = history.at(-1)
-    if (completed?._tag !== "RunCompleted" || completed.result.value !== "7") throw new Error("Typed output was not retained")
+    const child = yield* host.tools.get(work, childId)
+    if ((yield* child.await) !== 7) throw new Error("Typed output was not retained")
   }).pipe(Effect.provide(services))
 })))
 console.log("background Tool receipt and concurrent parent continuation verified")

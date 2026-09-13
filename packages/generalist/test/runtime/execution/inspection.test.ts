@@ -1,3 +1,4 @@
+import { Runtime as RuntimeRuntime, type RuntimeInspection } from "../../../src/runtime/engine.js"
 import { objectWorkerId } from "./object.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Schema } from "effect"
@@ -5,9 +6,7 @@ import { Response } from "effect/unstable/ai"
 import { expectTypeOf } from "vitest"
 import type { Agent } from "../../../src/index.js"
 import { Errors, ExecutableManifest, Run, RunEvent } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
-import type { RuntimeInspection } from "../../../src/runtime/engine.js"
 import { alternateAssistantRef, assistantAddress, objectLayer, openWait, suspension, textPrompt } from "./fixtures.js"
 
 expectTypeOf<RuntimeInspection>().toExtend<Agent.InspectionSnapshot>()
@@ -23,7 +22,7 @@ const activeCall = Schema.decodeSync(Response.ToolCallPart("active_tool", Schema
 layer(objectLayer)("Runtime inspection contracts", (it) => {
   it.effect("exposes canonical snapshot, finite history, list, and structured wait resolution", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -107,7 +106,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
 
   it.effect("derives raw usage only from canonical attempt events", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -216,7 +215,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
 
   it.effect("rejects conflicting call and compaction lifecycle projections", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -285,7 +284,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
 
   it.effect("requires call-before-attempt ordering and one attempt identity mapping", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const makeRun = (key: string) =>
         runtime.send({
@@ -366,7 +365,7 @@ layer(objectLayer)("Runtime inspection contracts", (it) => {
 
   it.effect("accepts one compaction failure and rejects a terminal turn mismatch", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,

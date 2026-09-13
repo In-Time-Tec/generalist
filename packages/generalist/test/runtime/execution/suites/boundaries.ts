@@ -1,3 +1,4 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { expect, it } from "@effect/vitest"
@@ -5,7 +6,6 @@ import { Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Stream } f
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, RunBudget } from "../../../../src/index.js"
 import { ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore, type Service as RunStoreService } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { AgentExecutionFailure, RuntimeUnavailable } from "../../../../src/runtime/errors.js"
@@ -96,7 +96,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
 
           const first = yield* scopedWith(layer())(
             Effect.gen(function* () {
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const store = yield* RunStore
               const receipt = yield* runtime.startExecution({
                 executable,
@@ -179,7 +179,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
 
           yield* scopedWith(layer())(
             Effect.gen(function* () {
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const store = yield* RunStore
               const host = yield* RunExecutor
               if ((yield* runtime.inspect(first.runId)).status !== "needs-resolution") {
@@ -315,7 +315,7 @@ it.live("replays a committed tool response across two interruptions and a budget
     for (const phase of ["write", "replay"] as const) {
       yield* scopedWith(layer())(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           if (phase === "write") {
             const receipt = yield* runtime.startExecution({
@@ -393,7 +393,7 @@ it.live("replays a committed tool response across two interruptions and a budget
     }
     yield* scopedWith(layer())(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         yield* host.execute(

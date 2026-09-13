@@ -1,9 +1,9 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Pins } from "../../../src/index.js"
 import { Approval, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
@@ -80,7 +80,7 @@ describe("durable Agent Programs", () => {
     suite.effect("dispatches and replays named operations", () =>
       Effect.gen(function* () {
         const runId = yield* executeProgramFixture
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
         expect(yield* store.getProgramOperation({ runId, operation: "echo" })).toMatchObject({
@@ -113,7 +113,7 @@ describe("durable Agent Programs", () => {
   )("authorizes before dispatch and resumes the exact approved operation once", (suite) => {
     suite.effect("authorizes once and resumes exactly", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const receipt = yield* runtime.send({
@@ -206,7 +206,7 @@ describe("durable Agent Programs", () => {
       ],
     }
     const suspend = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const host = yield* RunExecutor
       const receipt = yield* runtime.send({
@@ -233,7 +233,7 @@ describe("durable Agent Programs", () => {
     })
     const resume = Effect.suspend(() =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({
@@ -270,7 +270,7 @@ describe("durable Agent Programs", () => {
     const cancelled = approvalProgramFixture()
     const run = (fixture: ReturnType<typeof approvalProgramFixture>, resolution: "Denied" | "Cancel") =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const receipt = yield* runtime.send({
@@ -339,7 +339,7 @@ describe("durable Agent Programs", () => {
       runId = yield* executeProgramFixture
     })
     const reopen = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       expect((yield* runtime.snapshot(runId)).outcome).toMatchObject({
         _tag: "Succeeded",
@@ -368,7 +368,7 @@ describe("durable Agent Programs", () => {
 
   it.live("resolves a crashed non-idempotent Program operation without redispatch", () => {
     const verify = Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const host = yield* RunExecutor
       const receipt = yield* runtime.send({
@@ -461,7 +461,7 @@ describe("durable Agent Programs", () => {
         yield* scheduler.idle
       })
       const admit = Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: mapAddress,
@@ -476,7 +476,7 @@ describe("durable Agent Programs", () => {
       })
       const finishRun = (runId: string, finalizersBefore: number) =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const admitted = yield* store.getProgramOperation({ runId, operation: "workers" })
           const childRunIds = admitted?.childRunIds ?? []
@@ -515,7 +515,7 @@ describe("durable Agent Programs", () => {
       })
       const objectReopen = Effect.suspend(() => finishRun(objectRunId, objectFinalizersBefore))
       const cancelAdmitted = Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: mapAddress,

@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
@@ -10,7 +11,6 @@ import {
   ProgramHandlers,
 } from "../../../src/index.js"
 import { Address, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { registrationsFor } from "../execution/fixtures.js"
@@ -120,7 +120,7 @@ it.effect("assigns a fresh identity to every prototype-member operation on a for
   return provideScoped(
     fixture.layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const host = yield* RunExecutor
 

@@ -1,3 +1,4 @@
+import { Runtime as RuntimeRuntime, type Service } from "../../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
@@ -8,7 +9,6 @@ import { closedTestAgent, testExecutable } from "./identity.js"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
 import { maximumEventBytes } from "../../../src/runtime/execution/payload/index.js"
 import { Address, Errors, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import {
@@ -23,11 +23,11 @@ import {
 import { allowAllAuthorization } from "../../authorization.js"
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
-const steer = (runtime: Runtime.Service, runId: string, idempotencyKey: string, prompt: Prompt.Prompt | string) =>
+const steer = (runtime: Service, runId: string, idempotencyKey: string, prompt: Prompt.Prompt | string) =>
   runtime.send(runId, prompt, { idempotencyKey })
 
 const admitRun = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* RuntimeRuntime
   return yield* runtime.send({
     to: assistantAddress,
     sessionId: "session:steering",
@@ -46,7 +46,7 @@ const finish = Response.makePart("finish", {
 })
 
 const verifyInbox = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* RuntimeRuntime
   const store = yield* RunStore
   const receipt = yield* admitRun
   const first = Prompt.fromMessages([
@@ -186,7 +186,7 @@ layer(objectLayer)("Runtime durable steering object contract", (test) => {
 
   test.effect("cancellation wins while steering is pending", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -240,7 +240,7 @@ const backend = "object" as const
     (test) => {
       test.effect(`${backend} completion cannot resurrect cancellation through pending steering`, () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
@@ -279,7 +279,7 @@ const backend = "object" as const
 
       test.effect(`${backend} bounds direct steering without charging idempotent retries twice`, () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
@@ -345,7 +345,7 @@ const backend = "object" as const
 
       test.effect(`${backend} rejects a message over the per-event payload bound without mutation`, () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
@@ -406,7 +406,7 @@ it.live("persists accepted steering across an object-host close and reopen", () 
   const admit = provideScoped(
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const receipt = yield* admitRun
       runId = receipt.runId
       steeringReceipt = yield* steer(runtime, runId, "steer:reopen", "survive restart")
@@ -415,7 +415,7 @@ it.live("persists accepted steering across an object-host close and reopen", () 
   const reopen = provideScoped(
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       expect(yield* steer(runtime, runId, "steer:reopen", "survive restart")).toEqual(steeringReceipt)
       const claim = yield* store.claimExecution({
@@ -441,7 +441,7 @@ const lifecycleBackend = "object" as const
   layer(lifecycleLayer)(`${lifecycleBackend} steering terminal disposition`, (test) => {
     test.effect("discards every unconsumed entry on completion, failure, and cancellation", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const settle = (reason: "completed" | "failed" | "cancelled") =>
           Effect.gen(function* () {
@@ -518,7 +518,7 @@ it.live("atomically persists steering consumption and model scheduling before ob
   const schedule = provideScoped(
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const receipt = yield* admitRun
       runId = receipt.runId
@@ -597,7 +597,7 @@ it.live("atomically persists steering consumption and model scheduling before ob
   layer(runtimeLayer)("RunExecutor delivers durable steering in the next model operation", (test) => {
     test.effect("RunExecutor delivers durable steering in the next model operation", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const receipt = yield* runtime.send({
@@ -684,7 +684,7 @@ it.effect("steering admitted during model streaming does not interrupt it and re
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -791,7 +791,7 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({

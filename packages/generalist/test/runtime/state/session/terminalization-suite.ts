@@ -1,9 +1,9 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Cause, Effect, Layer, Option, Schema, Scope } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Pins, Session } from "../../../../src/index.js"
 import { Errors } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { CompletedModelResponse } from "../../../../src/runtime/run/event.js"
 import { assistantAddress, completedResult, objectLayer, textPrompt } from "../../execution/fixtures.js"
@@ -72,7 +72,7 @@ const scheduleToolCalls = (terminal: "cancelled" | "failed") => {
   const layer = objectLayer
   return scopedWith(layer)(
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const sessionId = `session:tool-terminalization:object:${terminal}`
       const receipt = yield* runtime.send({
@@ -325,7 +325,7 @@ it.effect("atomically closes unresolved tool calls on cancellation and failure i
 it.effect("rejects successful Run settlement while its Session still has an unresolved tool call", () =>
   scopedWith(objectLayer)(
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,

@@ -1,10 +1,10 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { DateTime, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Session } from "../../../../src/index.js"
 import type { Simulator } from "../../../../src/testing/durability/index.js"
 import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { assistantAddress, assistantRef, registrationsFor, resolverLayer } from "../../../runtime/execution/fixtures.js"
@@ -73,7 +73,7 @@ it.effect("reopens a Session entry with redacted provider headers and authored e
     yield* withObject(
       storage,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const runStore = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -209,7 +209,7 @@ it.effect("reuses equivalent durable payloads and rejects changed Session identi
     yield* withObject(
       storage,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const runStore = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -236,7 +236,7 @@ it.effect("reuses equivalent durable payloads and rejects changed Session identi
     yield* withObject(
       storage,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const runStore = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -355,7 +355,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
     )
     const runId = yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -378,7 +378,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
 
     yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const event = (yield* runtime.history({ runId, cursor: -1, limit: 100 })).find(
           (candidate) => candidate._tag === "ModelResponseCommitted",

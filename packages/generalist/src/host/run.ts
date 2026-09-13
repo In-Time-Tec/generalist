@@ -40,10 +40,7 @@ export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & {
     selection: string,
     prompt: Prompt.Prompt | string,
     options: ChildSpawnOptions,
-  ) => Effect.Effect<
-    ChildHandle,
-    SpawnError | InspectError | SessionError | import("../runtime/engine.js").GetRunError
-  >
+  ) => Effect.Effect<ChildHandle, SpawnError | InspectError | SessionError | import("../runtime/engine.js").GetRunError>
 }
 
 export const make = ({

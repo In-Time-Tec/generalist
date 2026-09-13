@@ -1,10 +1,10 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Gate, Hooks, ToolExecutor } from "../../src/index.js"
 import { Address, Errors, ExecutableResolver, Messaging, Steering } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import type { Service as ActiveExecutionsService } from "../../src/runtime/execution/active-executions.js"
@@ -92,7 +92,7 @@ const toolPolicy = (policy: "steer" | "session") =>
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         yield* store.createHostSession({ id: `session:${policy}-admission` })
@@ -190,7 +190,7 @@ it.effect("steering accepted during a blocking gate continues the run instead of
     yield* provideScoped(
       services,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const executor = yield* RunExecutor
         yield* runtime.register(agent)
@@ -271,7 +271,7 @@ it.effect("interrupt journals first, stops an in-flight tool, and creates an Unk
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const run = yield* runtime.send({
@@ -346,7 +346,7 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const run = yield* runtime.send({
@@ -382,7 +382,7 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
 )
 
 const completionLaneSelection = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* Runtime
   const store = yield* RunStore
   yield* store.createHostSession({ id: "session:mixed-completion-lanes" })
   const run = yield* runtime.send({
@@ -489,7 +489,7 @@ it.effect("completion continuations retain their lane and pass through onSteer",
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const run = yield* runtime.send({
@@ -529,7 +529,7 @@ it.effect("completion continuations retain their lane and pass through onSteer",
 layer(objectLayer)("rollback admission", (test) => {
   test.effect("rewinds to the previous TurnCompleted event before admitting exactly once", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const run = yield* runtime.send({
         to: assistantAddress,
@@ -656,7 +656,7 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const run = yield* runtime.send({
@@ -769,7 +769,7 @@ it.effect("rollback retains an unsafe running tool without redispatching replace
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const host = yield* RunExecutor
         const run = yield* runtime.send({
@@ -821,7 +821,7 @@ it.effect("rollback retains an unsafe running tool without redispatching replace
 layer(objectLayer)("admission retry side effects", (test) => {
   test.effect("interrupts at most once for exact interrupt and rollback retries", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const interrupts = yield* Ref.make(0)
       const active: ActiveExecutionsService = {
