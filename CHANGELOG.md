@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.66.1
+
+- Export the actor-owned `RunStore` and `RunExecutor` host controls from the unstable Rivet boundary so trusted actor integrations can preserve fixed-ID admission and exact execution-claim fencing without restoring those internals to the stable Runtime API.
+
 ## 0.66.0
 
 - Make scoped Runtime acquisition own readiness, admission fencing, replacement recovery, and retirement across process and actor hosts.

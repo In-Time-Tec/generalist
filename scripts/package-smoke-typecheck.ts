@@ -344,6 +344,19 @@ type HostedCommandServices = Assert<Equal<EffectServices<typeof hostedCommand>, 
 type ActorNamespace = Assert<Equal<ReturnType<Rivet.RuntimeActorOptions["namespace"]>, Rivet.RuntimeActorNamespace>>
 type FactoryStaticPartitionRemoved = Assert<Equal<"partition" extends keyof Rivet.RuntimeActorOptions ? true : false, false>>
 type CustomActorPartition = Assert<Equal<Rivet.ActorRuntimeOptions["partition"], string>>
+const rivetHostControls = (
+  store: Rivet.RunStoreService,
+  executor: Rivet.RunExecutorService,
+  admission: Rivet.AdmitStartInput,
+  claim: Rivet.ExecutionClaim,
+) => [
+  store.admitStart(admission),
+  store.loadExecution(claim.runId),
+  store.getOperationByKey({ runId: claim.runId, operationKey: "operation" }),
+  store.assertExecutionClaim(claim),
+  executor.interrupt(claim.runId),
+]
+void rivetHostControls
 class RequiredServerAuth extends Context.Service<RequiredServerAuth, { readonly token: string }>()(
   "generalist/package-smoke/RequiredServerAuth",
 ) {
