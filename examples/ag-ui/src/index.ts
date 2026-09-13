@@ -81,12 +81,20 @@ const executable = ExecutableManifest.make({
   root: pinnedAgent.pin,
   entries: [{ _tag: "Agent", ...pinnedAgent }],
 })
-const registrations = [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
-  pin,
-  codec: "ag-ui-example",
-  version: "1",
-  payload: { agent: agent.name },
-}))
+const registrations = [
+  {
+    pin: pinnedAgent.pin,
+    codec: "generalist/runtime/registered-agent",
+    version: "1",
+    payload: { agent: agent.name, revision: "1" },
+  },
+  ...[...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
+    pin,
+    codec: "ag-ui-example",
+    version: "1",
+    payload: { agent: agent.name },
+  })),
+]
 const resolver = ExecutableResolver.layerStatic([
   {
     executable,
@@ -168,10 +176,7 @@ const aguiRoute = Layer.merge(
       const input = Schema.decodeUnknownOption(statusRequest)(yield* request.json)
       if (Option.isNone(input)) return HttpServerResponse.empty({ status: 400 })
       const agui = yield* AGUI.AGUI
-      const current = yield* agui.snapshot(input.value.runId).pipe(
-        Effect.flatMap(decodeStatusSnapshot),
-        Effect.tapCause((cause) => Effect.logError(cause)),
-      )
+      const current = yield* agui.snapshot(input.value.runId).pipe(Effect.flatMap(decodeStatusSnapshot))
       return yield* HttpServerResponse.json({ status: current.snapshot.run.status })
     }),
   ),
