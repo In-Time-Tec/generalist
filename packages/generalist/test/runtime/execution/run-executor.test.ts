@@ -74,7 +74,10 @@ const finish = Response.makePart("finish", {
 
 const acknowledgementAddress = Address.make("agent:acknowledgement")
 
-const acknowledgementLayer = (storage: ReturnType<typeof makeObjectStorage>) => {
+const acknowledgementLayer = (
+  storage: ReturnType<typeof makeObjectStorage>,
+  observeClaim: (claim: Parameters<RunExecutor.Service["execute"]>[0]) => void = () => {},
+) => {
   const tool = Tool.make("acknowledgement_tool", {
     parameters: Schema.Struct({}),
     success: Schema.String,
@@ -111,7 +114,13 @@ const acknowledgementLayer = (storage: ReturnType<typeof makeObjectStorage>) => 
     }),
   )
   const executor = ToolExecutor.layerTest({
-    execute: () => Effect.succeed({ _tag: "Success" as const, result: "ok", encodedResult: "ok" }),
+    execute: () =>
+      Effect.gen(function* () {
+        const context = yield* ToolContext.ToolContext
+        if (context.executionClaim === undefined) return yield* Effect.die("Runtime execution claim is missing")
+        observeClaim(context.executionClaim)
+        return { _tag: "Success" as const, result: "ok", encodedResult: "ok" }
+      }),
   })
   const handlers = toolkit.toLayer({
     acknowledgement_tool: () => Effect.die("ToolExecutor test layer owns execution"),
@@ -142,7 +151,8 @@ const scopedWith =
 describe("RunExecutor", () => {
   it.live("resumes the exact unacknowledged event tail after an object-host reopen", () => {
     const storage = makeObjectStorage()
-    const layerObject = acknowledgementLayer(storage)
+    const claims: Array<Parameters<RunExecutor.Service["execute"]>[0]> = []
+    const layerObject = acknowledgementLayer(storage, (claim) => claims.push(claim))
     let runId = ""
     let acknowledgedSequence = -1
     let full: ReadonlyArray<RunEvent.RunEvent> = []
@@ -175,6 +185,11 @@ describe("RunExecutor", () => {
         expect(point.runId).toBe(runId)
         expect(point.sequence).toBe(acknowledgedSequence)
         expect(point.acknowledgedAt).toBeTypeOf("string")
+        expect(claims).toHaveLength(1)
+        expect(claims[0]?.runId).toBe(runId)
+        expect(claims[0]?.ownerId).toBe(objectWorkerId)
+        expect(claims[0]?.attemptFence).toBe(1)
+        expect(claims[0]?.session?.sessionId).toBe("session:host-acknowledgement")
       }),
     )
 

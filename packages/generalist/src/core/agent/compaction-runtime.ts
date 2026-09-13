@@ -123,6 +123,9 @@ export const make = (context: CompactionContext) => {
         Effect.gen(function* () {
           let path = yield* session.path()
           const projection = buildContext(path)
+          if (promptDigest(projection.content) === promptDigest(conversationOnly(transcript).content)) {
+            return cursorFromPath(path)
+          }
           const cursor = sessionTranscriptCursor(projection.content, transcript.content)
           if (Option.isNone(cursor)) {
             const checkpoint = path.at(-1)

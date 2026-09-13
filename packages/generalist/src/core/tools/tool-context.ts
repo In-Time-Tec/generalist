@@ -24,6 +24,19 @@ export interface Service {
   readonly attempt?: number
   readonly admittedAt?: string
   readonly deadline?: string
+  /** @internal Exact storage-issued authority for a Runtime-hosted tool call. */
+  readonly executionClaim?: {
+    readonly runId: string
+    readonly ownerId: string
+    readonly attemptFence: number
+    readonly session?: {
+      readonly sessionId: string
+      readonly runId: string
+      readonly ownerId: string
+      readonly runAttemptFence: number
+      readonly epoch: string
+    }
+  }
   /** @internal Exact live transcript available to child inheritance at a tool-spawn boundary. */
   readonly history?: Effect.Effect<Prompt.Prompt>
   /** @internal Parent definition used to attenuate process-local children. */

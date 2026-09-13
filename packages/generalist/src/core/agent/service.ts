@@ -307,6 +307,8 @@ export interface RunOptions {
     readonly attempt: number
     readonly admittedAt?: string
     readonly inheritedSandboxSnapshot?: Ref.Ref<string | undefined>
+    /** @internal Exact storage-issued authority propagated to Runtime-hosted tools. */
+    readonly executionClaim?: NonNullable<import("../tools/tool-context.js").Service["executionClaim"]>
   }
   /** First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number

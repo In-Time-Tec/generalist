@@ -8910,7 +8910,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               safeCheckpoint = checkpoint
             }),
         }
-        const events = yield* Agent.stream(agent, "", {
+        const events = yield* Agent.stream(agent, "continue", {
           logicalOperationId: "journal-restart",
           executableRef: executable.ref,
           driverCheckpoint: pending!,
