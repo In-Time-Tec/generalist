@@ -81,20 +81,12 @@ const executable = ExecutableManifest.make({
   root: pinnedAgent.pin,
   entries: [{ _tag: "Agent", ...pinnedAgent }],
 })
-const registrations = [
-  {
-    pin: pinnedAgent.pin,
-    codec: "generalist/runtime/registered-agent",
-    version: "1",
-    payload: { agent: agent.name, revision: "1" },
-  },
-  ...[...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
-    pin,
-    codec: "ag-ui-example",
-    version: "1",
-    payload: { agent: agent.name },
-  })),
-]
+const registrations = [...ExecutableRegistration.requiredPins(executable)].map((pin) => ({
+  pin,
+  codec: "generalist/runtime/registered-agent",
+  version: "1",
+  payload: { pin, revision: "1" },
+}))
 const resolver = ExecutableResolver.layerStatic([
   {
     executable,
