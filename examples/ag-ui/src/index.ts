@@ -168,7 +168,10 @@ const aguiRoute = Layer.merge(
       const input = Schema.decodeUnknownOption(statusRequest)(yield* request.json)
       if (Option.isNone(input)) return HttpServerResponse.empty({ status: 400 })
       const agui = yield* AGUI.AGUI
-      const current = yield* agui.snapshot(input.value.runId).pipe(Effect.flatMap(decodeStatusSnapshot))
+      const current = yield* agui.snapshot(input.value.runId).pipe(
+        Effect.flatMap(decodeStatusSnapshot),
+        Effect.tapCause((cause) => Effect.logError(cause)),
+      )
       return yield* HttpServerResponse.json({ status: current.snapshot.run.status })
     }),
   ),
