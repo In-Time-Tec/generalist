@@ -1,4 +1,4 @@
-import { Effect, Function, Layer, Option, Schema } from "effect"
+import { Context, Effect, Function, Layer, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
 import type { Agent } from "../../agent/service.js"
 import { make as makeLoopDriver, type LoopDriverOptions } from "../loop-driver.js"
@@ -11,6 +11,8 @@ import { initialize as initializeCapabilities } from "../../capability/state.js"
 import { LoopDriverState } from "../loop-driver-state.js"
 import { capabilitiesFor } from "../../agent/lifecycle/hosted/capability-binding.js"
 import type { HostedRunOptions } from "../../agent/lifecycle/hosted/options.js"
+import { CommandTool, type Registration } from "../component.js"
+import { namespace } from "../component/definition.js"
 
 const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
 
@@ -30,6 +32,37 @@ export const layerInline = (input: {
         ...input,
         journal,
         components: Option.getOrElse(components, () => []),
+        sessionState: Option.getOrUndefined(sessionState),
+      })
+    }),
+  )
+
+const layerWithComponents = (
+  input: {
+    readonly driver: DurableAgentDriver
+    readonly initial: DriverCheckpoint
+  },
+  discovered: ReadonlyArray<Registration>,
+): Layer.Layer<DriverInterpreter, DriverStateInvalid> =>
+  Layer.effect(
+    DriverInterpreter,
+    Effect.gen(function* () {
+      const hostJournal = yield* Effect.serviceOption(DriverJournal)
+      const components = yield* Effect.serviceOption(Registry)
+      const sessionState = yield* Effect.serviceOption(SessionState)
+      const registrations = new Map<string, Registration>()
+      for (const registration of [...Option.getOrElse(components, () => []), ...discovered]) {
+        const name = namespace(registration.descriptor)
+        const existing = registrations.get(name)
+        if (existing !== undefined && existing !== registration) {
+          return yield* DriverStateInvalid.make({ message: `Duplicate component namespace: ${name}` })
+        }
+        registrations.set(name, registration)
+      }
+      return yield* makeInterpreter({
+        ...input,
+        journal: Option.getOrElse(hostJournal, () => journalNoop),
+        components: [...registrations.values()],
         sessionState: Option.getOrUndefined(sessionState),
       })
     }),
@@ -67,6 +100,10 @@ export const layerForRun: {
       driverOptions = { ...driverOptions, modelCallOrdinalStart: options.modelCallOrdinalStart }
     }
     const driver = makeLoopDriver(driverOptions)
+    const components = Object.values(agent.toolkit.tools).flatMap((tool) => {
+      const registration = Context.getOption(tool.annotations, CommandTool)
+      return Option.isNone(registration) ? [] : [registration.value]
+    })
     const initial: Effect.Effect<DriverCheckpoint, DriverError | DriverStateInvalid> = Effect.gen(function* () {
       if (options.driverCheckpoint === undefined) {
         let driverInput: Parameters<typeof driver.initial>[0] = {
@@ -102,6 +139,8 @@ export const layerForRun: {
       }
       return checkpoint
     })
-    return Layer.unwrap(initial.pipe(Effect.map((checkpoint) => layerInline({ driver, initial: checkpoint }))))
+    return Layer.unwrap(
+      initial.pipe(Effect.map((checkpoint) => layerWithComponents({ driver, initial: checkpoint }, components))),
+    )
   },
 )

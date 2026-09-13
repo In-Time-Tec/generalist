@@ -29,7 +29,7 @@ import { ProjectionInvalid } from "../../policy/handoff-projection.js"
 import { Rejected } from "../../policy/handoff-rejected.js"
 import { PolicyError } from "../../turn/policy.js"
 import { PolicyInvalid } from "../../turn/steering.js"
-import { HookFailed } from "../../../hooks/index.js"
+import { CheckpointInvalid, HookFailed, LifecyclePersistenceFailed, ReplayUnresolved } from "../../../hooks/index.js"
 import { Suspended as NestedOperationSuspended } from "../../tools/nested-operation.js"
 import { GateFailed } from "../gates/definition.js"
 
@@ -38,6 +38,9 @@ export const RunError = Schema.Union([
   SinkFailed,
   InvocationLifecycleFailed,
   HookFailed,
+  LifecyclePersistenceFailed,
+  CheckpointInvalid,
+  ReplayUnresolved,
   GateFailed,
   AgentError,
   ChildExceedsParent,

@@ -9,6 +9,7 @@ import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.
 import { digest } from "../../../../src/core/durable/pin.js"
 import { make as makeBudget } from "../../../../src/core/durable/run-budget.js"
 import { encode as encodeHookInput } from "../../../../src/hooks/input.js"
+import { chainPin, make as makeHooks } from "../../../../src/hooks/internal.js"
 import { ExecutableManifest } from "../../../../src/runtime/index.js"
 import { HostedRun } from "../../../../src/core/agent/lifecycle/run-handle.js"
 import { externalRunInbox } from "../../../../src/core/turn/steering-inbox.js"
@@ -33,7 +34,7 @@ const fixture = Effect.fn("test.runEndContinuationFixture")(function* (complete:
         return Hooks.Continue()
       }),
   })
-  const hooks = Hooks.make({ declarations: [declaration] })
+  const hooks = makeHooks({ declarations: [declaration] })
   const input = {
     runId: id,
     agentName: agent.name,
@@ -49,7 +50,7 @@ const fixture = Effect.fn("test.runEndContinuationFixture")(function* (complete:
       kind: "hook",
       key: `${id}:hook:${digest({ checkpoint: "hook:run:end", index: 0, declaration: declaration.key })}`,
       input: {
-        chain: Hooks.chainPin([declaration]),
+        chain: chainPin([declaration]),
         event: "RunEnd",
         key: declaration.key,
         version: declaration.version,
@@ -61,7 +62,7 @@ const fixture = Effect.fn("test.runEndContinuationFixture")(function* (complete:
   )
   const interpreter = yield* makeInterpreter({ driver, initial })
   yield* interpreter.recordHookDecisions({
-    chain: Hooks.chainPin([declaration]),
+    chain: chainPin([declaration]),
     key: "hook:run:end",
     event: "RunEnd",
     decisions: [],

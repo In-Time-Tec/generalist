@@ -3,22 +3,22 @@ title: "Object durability"
 description: "Configure the shared object-storage engine, understand commit uncertainty, and recover a retained namespace."
 ---
 
-Use `generalist/durability` when accepted work must survive the process that accepted it. S3, native R2, and a local directory are transports for the same canonical engine and object format, not different Runtime backends. Ordinary `Agent.run` calls remain process-local and need no durable storage.
+Use `generalist/durability` when accepted work must survive the process that accepted it. S3-compatible storage and a local directory are transports for the same canonical engine and object format, not different Runtime backends. Ordinary `Agent.run` calls remain process-local and need no durable storage.
 
 All public exports remain `@experimental`. Clean v1 has no SQL Generalist backends, alternate production memory/filesystem Runtime, compatibility aliases, legacy readers, or migration path. Use fresh namespaces. Implementation is not full acceptance, release readiness, provider certification, or a verified performance claim.
 
 ## Local qualification without cloud credentials
 
-The repository's local acceptance uses the production S3 client against Docker-backed MinIO and native R2 against persistent Miniflare/workerd:
+The repository's local acceptance uses the production S3 client against Docker-backed MinIO:
 
 ```bash
 bun install --frozen-lockfile
 bun --bun vitest run packages/generalist/test/durability/object-store.test.ts --no-file-parallelism
 ```
 
-Use Bun 1.4.0 and a running Docker daemon. The suite provisions disposable local credentials and tests conditional creation, lost acknowledgements, service restart, and shared-bucket native/S3 contention through Miniflare's gateway. It does not require cloud accounts or model keys. Missing Docker or skipped service tests leave the local gate unmet.
+Use Bun 1.4.0 and a running Docker daemon. The suite provisions disposable local credentials and tests conditional creation, lost acknowledgements, and service restart. It does not require cloud accounts or model keys. Missing Docker or skipped service tests leave the local gate unmet.
 
-The local pins are MinIO `RELEASE.2025-04-22T22-12-26Z`, Miniflare `5.20260811.1-alpha`, and workerd `1.20260819.1`. The committed Miniflare patch corrects exact-EOF range handling (`offset >= size`). This is patched-emulator and gateway evidence, not AWS S3, deployed R2, or arbitrary S3-compatible-provider certification. Do not run remote qualification or request cloud credentials for local acceptance.
+The local MinIO pin is `RELEASE.2025-04-22T22-12-26Z`. This is emulator evidence, not AWS or arbitrary S3-compatible-provider certification. Do not run remote qualification or request cloud credentials for local acceptance.
 
 ## Prerequisites
 
@@ -89,7 +89,7 @@ await Effect.gen(function* () {
 }).pipe(Effect.scoped, Effect.provide(services), Effect.runPromise)
 ```
 
-The command prints a Run ID and the scripted answer. A second invocation uses the same Session and idempotency key to retrieve the accepted Run, rather than admitting another one. A new input under that identity is a conflict, not a request to overwrite the old Run. The owned Layer scope closes when the effect exits. For an explicit close/reopen comparison, run the [five-minutes](../../examples/five-minutes) example.
+The command prints a Run ID and the scripted answer. A second invocation uses the same Session and idempotency key to retrieve the accepted Run, rather than admitting another one. A new input under that identity is a conflict, not a request to overwrite the old Run. The owned Layer scope closes when the effect exits.
 
 `Durability.layer(options)` provides Runtime, RunStore, executor, and scheduler services. `layerRunStore(options)` provides storage without owning an execution loop. Both require an ObjectStore and Crypto; the full Runtime also requires `ExecutableResolver`. Neither selects a fallback store when configuration is missing.
 
@@ -150,18 +150,7 @@ const objects = S3.layer({
 })
 ```
 
-Use `region: "auto"` for the R2 S3 endpoint; other providers may require a different region. Set `forcePathStyle: true` only when the endpoint requires path-style addressing. `capabilities` is an operator assertion of documented, tested semantics, not a probe or certification. Do not set it merely to silence an initialization failure.
-
-Inside a Worker, native R2 avoids separate S3 credentials. This **binding fragment** receives the application's R2 binding:
-
-```ts
-import * as R2 from "generalist/durability/r2"
-
-declare const bucket: R2.Bucket
-const objects = R2.layer(bucket)
-```
-
-Provide this Layer to the same durability engine with a Worker-compatible Crypto Layer and executable resolver. [Cloudflare hosting](cloudflare.md) adds lifecycle integration. Read canonical state through the binding or direct object API, never an R2 public cached domain.
+Choose the provider's required region and set `forcePathStyle: true` only when the endpoint requires path-style addressing. `capabilities` is an operator assertion of documented, tested semantics, not a probe or certification. Do not set it merely to silence an initialization failure.
 
 For a single host — a laptop agent, a self-hosted node, or a test — `generalist/durability/fs` stores objects as immutable files in a dedicated local directory. Creates write a synced temporary file and install it with an atomic hard link, so concurrent writers produce exactly one winner; reads are byte-budgeted with optional ranges; listings decode, sort, and page keys. One key segment maps to one directory entry, so when an object key is a strict prefix of an already stored key — or a stored key occupies one of its segments — create fails with a typed `invalid-response`; the transport never reports a `conflict` that a direct read cannot observe. This **local fragment** points a Runtime at a directory:
 
@@ -179,15 +168,11 @@ A usable provider must preserve complete bytes, atomically create an absent key,
 
 `generalist/durability/object-store` exports the transport contract itself: the `Service` interface, the `ObjectStore` and `ObjectMaintenance` tags, `ObjectStoreFailure`, and the shared bound-validation and deadline helpers the first-party transports use. Implement `Service` to provide a custom backend — another provider's native API or an injected client — then qualify it with the `generalist/testing/durability` conformance suite (`atomicCreates`, `createOutcomeEvidence`, `freshReads`, `caseEquivalentKeys`, `listing`, `byteIntegrity`, `keySpellings`) and a close/reopen check before trusting a real namespace. Passing conformance establishes the interface contract only; it is not provider certification, and a host-local backend cannot be reached by a replacement host.
 
-S3, native R2, and a local directory are the shipped transports. An S3-shaped API alone is insufficient. Current qualification is local-only MinIO and Miniflare/workerd; AWS and deployed R2 are not certified. Simulator or emulator results do not certify a live provider. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
+S3-compatible storage and a local directory are the shipped transports. An S3-shaped API alone is insufficient. Current qualification is local-only MinIO; AWS and other live providers are not certified. Simulator or emulator results do not certify a live provider. No throughput, cold-recovery, memory ceiling, or cross-region latency claim is established here.
 
-## Local workload baseline
+## Performance evidence
 
-Run `bun scripts/durability-benchmark.ts` to collect a deterministic ObjectStore-simulator baseline. Each report records the exact source commit, dirty status, benchmark-script SHA-256, Bun/runtime platform, seed, page size, concurrency, payload sizes, metric definitions, and raw request/byte deltas, and is written under `artifacts/durability-benchmark/`.
-
-The baseline exercises hot-partition contention, independent partitions, a long admission history with fresh-layer recovery, bounded 64 KiB BlobStore payloads, release-and-reclaim owner replacement, and no-due-work scans. It reports p50, p95, p99, and maximum latency for durable admission, Runtime terminal outcome commit, reward mutation, state read, cold recovery, artifact write, owner replacement, and idle scans. The program fails if request/byte counters are negative or inconsistent, or if a no-due-work scan creates an object or attempts to write bytes. The payload workload stays within the BlobStore byte cap.
-
-This is a reproducible local simulator baseline, not a latency promise or provider benchmark. Its scripted Runtime workloads persist await-event suspensions, reopen fresh hosts, and complete through both a direct wake and an expired deadline processed by `LocalScheduler.tick` and `idle`; dispatch counters assert that neither path reruns the waiting tool. A deterministic two-client CAS workload pauses the first exact commit create, lets the second writer win, and asserts one losing-reducer retry before both commits recover. The report also measures a divergent idempotency conflict followed by exact retry and samples RSS/heap through the local process host boundary. Its `ToolOutput` workload retains and rereads the full result from a process-memory test callback, then verifies the actual UTF-8 preview length returned by the production bound; this is projection evidence, not durable BlobStore output persistence.
+Generalist does not publish a performance baseline. Any future performance claim requires a separately reviewed workload that records the exact source commit, runtime platform, seed, concurrency, payload sizes, metric definitions, and raw request/byte deltas. Unit tests are not benchmark evidence.
 
 The S3 transport uses ordinary general-purpose buckets and single-object writes. Bucket versioning, Object Lock, multipart conditional completion, native sidecars, and bucket administration are not normal Runtime requirements. Custom endpoints and injected clients must satisfy the declared guarantees. Unsupported semantics fail initialization instead of weakening conditional writes.
 
@@ -219,7 +204,7 @@ Large attachments belong in `BlobStore.layer({ environment, tenant, maxBytes? })
 
 The default process scheduler is scoped to the Runtime Layer. A supervisor must restart failed processes. For platform-managed wakeups use `schedulerMode: "external"` and await `LocalScheduler.drain({ fuel })`; its result reports `processed`, `hasMore`, and an optional `nextDueAt`.
 
-The canonical schedule or wait is authoritative; a successful alarm or schedule call is only a wake hint. Run an independent reconciler so a commit followed by failed wake delivery cannot strand accepted work. Cloudflare Durable Objects and Rivet actors host the same object authority. Their local state is not a second persistence model. See [hosts](hosts.md).
+The canonical schedule or wait is authoritative; a successful alarm or schedule call is only a wake hint. Run an independent reconciler so a commit followed by failed wake delivery cannot strand accepted work. Application-owned workers and the generic server use the same object authority; process-local state is not a second persistence model. See [hosts](hosts.md).
 
 ## Snapshots, retention, and garbage collection
 

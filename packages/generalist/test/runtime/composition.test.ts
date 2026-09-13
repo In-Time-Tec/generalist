@@ -15,8 +15,9 @@ import {
   Scope,
   Stream,
 } from "effect"
-import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
-import { Agent } from "generalist"
+import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
+import { Agent, AgentTool } from "generalist"
+import * as Components from "generalist/components"
 import { ObjectStore } from "generalist/durability/object-store"
 import { Runtime } from "generalist/runtime"
 import { TestClock } from "effect/testing"
@@ -85,6 +86,159 @@ class StorageBreach extends Schema.TaggedError<StorageBreach>()(
 ) {}
 
 describe("Runtime.layer", () => {
+  it.effect("discovers managed component tools once without executing user callbacks", () =>
+    Effect.gen(function* () {
+      let transitions = 0
+      let mappings = 0
+      const counter = Components.make({
+        key: "composition-counter",
+        instance: "default",
+        schemaVersion: "1",
+        handler: "increment",
+        handlerVersion: "1",
+        scope: "run",
+        maxStateBytes: 64,
+        maxCommandBytes: 64,
+        maxReceiptBytes: 4096,
+        state: Schema.Int,
+        command: Schema.Int,
+        initial: 0,
+        transition: (state, amount) => {
+          transitions++
+          return state + amount
+        },
+      })
+      const first = Components.commandTool({
+        name: "increment_one",
+        parameters: Schema.Struct({ amount: Schema.Int }),
+        toCommand: ({ amount }) => {
+          mappings++
+          return amount
+        },
+      })(counter)
+      const second = Components.commandTool({
+        name: "increment_two",
+        parameters: Schema.Struct({ amount: Schema.Int }),
+        toCommand: ({ amount }) => {
+          mappings++
+          return amount
+        },
+      })(counter)
+      const assistant = Agent.make({ name: "component-discovery", tools: [first, second] })
+
+      yield* acquire(
+        Runtime.layer({
+          agents: { "component-discovery": assistant },
+          revision: "component-discovery-v1",
+          services: modelLayer,
+          storage: storageLayer(),
+          namespace: { ...namespace, partition: "component-discovery" },
+        }),
+      )
+      expect(transitions).toBe(0)
+      expect(mappings).toBe(0)
+    }),
+  )
+
+  it.effect("discovers component conflicts on an implicitly registered fan-out child", () =>
+    Effect.gen(function* () {
+      const declare = (handlerVersion: string) =>
+        Components.make({
+          key: "transitive-component-conflict",
+          instance: "default",
+          schemaVersion: "1",
+          handler: "increment",
+          handlerVersion,
+          scope: "session",
+          maxStateBytes: 64,
+          maxCommandBytes: 64,
+          maxReceiptBytes: 4096,
+          state: Schema.Int,
+          command: Schema.Int,
+          initial: 0,
+          transition: (state, amount) => state + amount,
+        })
+      const first = Components.commandTool({
+        name: "transitive_increment_one",
+        parameters: Schema.Struct({ amount: Schema.Int }),
+        toCommand: ({ amount }) => amount,
+      })(declare("1"))
+      const second = Components.commandTool({
+        name: "transitive_increment_two",
+        parameters: Schema.Struct({ amount: Schema.Int }),
+        toCommand: ({ amount }) => amount,
+      })(declare("2"))
+      const child = Agent.make({ name: "transitive-component-child", toolkit: Toolkit.make(first, second) })
+      const delegate = AgentTool.fanOut({
+        name: "delegate_to_component_child",
+        description: "Delegate",
+        agents: { child: { agent: child } },
+        maxChildren: 1,
+      })
+      const root = Agent.make({ name: "transitive-component-root", tools: [delegate] })
+      const failure = yield* acquire(
+        Runtime.layer({
+          agents: { "transitive-component-root": root },
+          revision: "transitive-component-conflict-v1",
+          services: modelLayer,
+          storage: storageLayer(),
+          namespace: { ...namespace, partition: "transitive-component-conflict" },
+        }),
+      ).pipe(Effect.flip)
+
+      expect(failure).toMatchObject({
+        _tag: "generalist/runtime/RuntimeOptionsInvalid",
+        field: "agents",
+      })
+    }),
+  )
+
+  it.effect("rejects distinct managed declarations with one component namespace", () =>
+    Effect.gen(function* () {
+      const declare = (handlerVersion: string) =>
+        Components.make({
+          key: "composition-conflict",
+          instance: "default",
+          schemaVersion: "1",
+          handler: "increment",
+          handlerVersion,
+          scope: "run",
+          maxStateBytes: 64,
+          maxCommandBytes: 64,
+          maxReceiptBytes: 4096,
+          state: Schema.Int,
+          command: Schema.Int,
+          initial: 0,
+          transition: (state, amount) => state + amount,
+        })
+      const first = Components.commandTool({
+        name: "conflicting_one",
+        parameters: Schema.Struct({ amount: Schema.Int }),
+        toCommand: ({ amount }) => amount,
+      })(declare("1"))
+      const second = Components.commandTool({
+        name: "conflicting_two",
+        parameters: Schema.Struct({ amount: Schema.Int }),
+        toCommand: ({ amount }) => amount,
+      })(declare("2"))
+      const assistant = Agent.make({ name: "component-conflict", tools: [first, second] })
+      const failure = yield* acquire(
+        Runtime.layer({
+          agents: { "component-conflict": assistant },
+          revision: "component-conflict-v1",
+          services: modelLayer,
+          storage: storageLayer(),
+          namespace: { ...namespace, partition: "component-conflict" },
+        }),
+      ).pipe(Effect.flip)
+
+      expect(failure).toMatchObject({
+        _tag: "generalist/runtime/RuntimeOptionsInvalid",
+        field: "agents",
+      })
+    }),
+  )
+
   it.effect("rejects an empty revision", () =>
     Effect.gen(function* () {
       const assistant = Agent.make({ name: "assistant" })
@@ -285,16 +439,14 @@ describe("Runtime.layer", () => {
 
   it("fails compilation when a declared Agent service is missing", () => {
     const assistant = Agent.make({ name: "assistant-unclosed" })
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- This negative compile assertion intentionally constructs an invalid Runtime Layer.
-    const unclosed = Runtime.layer<{ readonly assistant: typeof assistant }, never, never, never, never>({
+    const unclosed: Runtime.Options<{ readonly assistant: typeof assistant }> = {
       agents: { assistant },
       revision: "assistant-v1",
       // @ts-expect-error the services Layer must close LanguageModel for this Agent
       services: Layer.empty,
       storage: storageLayer(),
       namespace,
-    })
-    // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The intentionally invalid Layer above carries its inferred missing requirement into this assertion.
+    }
     expect(unclosed).toBeDefined()
   })
 

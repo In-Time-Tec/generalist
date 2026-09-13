@@ -425,7 +425,7 @@ export const readinessForAdmission: {
     activeChildCount(state, parent) < parent.treePolicy.concurrency.agents ? "ready" : "queued",
 )
 
-const promoteInternalChildren = (state: RuntimeState, parent: StoredRun, initialActive: number) =>
+const promoteLocalChildren = (state: RuntimeState, parent: StoredRun, initialActive: number) =>
   Effect.gen(function* () {
     let next = state
     let active = initialActive
@@ -505,8 +505,8 @@ export const promoteChildCapacity: {
     if (parent === undefined || parent.cancellationRequested || parent.treePolicy.concurrency.agents === 0) {
       return state
     }
-    const [next, active] = yield* promoteInternalChildren(state, parent, activeChildCount(state, parent))
-    return yield* promoteExternalChildren(next, parent, active)
+    const [withLocalPromotions, active] = yield* promoteLocalChildren(state, parent, activeChildCount(state, parent))
+    return yield* promoteExternalChildren(withLocalPromotions, parent, active)
   }),
 )
 

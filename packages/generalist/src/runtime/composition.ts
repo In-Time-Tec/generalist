@@ -23,6 +23,7 @@ import {
   capture,
   captureWithExecutionServices,
   make as makeRegisteredAgents,
+  registrationGraphAgents,
   resolve as resolveRegisteredAgent,
   validateProfiles,
   type RegisteredAgent,
@@ -39,6 +40,9 @@ import {
 } from "./errors.js"
 import type { ErasedExecutionServicesFactory, ExecutionServicesFactory } from "./execution/scope.js"
 import { ExternalChildPeerRoutes } from "./child/external/reconciliation.js"
+import { CommandTool, type Registration as ComponentRegistration } from "../core/durable/component.js"
+import { namespace as componentNamespace } from "../core/durable/component/definition.js"
+import { Registry as ComponentRegistry } from "../core/durable/component/services.js"
 
 const MAX_REVISION_LENGTH = 255
 const MAX_NAME_LENGTH = 128
@@ -90,7 +94,7 @@ export interface RevisionRequest {
 export interface RevisionDefinition<Agents extends AgentRegistry, ServiceError = never, ServiceRequirements = never> {
   readonly agents: Agents
   readonly revision: string
-  readonly services: Layer.Layer<AgentServices<Agents[keyof Agents]>, ServiceError, ServiceRequirements>
+  readonly services: Layer.Layer<AgentServices<NoInfer<Agents>[keyof Agents]>, ServiceError, ServiceRequirements>
 }
 
 /** Result of one exact-revision lookup. */
@@ -130,7 +134,7 @@ export interface Options<
 > {
   readonly agents: Agents
   readonly revision: string
-  readonly services: Layer.Layer<AgentServices<NoInfer<Agents[keyof Agents]>>, ServiceError, ServiceRequirements>
+  readonly services: Layer.Layer<AgentServices<NoInfer<Agents>[keyof Agents]>, ServiceError, ServiceRequirements>
   readonly storage: Layer.Layer<ObjectStore | Crypto.Crypto, StorageError, StorageRequirements>
   readonly namespace: Namespace
   readonly scheduler?: {
@@ -180,8 +184,8 @@ export type ExecutionServicesOptions<
 > & {
   readonly services: Layer.Layer<BaseServices, ServiceError, ServiceRequirements>
   readonly executionServices: ExecutionServicesFactory<Agents, ExecutionServices, ExecutionRequirements>
-} & Covers<AgentServices<Agents[keyof Agents]>, BaseServices | ExecutionServices> &
-  Covers<AgentBoundaryServices<Agents[keyof Agents]>, BaseServices> &
+} & Covers<AgentServices<NoInfer<Agents>[keyof Agents]>, BaseServices | ExecutionServices> &
+  Covers<AgentBoundaryServices<NoInfer<Agents>[keyof Agents]>, BaseServices> &
   Covers<ExecutionRequirements, BaseServices | Runtime>
 
 /** One exact historical Agent/base/factory declaration. */
@@ -197,8 +201,8 @@ export type ExecutionRevisionDefinition<
   readonly revision: string
   readonly services: Layer.Layer<BaseServices, ServiceError, ServiceRequirements>
   readonly executionServices: ExecutionServicesFactory<Agents, ExecutionServices, ExecutionRequirements>
-} & Covers<AgentServices<Agents[keyof Agents]>, BaseServices | ExecutionServices> &
-  Covers<AgentBoundaryServices<Agents[keyof Agents]>, BaseServices> &
+} & Covers<AgentServices<NoInfer<Agents>[keyof Agents]>, BaseServices | ExecutionServices> &
+  Covers<AgentBoundaryServices<NoInfer<Agents>[keyof Agents]>, BaseServices> &
   Covers<ExecutionRequirements, BaseServices | Runtime>
 
 /** Result of one exact historical execution-service revision lookup. */
@@ -575,6 +579,37 @@ const invalidRegistration = (error: DuplicateAgent | ExecutableRegistrationInval
       error._tag === "generalist/runtime/DuplicateAgent" ? `Duplicate Agent name: ${error.agentName}` : error.message,
   })
 
+const withDiscoveredComponents = (
+  context: Context.Context<unknown>,
+  declared: ReadonlyArray<AnyAgent>,
+): Effect.Effect<Context.Context<unknown>, RuntimeOptionsInvalid> =>
+  Effect.gen(function* () {
+    const advanced = Option.getOrElse(Context.getOption(context, ComponentRegistry), () => [])
+    const registered = yield* registrationGraphAgents(declared).pipe(Effect.mapError(invalidRegistration))
+    const discovered = registered.flatMap((agent) =>
+      Object.values(agent.toolkit.tools).flatMap((tool) => {
+        const registration = Context.getOption(tool.annotations, CommandTool)
+        return Option.isNone(registration) ? [] : [registration.value]
+      }),
+    )
+    const registrations: Array<ComponentRegistration> = []
+    const byNamespace = new Map<string, ComponentRegistration>()
+    for (const registration of [...advanced, ...discovered]) {
+      const name = componentNamespace(registration.descriptor)
+      const existing = byNamespace.get(name)
+      if (existing === registration) continue
+      if (existing !== undefined) {
+        return yield* RuntimeOptionsInvalid.make({
+          field: "agents",
+          message: `Duplicate component namespace: ${name}`,
+        })
+      }
+      byNamespace.set(name, registration)
+      registrations.push(registration)
+    }
+    return registrations.length === 0 ? context : Context.add(context, ComponentRegistry, registrations)
+  })
+
 /** Register every declared Agent into one fresh registry over the supplied service context. */
 const registerClosure = (
   declared: ReadonlyArray<AnyAgent>,
@@ -675,10 +710,11 @@ const makeResolver = (
         const loadedContext = Context.merge(environment, services).pipe(
           Context.add(AgentRuntimePartition, options.namespace.partition),
         )
-        const loadedBase =
-          definition.executionServices === undefined ? loadedContext : Context.omit(Scope.Scope)(loadedContext)
-        const agents = makeRegisteredAgents()
         const declared = Object.values(definition.agents)
+        const componentContext = yield* withDiscoveredComponents(loadedContext, declared)
+        const loadedBase =
+          definition.executionServices === undefined ? componentContext : Context.omit(Scope.Scope)(componentContext)
+        const agents = makeRegisteredAgents()
         const pinByAgent = yield* registerClosure(
           declared,
           definition.revision,
@@ -751,7 +787,7 @@ const make = (options: AnyOptions) =>
       const built = yield* Layer.build(inner).pipe(Effect.provide(kernelServices))
       const runtime = Context.get(built, EngineRuntime)
       const declared = Object.values(options.agents)
-      const mergedServices = Context.merge(environment, services)
+      const mergedServices = yield* withDiscoveredComponents(Context.merge(environment, services), declared)
       const registrationContext =
         options.executionServices === undefined ? mergedServices : Context.omit(Scope.Scope)(mergedServices)
       for (const agent of declared) {

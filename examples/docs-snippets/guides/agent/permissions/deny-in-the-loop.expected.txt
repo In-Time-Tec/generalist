@@ -1,1 +1,0 @@
-drop_table authorization: Schema changes require a migration

@@ -11,22 +11,15 @@ import { emptySession } from "../../../../src/runtime/state/projection.js"
 import { rewoundSession } from "../../../../src/runtime/state/store/fork/history.js"
 
 const component = make({
-  descriptor: {
-    version: "1",
-    key: "session-state",
-    instance: "default",
-    schemaVersion: "1",
-    handler: "replace",
-    handlerVersion: "1",
-    scope: "session",
-    access: "session-owner",
-    inheritance: "none",
-    branch: "restore",
-    redaction: "visible",
-    maxStateBytes: 64,
-    maxCommandBytes: 64,
-    maxReceiptBytes: 4096,
-  },
+  key: "session-state",
+  instance: "default",
+  schemaVersion: "1",
+  handler: "replace",
+  handlerVersion: "1",
+  scope: "session",
+  maxStateBytes: 64,
+  maxCommandBytes: 64,
+  maxReceiptBytes: 4096,
   state: Schema.NullOr(Schema.Int),
   command: Schema.NullOr(Schema.Int),
   initial: null,
@@ -51,11 +44,23 @@ it.effect("requires explicit Session owner access and no automatic child inherit
     expect(Schema.is(Descriptor)({ ...implicit, access: "parent-write", inheritance: "shared" })).toBe(false)
     const input = yield* setup
     const unbound = yield* makeInterpreter({ ...input, sessionState: undefined })
-    expect(Exit.isFailure(yield* Effect.exit(unbound.componentRead(component.registration.capability)))).toBe(true)
-    expect(Exit.isFailure(yield* Effect.exit(unbound.componentCommand(command)))).toBe(true)
+    expect(yield* unbound.componentRead(component.registration.capability).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/components/ComponentAccessDenied",
+      scope: "session",
+    })
+    expect(yield* unbound.componentCommand(command).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/components/ComponentAccessDenied",
+      scope: "session",
+    })
     const child = yield* makeInterpreter({ ...input, sessionState: { sessionId: "child", components: [] } })
-    expect(Exit.isFailure(yield* Effect.exit(child.componentRead(component.registration.capability)))).toBe(true)
-    expect(Exit.isFailure(yield* Effect.exit(child.componentCommand(command)))).toBe(true)
+    expect(yield* child.componentRead(component.registration.capability).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/components/ComponentAccessDenied",
+      sessionId: "parent",
+    })
+    expect(yield* child.componentCommand(command).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/components/ComponentAccessDenied",
+      sessionId: "parent",
+    })
     expect(yield* Schema.decodeUnknownEffect(LoopDriverState)((yield* child.checkpoint).state)).toMatchObject({
       sessionId: "parent",
       components: [],
@@ -71,7 +76,10 @@ it.effect("rejects missing Session registrations and changed pins before dispatc
     const initial = yield* writer.checkpoint
     const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(initial.state)
     const sessionState = { sessionId: "parent", components: state.components ?? [] }
-    expect(Exit.isFailure(yield* Effect.exit(validate(sessionState.components, [])))).toBe(true)
+    expect(yield* validate(sessionState.components, []).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/components/ComponentUnavailable",
+      reason: "not-registered",
+    })
     const missing = yield* makeInterpreter({ ...input, initial, sessionState, components: [] })
     expect(
       Exit.isFailure(
@@ -92,7 +100,15 @@ it.effect("rejects missing Session registrations and changed pins before dispatc
     ).toBe(true)
     expect(yield* missing.recorded).toEqual([])
     const changed = make({
-      descriptor: { ...component.registration.descriptor, handlerVersion: "2" },
+      key: component.registration.descriptor.key,
+      instance: component.registration.descriptor.instance,
+      schemaVersion: component.registration.descriptor.schemaVersion,
+      handler: component.registration.descriptor.handler,
+      handlerVersion: "2",
+      scope: component.registration.descriptor.scope,
+      maxStateBytes: component.registration.descriptor.maxStateBytes,
+      maxCommandBytes: component.registration.descriptor.maxCommandBytes,
+      maxReceiptBytes: component.registration.descriptor.maxReceiptBytes,
       state: component.state,
       command: component.command,
       initial: null,
@@ -100,10 +116,13 @@ it.effect("rejects missing Session registrations and changed pins before dispatc
     })
     const incompatible = yield* makeInterpreter({ ...input, initial, sessionState, components: [changed.registration] })
     expect(
-      Exit.isFailure(
-        yield* Effect.exit(incompatible.componentCommand({ ...command, capability: changed.registration.capability })),
-      ),
-    ).toBe(true)
+      yield* incompatible
+        .componentCommand({ ...command, capability: changed.registration.capability })
+        .pipe(Effect.flip),
+    ).toMatchObject({
+      _tag: "generalist/components/ComponentUnavailable",
+      reason: "wrong-version",
+    })
   }),
 )
 

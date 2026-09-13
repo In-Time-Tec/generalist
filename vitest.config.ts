@@ -2,9 +2,7 @@ import { availableParallelism } from "node:os"
 import { fileURLToPath } from "node:url"
 import { configDefaults, defineConfig } from "vitest/config"
 import generalistManifest from "./packages/generalist/package.json" with { type: "json" }
-import { RuntimeDriverReport } from "./scripts/runtime-driver-report"
 
-const repositoryRoot = fileURLToPath(new URL(".", import.meta.url))
 const generalistRoot = new URL("./packages/generalist/", import.meta.url)
 const generalistExports: Readonly<Record<string, { readonly import: string }>> = generalistManifest.exports
 const localSchedulerTest = "packages/generalist/test/runtime/execution/local-scheduler.test.ts"
@@ -42,18 +40,7 @@ export default defineConfig({
      */
     alias: generalistSourceAliases,
   },
-  plugins: [
-    {
-      name: "workspace-at-alias",
-      resolveId(source: string, importer: string | undefined) {
-        if (!source.startsWith("@/") || importer === undefined) return undefined
-        return `${repositoryRoot}examples/deep-research-agent/web/src/${source.slice(2)}.ts`
-      },
-    },
-  ],
   test: {
-    env: { RIVETKIT_STORAGE_PATH: `/tmp/generalist-rivetkit-${process.pid}` },
-    reporters: ["default", new RuntimeDriverReport()],
     maxWorkers: Math.min(4, availableParallelism()),
     testTimeout: 60_000,
     hookTimeout: 60_000,
@@ -70,12 +57,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: "parallel",
-          include: [
-            "packages/**/test/**/*.test.ts",
-            "examples/**/test/**/*.test.ts",
-            "examples/**/src/**/*.test.ts",
-            "test/**/*.test.ts",
-          ],
+          include: ["packages/**/test/**/*.test.ts"],
           exclude: [...configDefaults.exclude, localSchedulerTest],
           sequence: { groupOrder: 1 },
         },

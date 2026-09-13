@@ -91,9 +91,8 @@ one synchronized lifecycle. Failures are `OAuthPending`, `OAuthDenied`,
   reconstruction data contains only a host-owned secret reference.
 - Generalist toolkits can be registered directly with Effect's
   `McpServer.toolkit`; no Generalist server wrapper is required.
-- `examples/mcp-toolkit-server` explicitly uses the legacy `2025-06-18`
-  Streamable HTTP adapter. Effect has no `2026-07-28` adapter yet, so the example
-  is not evidence of current-revision support.
+- Effect's Streamable HTTP adapter currently targets the legacy `2025-06-18`
+  revision. It is not evidence of current-revision support.
 - There is no generic `serveAgent()`: a host must expose bounded tools because
   prompt visibility, budgets, cancellation, tenant scope, and approvals cannot
   be inferred safely.

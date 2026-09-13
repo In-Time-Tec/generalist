@@ -4,13 +4,13 @@
 
 An agent handling a support case or waiting for approval shouldn't lose its work when a server restarts. Generalist turns disposable agent sessions into durable workers in TypeScript, built on [Effect](https://effect.website).
 
-The optional Runtime records accepted work in object storage so another host can recover it. One engine supports S3, native R2, and a single-host local directory; local processes, servers, Cloudflare Durable Objects, and Rivet actors are replaceable compute hosts. Commands serialize within a partition, not across the whole application. If an external action's outcome is uncertain, recovery surfaces it for resolution rather than assuming it is safe to repeat.
+The optional Runtime records accepted work in object storage so another host can recover it. One engine supports S3-compatible storage and a single-host local directory; application-owned processes and the generic server are replaceable compute hosts. Commands serialize within a partition, not across the whole application. If an external action's outcome is uncertain, recovery surfaces it for resolution rather than assuming it is safe to repeat.
 
 Don't need recovery yet? Use the process-local Effect agent loop on its own: call a model, execute tools, and continue to an answer. It needs no storage or Runtime.
 
 ## Run your first agent
 
-This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs. To run directly from a checkout, use the [repository examples](examples/).
+This process-local example uses OpenAI. You will need an API key and Bun 1.4+; model calls incur provider costs.
 
 ```bash
 bun add generalist effect@4.0.0-rc.112 @effect/ai-openai@4.0.0-rc.112
@@ -22,18 +22,18 @@ Save this as `index.ts` and run `bun index.ts`:
 ```ts
 import { Config, Console, Effect, Layer } from "effect"
 import { FetchHttpClient } from "effect/unstable/http"
+import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai"
 import { Agent } from "generalist"
-import { layerConfig, layerModel } from "generalist/providers/openai"
 
 const assistant = Agent.make({
   name: "assistant",
   instructions: "Give short, practical answers.",
 })
 
-const model = layerModel({ model: "gpt-4o-mini" }).pipe(
-  Layer.provide(layerConfig({ apiKey: Config.redacted("OPENAI_API_KEY") })),
+const client = OpenAiClient.layerConfig({ apiKey: Config.redacted("OPENAI_API_KEY") }).pipe(
   Layer.provide(FetchHttpClient.layer),
 )
+const model = OpenAiLanguageModel.model("gpt-4o-mini").pipe(Layer.provide(client))
 
 await Agent.run(assistant, "When would I use an AI agent instead of a single model call?").pipe(
   Effect.provide(model),
@@ -58,20 +58,19 @@ await Agent.run(assistant, "When would I use an AI agent instead of a single mod
 | Test without calling a model API      | [Testing](docs/features/testing.md)                     |
 | Recover work after a restart          | [Durable Runtime](docs/features/runtime.md)             |
 
-Durable execution uses one object-storage engine through `generalist/durability`, with S3, native R2, and local-directory transports. There is no production memory or filesystem durability backend. You do not need storage or Runtime for the process-local agent loop. Start with the [object durability guide](docs/features/durable-stores.md); the [host comparison](docs/features/hosts.md) separates host integration from provider conformance.
+Durable execution uses one object-storage engine through `generalist/durability`, with S3-compatible and local-directory transports. There is no production memory Runtime; the directory transport is canonical state for one machine. You do not need storage or Runtime for the process-local agent loop. Start with the [object durability guide](docs/features/durable-stores.md); the [generic server guide](docs/features/server.md) covers authenticated command and observation routes.
 
 ## Documentation and examples
 
 - [Documentation site source](docs/) — the code-first docs (Foldkit + StyleX), run `bun run dev` to preview
 - [Feature reference](docs/features/) · [Decision records](docs/decisions/) · [Tradeoffs](docs/tradeoffs/)
-- [Example projects](examples/)
 - [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Changelog](CHANGELOG.md)
 
 ## Status
 
 Generalist is pre-1.0: APIs can change between releases. It currently requires `effect@4.0.0-rc.112` and Node 22+ or Bun 1.4+. Public exports are marked `@experimental` while Effect AI is unstable. Install optional Effect provider and platform packages at the matching version.
 
-Local qualification uses MinIO and Miniflare/workerd, not live AWS S3 or deployed R2. Local performance measurements are not production latency or throughput guarantees. Use fresh object namespaces; there is no compatibility reader or migration fallback.
+Local qualification uses MinIO, not live AWS or another S3-compatible provider. Local performance measurements are not production latency or throughput guarantees. Use fresh object namespaces; there is no compatibility reader or migration fallback.
 
 Everything ships in the `generalist` package. Imports such as `generalist/runtime` and `generalist/durability/s3` are subpaths, not separate packages. The durability contract is intended to be the long-term storage boundary, but remains `@experimental`; that intent is not provider certification or a performance claim.
 

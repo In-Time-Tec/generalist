@@ -35,7 +35,7 @@ For every error below, the final segment of the tag names when it fires at the n
 
 ## Instructions, learning, and memory
 
-`PackageCatalogError`, `PackageIntegrityMismatch`, `generalist/instructions/AuthorshipRejected`, `generalist/instructions/RefinementRejected`, `generalist/instructions/SnapshotInvalid`, `generalist/instructions/SnapshotMismatch`, `generalist/instructions/StoreError`, `generalist/learning/ConsolidationInvalid`, `generalist/memory/SupermemoryError`, `generalist/memory/VectorStoreError`.
+`PackageCatalogError`, `PackageIntegrityMismatch`, `generalist/instructions/AuthorshipRejected`, `generalist/instructions/RefinementRejected`, `generalist/instructions/SnapshotInvalid`, `generalist/instructions/SnapshotMismatch`, `generalist/instructions/StoreError`, `generalist/learning/ConsolidationInvalid`, `generalist/memory/VectorStoreError`.
 
 ## REPL and sandbox
 

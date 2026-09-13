@@ -1,5 +1,0 @@
-allow
-deny
-ask
-ask
-true

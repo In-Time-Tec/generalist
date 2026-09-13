@@ -1,11 +1,9 @@
-import { type LayerOptions, Runtime } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
-import { Config, Deferred, Effect, Fiber, Layer, Option, Redacted, Schema, Stream } from "effect"
+import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index.js"
-import { layer } from "../../../../src/ai/provider/openrouter.js"
 import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore, type ExecutionClaim, type WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
@@ -19,8 +17,8 @@ import { allowAllAuthorization } from "../../../authorization.js"
 export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
-    options: LayerOptions,
-  ) => Layer.Layer<Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
+    options: Runtime.LayerOptions,
+  ) => Layer.Layer<Runtime.Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -39,29 +37,6 @@ const finish = Response.makePart("finish", {
 })
 const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
 
-const openRouterChunk = (delta: { readonly reasoning?: string; readonly content?: string }): string =>
-  JSON.stringify({
-    id: "generation-1",
-    choices: [{ delta, index: 0 }],
-    created: 1,
-    model: "router-test",
-    object: "chat.completion.chunk",
-  })
-
-const terminalDecodeResponse = [
-  openRouterChunk({ reasoning: "thinking" }),
-  openRouterChunk({ content: "partial answer" }),
-  JSON.stringify({
-    id: "generation-1",
-    choices: "invalid",
-    created: 1,
-    model: "router-test",
-    object: "chat.completion.chunk",
-  }),
-]
-  .map((data) => `data: ${data}\n\n`)
-  .join("")
-
 export const operationRecoverySuite = <StoreError, Extra = never>(
   options: OperationRecoverySuiteOptions<StoreError, Extra>,
 ) => {
@@ -78,80 +53,6 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
       : options.claim(runId, ownerId)
 
   describeBackend(`running operation recovery (${options.name})`, () => {
-    it.live("settles a terminal OpenRouter stream decode failure without making the model operation unknown", () => {
-      let providerCalls = 0
-      const client = HttpClient.make((request) =>
-        Effect.sync(() => {
-          providerCalls += 1
-          return HttpClientResponse.fromWeb(
-            request,
-            new globalThis.Response(terminalDecodeResponse, {
-              status: 200,
-              headers: { "content-type": "text/event-stream" },
-            }),
-          )
-        }),
-      )
-      const agent = Agent.make({
-        name: `terminal-stream-decode-${options.name}`,
-        model: { provider: "openrouter", model: "router-test" },
-      })
-      const executable = testExecutable(agent, `terminal-stream-decode-${options.name}-v1`)
-      const model = layer({
-        model: "router-test",
-        apiKey: Config.succeed(Redacted.make("test-key")),
-      }).pipe(Layer.provide(Layer.succeed(HttpClient.HttpClient, client)))
-      const resolverLayer = ExecutableResolver.layerStatic([
-        { executable, agent: Agent.close(agent, Layer.mergeAll(allowAllAuthorization, model.pipe(Layer.orDie))) },
-      ]).pipe(Layer.orDie)
-
-      return provideScoped(
-        options.makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(Layer.provide(resolverLayer)),
-        Effect.gen(function* () {
-          const runtime = yield* Runtime
-          const store = yield* RunStore
-          const host = yield* RunExecutor
-          const receipt = yield* runtime.startExecution({
-            executable,
-            registrations: registrationsFor(executable),
-            sessionId: `session:terminal-stream-decode:${options.name}`,
-            idempotencyKey: `terminal-stream-decode:${options.name}`,
-            prompt: textPrompt("decode the response"),
-          })
-          const executionClaim = yield* claim(receipt.runId, `terminal-stream-decode-${options.name}`)
-          yield* host.execute(executionClaim)
-
-          const history = yield* runtime.history({ runId: receipt.runId, cursor: -1, limit: 100 })
-          const tags = history.map((event) => event._tag)
-          const operation = yield* store.getOperationByKey({
-            runId: receipt.runId,
-            operationKey: `${receipt.runId}:model:0:0:conversation`,
-          })
-          expect(providerCalls).toBe(1)
-          expect(history).toContainEqual(
-            expect.objectContaining({
-              _tag: "ModelAttemptFailed",
-              category: "stream-decode",
-              classification: "terminal",
-              disposition: "terminal",
-            }),
-          )
-          expect(history).toContainEqual(
-            expect.objectContaining({
-              _tag: "ModelCallFailed",
-              category: "stream-decode",
-              classification: "terminal",
-            }),
-          )
-          expect(operation).toMatchObject({ kind: "model", replayPolicy: "never", status: "failed" })
-          expect((yield* runtime.inspect(receipt.runId)).status).toBe("failed")
-          expect(tags).toContain("ModelResponseInterrupted")
-          expect(tags).toContain("RunFailed")
-          expect(tags).not.toContain("OperationUnknown")
-        }),
-      )
-    })
-
     it.live("persists one bounded tool outcome across operation, event, Session, and provider input", () => {
       const raw = `raw-tool-sentinel:${"x".repeat(60 * 1024)}`
       const tool = Tool.make("large_result", { parameters: Schema.Struct({}), success: Schema.String })
@@ -210,7 +111,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           })
           .pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
-          const runtime = yield* Runtime
+          const runtime = yield* Runtime.Runtime
           const store = yield* RunStore
           const host = yield* RunExecutor
           const receipt = yield* runtime.send({
@@ -296,7 +197,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             ),
           ),
         Effect.gen(function* () {
-          const runtime = yield* Runtime
+          const runtime = yield* Runtime.Runtime
           const store = yield* RunStore
           const receipt = yield* runtime.startExecution({
             executable: assistantRef,
@@ -448,7 +349,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.send({
@@ -582,7 +483,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.send({

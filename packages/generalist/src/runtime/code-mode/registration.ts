@@ -4,7 +4,7 @@ import { Prompt, Response, Toolkit } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../../core/agent/lifecycle/definition.js"
 import { encode as encodeAgentInput } from "../../core/agent/lifecycle/input.js"
 import { setupToolAuthorizer } from "../../core/agent/lifecycle/setup.js"
-import { managedToolHandlers } from "../../core/artifact.js"
+import { managedToolHandlers } from "../../core/tools/managed-tool.js"
 import type { PinnedAgent, ProgramAuthority } from "../../core/durable/manifest/agent-manifest.js"
 import { digest, makeCapability, type CapabilityPin } from "../../core/durable/pin.js"
 import {
@@ -201,7 +201,6 @@ export const bind = (input: {
             Schema.decodeUnknownEffect(tool.parametersSchema, { onExcessProperty: "error" })(encoded).pipe(
               Effect.provideContext(input.context),
               Effect.map((parameters): Invocation => {
-                let operation: string | undefined
                 const callFor = (id: string) =>
                   Response.makePart("tool-call", {
                     id,
@@ -211,7 +210,6 @@ export const bind = (input: {
                   })
                 return {
                   authorize: (currentOperation) => {
-                    operation = currentOperation
                     const call = callFor(currentOperation)
                     return Effect.gen(function* () {
                       const decision = yield* authorizer!
@@ -256,51 +254,49 @@ export const bind = (input: {
                       }
                     })
                   },
-                  execute: Effect.scoped(
-                    Effect.gen(function* () {
-                      if (operation === undefined) {
-                        return yield* ProgramInvocationFailure.make({ cause: "Tool execution was not authorized" })
-                      }
-                      const signal = yield* Effect.abortSignal
-                      const toolContext = ToolContext.of({
-                        signal,
-                        emit: () => Effect.succeed(true),
-                        sessionId: `code-mode:${runId}`,
-                        runId,
-                        rootRunId: runId,
-                        toolCallId: operation,
-                        operationKey: operation,
-                        idempotencyKey: operation,
-                      })
-                      const call = callFor(operation)
-                      const managed = managedToolHandlers(tool)
-                      const context = Context.add(
-                        managed === undefined ? input.context : Context.merge(input.context, managed),
-                        ToolContext,
-                        toolContext,
-                      )
-                      const outcome = yield* executeToolkit(toolkit!, {
-                        call,
-                        toolCallBatch: { calls: [call] },
-                        turn: 0,
-                        toolCallIndex: 0,
-                        agentName: input.owner.name,
-                        sessionId: `code-mode:${runId}`,
-                      }).pipe(
-                        Effect.provideContext(context),
-                        Effect.mapError((cause) => ProgramInvocationFailure.make({ cause })),
-                      )
-                      if (outcome._tag === "Success") return outcome.result
-                      if (outcome._tag === "Suspend") {
-                        return yield* ProgramSuspended.make({
-                          operation,
-                          reason: "tool-wait",
-                          token: outcome.token,
+                  execute: (operation) =>
+                    Effect.scoped(
+                      Effect.gen(function* () {
+                        const signal = yield* Effect.abortSignal
+                        const toolContext = ToolContext.of({
+                          signal,
+                          emit: () => Effect.succeed(true),
+                          sessionId: `code-mode:${runId}`,
+                          runId,
+                          rootRunId: runId,
+                          toolCallId: operation,
+                          operationKey: operation,
+                          idempotencyKey: operation,
                         })
-                      }
-                      return yield* ProgramInvocationFailure.make({ cause: outcome.failure })
-                    }),
-                  ),
+                        const call = callFor(operation)
+                        const managed = managedToolHandlers(tool)
+                        const context = Context.add(
+                          managed === undefined ? input.context : Context.merge(input.context, managed),
+                          ToolContext,
+                          toolContext,
+                        )
+                        const outcome = yield* executeToolkit(toolkit!, {
+                          call,
+                          toolCallBatch: { calls: [call] },
+                          turn: 0,
+                          toolCallIndex: 0,
+                          agentName: input.owner.name,
+                          sessionId: `code-mode:${runId}`,
+                        }).pipe(
+                          Effect.provideContext(context),
+                          Effect.mapError((cause) => ProgramInvocationFailure.make({ cause })),
+                        )
+                        if (outcome._tag === "Success") return outcome.result
+                        if (outcome._tag === "Suspend") {
+                          return yield* ProgramSuspended.make({
+                            operation,
+                            reason: "tool-wait",
+                            token: outcome.token,
+                          })
+                        }
+                        return yield* ProgramInvocationFailure.make({ cause: outcome.failure })
+                      }),
+                    ),
                 }
               }),
             ),
@@ -319,28 +315,29 @@ export const bind = (input: {
               Effect.map(
                 (parameters): Invocation => ({
                   authorize: () => step.authorize(parameters).pipe(Effect.provideContext(input.context)),
-                  execute: step.execute(parameters).pipe(
-                    Effect.provideContext(input.context),
-                    Effect.catch((failure) =>
-                      Schema.encodeEffect(step.failure, { onExcessProperty: "error" })(failure).pipe(
-                        Effect.provideContext(input.context),
-                        Effect.matchEffect({
-                          onFailure: (error) =>
-                            Effect.fail(
-                              ProgramInvocationFailure.make({
-                                cause: {
-                                  _tag: "generalist/code-mode/StepFailureEncodingFailed",
-                                  step: step.name,
-                                  message: error.message,
-                                },
-                              }),
-                            ),
-                          onSuccess: (encodedFailure) =>
-                            Effect.fail(ProgramInvocationFailure.make({ cause: encodedFailure })),
-                        }),
+                  execute: () =>
+                    step.execute(parameters).pipe(
+                      Effect.provideContext(input.context),
+                      Effect.catch((failure) =>
+                        Schema.encodeEffect(step.failure, { onExcessProperty: "error" })(failure).pipe(
+                          Effect.provideContext(input.context),
+                          Effect.matchEffect({
+                            onFailure: (error) =>
+                              Effect.fail(
+                                ProgramInvocationFailure.make({
+                                  cause: {
+                                    _tag: "generalist/code-mode/StepFailureEncodingFailed",
+                                    step: step.name,
+                                    message: error.message,
+                                  },
+                                }),
+                              ),
+                            onSuccess: (encodedFailure) =>
+                              Effect.fail(ProgramInvocationFailure.make({ cause: encodedFailure })),
+                          }),
+                        ),
                       ),
                     ),
-                  ),
                 }),
               ),
             ),

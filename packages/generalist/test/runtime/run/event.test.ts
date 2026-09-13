@@ -1,7 +1,7 @@
 import { Runtime } from "../../../src/runtime/engine.js"
 import "./suites/event-telemetry-suite.js"
 import { expect, it } from "@effect/vitest"
-import { ProgramCapabilities, ProgramRunner, CodeExecutor, Gate } from "../../../src/index.js"
+import { ProgramCapabilities, ProgramRunner, CodeExecutor, Gate, Hooks } from "../../../src/index.js"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Errors, ExecutableResolver, RunEvent } from "../../../src/runtime/index.js"
@@ -27,6 +27,9 @@ const failures: ReadonlyArray<RunFailureType> = [
     message: "completion gate failed",
     failure: Gate.GateFailed.make({ gate: { name: "quality", verdict: "fail", evidence: "rejected" } }),
   }),
+  Hooks.LifecyclePersistenceFailed.make({ operationKey: "hook:run:start", stage: "record", message: "unavailable" }),
+  Hooks.CheckpointInvalid.make({ checkpointKey: "hook:run:start", event: "RunStart", message: "invalid" }),
+  Hooks.ReplayUnresolved.make({ operationKey: "run:hook:1", replayKey: "operation:1", message: "unknown" }),
   Errors.ExecutablePinMissing.make({ runId: "run:codec", ref: assistantRef.ref }),
   Errors.ExecutableIdentityMismatch.make({
     runId: "run:codec",

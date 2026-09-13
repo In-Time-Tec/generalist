@@ -1,32 +1,19 @@
 # Generalist
 
-Generalist turns agents from disposable chat sessions into durable workers. It is an Effect-native framework over `effect/unstable/ai`: the `generalist` package provides the process-local loop and optional durable Runtime. `generalist/durability` is the sole production durability engine, with S3, native R2, and local-directory transports. Local processes, servers, Cloudflare Durable Objects, and Rivet actors are independent compute hosts, not storage backends. Core stays usable without storage, Relay, or another durable runtime.
+Generalist is an Effect-native agent framework. It provides a process-local agent loop and an optional durable Runtime backed by local-directory or S3-compatible object storage. Applications own model providers, compute hosts, sandboxes, interfaces, and deployment; keep extension contracts provider-neutral.
 
-## Product and writing standard
+## Work in this repository
 
-Write for the developer deciding whether Generalist solves a real problem. Lead with the task or failure they face, explain the mechanism, and show the outcome. Use direct, concrete language: short openings, useful examples, and clear next steps. Keep technical references precise; do not turn every API description into a pitch.
-
-- Frame the product around work that crosses tool calls, human decisions, and host lifetimes. Preserve the simple process-local entry point instead of implying every agent needs storage.
-- Explain architectural advantages with their limits. Independent partitions enable separate progress, but mutations within a partition serialize. Replaceable compute does not imply automatic scaling, portable credentials, or arbitrary executable compatibility.
-- Separate shipped behavior, design intent, measured performance, and release acceptance. Never describe uncertain external effects as exactly-once, local emulator results as live-provider certification, or another product's numbers as Generalist evidence.
-- Demos and code examples must demonstrate a concrete reader outcome. State whether models and tools are scripted or live, which credentials and services are required, what persists, and what the example does not prove. Keep runnable code complete and verified.
-- Architecture documentation should progress from the system view to ownership boundaries, data flow, and failure/recovery details. Diagrams must distinguish canonical storage, replaceable compute, derived caches, and provisional client output.
-- Cite first-party sources when drawing comparisons. Identify each system's actual category and the relevant design pattern; do not imply an integration, endorsement, or equivalent performance. Keep historical decisions and generated API output under their existing authorities.
-
-`PRODUCT.md` owns the product thesis and audience. The writing skills own the documentation workflow. This positioning never relaxes the correctness, safety, testing, or release requirements below.
-
-## Commands
-
-Use Bun 1.4.0, pinned in `package.json`, and the committed lockfile.
+Use Bun 1.4.0 and the committed lockfile.
 
 ```bash
-bun install --frozen-lockfile # install the locked workspace
-bun run dev                   # preview the docs site
-bun run build                 # build every workspace
-bun run format                # write formatting changes
+bun install --frozen-lockfile
+bun run dev
+bun run build
+bun run format
 ```
 
-Run the narrowest useful check while editing:
+Run focused checks while editing:
 
 ```bash
 bun --bun vitest run packages/generalist/test/<path>.test.ts --no-file-parallelism
@@ -34,81 +21,31 @@ bun run --cwd packages/generalist typecheck
 bun node_modules/prettier/bin/prettier.cjs --check <paths>
 ```
 
-Replace the test path as needed; object-engine tests live under `packages/generalist/test/durability`, and compute-host suites under `test/{cloudflare,rivet}`. Local integration uses Docker-backed MinIO and persistent Miniflare/workerd; it needs no external service credentials. A skipped suite is not conformance evidence.
-
-Before review, run the full checks:
+Before review or release, run:
 
 ```bash
-bun run check # build, formatting, repository rules, lint, and typecheck; no tests
-bun run test  # build and run the complete Vitest suite
+bun run check
+bun run test
+bun run package
+(cd release && sha256sum --check SHA256SUMS)
 ```
 
-For changes to public exports, package manifests, dependencies, or release output, also run:
+Package tests live under `packages/generalist/test/`. Durability changes must include a fresh-Layer or close/reopen recovery case. Local directory and MinIO tests do not certify a deployed S3 provider.
 
-```bash
-PACKAGE_ARTIFACT_DIR=release bun run package
-```
+## Engineering rules
 
-This is the downstream compatibility check. It packs the public package, validates every exact manifest export plus concrete wildcard examples, installs the tarball in fresh Bun-isolated, core-only, and npm consumers, typechecks and bundles a consumer, imports public entrypoints under Node and Bun, and verifies one Effect installation. It writes one tarball, `release-evidence.json`, and `SHA256SUMS`.
+- Follow existing Effect patterns and keep Effects lazy until application, framework, or test boundaries.
+- Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly.
+- Use Effect platform services for boundaries they own and `Schema` for serialized or untrusted data.
+- Preserve typed failures, interruption, scopes, resource ownership, and bounded concurrency.
+- Keep public seams focused and provider-neutral. Do not add vendor model, compute, sandbox, or native storage adapters.
+- Filesystem and S3-compatible durability are the maintained production transports.
+- Keep one current pre-1.0 contract; update callers and remove replaced paths instead of adding compatibility shims.
+- Never edit, import, format, build, or test `repos/effect`; it is read-only reference material.
+- Do not add root `scripts/`, `examples/`, or `test/` trees. Use package-local tests and direct package commands.
 
-## Boundaries
+`PRODUCT.md` owns product scope. `CONTEXT.md` owns architecture and vocabulary. `docs/features/` describes current behavior; `docs/decisions/` and `docs/tradeoffs/` preserve design reasoning.
 
-- Never import `@relayfx/*` from Generalist; repository checks enforce the standalone core boundary.
-- Use Effect AI `Prompt`, `Response`, `Tool`, and `Toolkit` directly. Do not add a parallel payload or tool format.
-- Keep Effects lazy and run them only at process, framework, or test-host boundaries. Preserve typed failures, requirements, interruption, scopes, and bounded concurrency.
-- Use Effect platform services instead of raw filesystem, process, HTTP, time, randomness, socket, or terminal APIs when Effect owns that boundary. Every resource and fiber needs a visible scope owner.
-- Use `Schema` at serialized and untrusted boundaries. Boundary failures use `Schema.TaggedErrorClass`; behavior-bearing service seams provide a test or memory Layer.
-- Public exports remain `@experimental` while Effect AI is unstable. Prefer direct imports and intentional package-root namespaces; do not add wrapper barrels or generic `utils`, `helpers`, `common`, or `lib` directories.
-- `make` constructs an in-memory value, `register` records it for lookup, and `start` begins a hosted Runtime `Execution`. Layer constructors are named `layer` or `layer<Noun>`.
-- Tests use `@effect/vitest`, deterministic Effect services, and live under `test/` mirroring `src/`.
-- Inspect pinned Effect source and types in `node_modules` before using an unfamiliar API. `repos/effect` is read-only reference material: never edit, import, format, build, or test it.
-- This project is pre-1.0 and has no compatibility promise. Keep one current contract, update all callers, and delete replaced paths instead of adding shims.
-- The clean v1 contract has no Generalist SQL backends, alternate production memory/filesystem Runtime, compatibility readers, aliases, or legacy migration path. Use fresh namespaces; never delete production objects to repair recovery.
-- Retained history, immutable command receipts, and incurred costs survive rewind. Exact command retries return the original receipt, including its original `duplicate` field. Preserve caller command identities across ambiguous outcomes.
+## Releases
 
-`PRODUCT.md` owns audience, direction, and exclusions. `CONTEXT.md` owns vocabulary, authority, and system boundaries. `docs/features/` records current behavior and invariants. `docs/decisions/` records durable reasons, and `docs/tradeoffs/` records meaningful gains and costs. The `docs/` site (`docs/src/content.ts`) and package READMEs own public usage.
-
-Package manifests, `scripts/package-smoke*.ts`, and `.github/workflows/publish.yml` own the release train. Do not introduce another package list, version, or artifact authority.
-
-## Durable Runtime checks
-
-`generalist/testing/runtime-driver` is the authoritative capability-based driver suite. Add shared expectations there and register only capabilities a host implements; do not copy generic conformance tests into each host. `generalist/testing/durability` is a test-only object simulator, not another production Runtime.
-
-```bash
-bun --bun vitest run \
-  packages/generalist/test/testing/runtime-driver/index.test.ts \
-  packages/generalist/test/durability \
-  --no-file-parallelism --maxWorkers=1
-bun --bun vitest run packages/generalist/test/cloudflare packages/generalist/test/rivet --no-file-parallelism
-```
-
-Persistence or replay changes must exercise a close/reopen or fresh-Layer boundary, recovery of interrupted operations, and strict replay from an authoritative cursor without redispatch. Start with:
-
-```bash
-bun --bun vitest run \
-  packages/generalist/test/runtime/execution/recovery/exclusive.test.ts \
-  packages/generalist/test/durability/internal/runtime.test.ts \
-  packages/generalist/test/transport/replay.test.ts \
-  --no-file-parallelism
-```
-
-The object Runtime entrypoint also registers the branch-evidence suite.
-
-Local transport qualification runs `packages/generalist/test/durability/object-store.test.ts` against MinIO and the pinned Miniflare/workerd runtime, including restart and shared-bucket native/S3 gateway cases. The local Miniflare harness enforces production R2's exact-EOF range rejection in `test/durability/local-r2-worker.ts`; it does not certify AWS S3 or deployed R2. Do not request cloud credentials or run remote qualification as part of local acceptance. Preserve protocol assumptions, seeds, runtime versions, and workload bounds with verification results; performance and full acceptance require their own evidence.
-
-## Release
-
-The public package is `generalist`; `generalist/durability/s3`, `generalist/durability/r2`, `generalist/unstable/cloudflare/*`, and `generalist/unstable/rivet` are subpath exports of that one package, not separately published packages. Root and package manifest versions match exactly. Do not publish from a workstation.
-
-A release change must:
-
-1. Add the user-visible change to `CHANGELOG.md`.
-2. Set one lockstep semantic version in the root manifest and `packages/generalist/package.json`.
-3. Pass `bun run check`, `bun run test` with local MinIO and Miniflare/workerd available, and `bun run package`. Report local qualification separately from untested live AWS/R2 behavior.
-4. Use the `generalist-release` skill to produce and verify artifacts from one exact detached commit. Local packaging from a dirty worktree is not commit evidence.
-5. Land the exact release commit on `main`, require successful main CI at that commit, then create the immutable `v<version>` tag there.
-6. Push the tag to start `.github/workflows/publish.yml`. The workflow builds once, passes the same checksummed assets to GitHub and npm, and checks registry integrity. Manual dispatch only reconciles an existing tag and requires the tag plus its full 40-character commit SHA.
-
-Pushing branches or tags, merging, publishing, and deploying change shared state; do them only when the user explicitly asks.
-
-Keep root scripts limited to supported workflows. Pass focused arguments to the underlying tool instead of adding aliases for Git, status, logs, watch, coverage, or other trivial commands.
+The public package is `generalist`. Keep root and package versions equal, update `CHANGELOG.md`, verify an exact clean commit, land it on `main`, and require successful CI before creating its immutable `v<version>` tag. Tag pushes run `.github/workflows/publish.yml`; do not publish from a workstation.

@@ -1,9 +1,9 @@
-import { type LayerOptions, Runtime } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema, Stream, Tracer } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
 import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore, type ExecutionClaim, type WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
@@ -24,8 +24,8 @@ import { allowAllAuthorization } from "../../../authorization.js"
 export interface ToolCancellationSuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
-    options: LayerOptions,
-  ) => Layer.Layer<Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
+    options: Runtime.LayerOptions,
+  ) => Layer.Layer<Runtime.Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -152,7 +152,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             .makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.startExecution({
@@ -294,7 +294,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             .makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.startExecution({
@@ -370,7 +370,7 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             .makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime
+            const runtime = yield* Runtime.Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.startExecution({

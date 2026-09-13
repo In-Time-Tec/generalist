@@ -6,7 +6,7 @@ import { Response as AiResponse } from "effect/unstable/ai"
 import { ToolContext, ToolExecutor } from "../../../src/index.js"
 import { PackageCatalog } from "../../../src/instructions/index.js"
 
-const fixtureRoot = "examples/packages/generalist-skills-example"
+const fixtureRoot = "packages/generalist/test/instructions/package-catalog/fixture"
 const registry = "https://registry.example"
 const github = "https://github.example"
 const packageName = "@in-time-tec/generalist-skills-example"

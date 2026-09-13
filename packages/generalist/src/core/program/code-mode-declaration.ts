@@ -1,5 +1,4 @@
 /* oxlint-disable typescript/no-unsafe-argument, typescript/no-unsafe-member-access, typescript/no-unsafe-return -- Effect AI's heterogeneous Tool.Any erases its name and schema parameters to any; validation establishes the Tool identity before these fields are retained. */
-import { CodeExecutor, Identity, declareIdentity } from "./code-executor.js"
 import { Brand, Effect, Function, Predicate, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import type {
@@ -8,9 +7,14 @@ import type {
   Requirements as AgentRequirements,
 } from "../agent/lifecycle/definition.js"
 import type { ToolContext } from "../tools/tool-context.js"
-import { ActionableTaggedError, errorHint } from "../error-hint.js"
+import {
+  declareIdentity as declareExecutorIdentity,
+  type CodeExecutor,
+  type Identity as CodeExecutorIdentity,
+} from "./code-executor.js"
 import type { ProgramAuthorizationFailure } from "./capabilities.js"
 import { ProgramReplayPolicy } from "./handlers.js"
+import { ActionableTaggedError, errorHint } from "../error-hint.js"
 
 /** Stable nominal declaration identity attached only by {@link step}. */
 export const StepTypeId = "generalist/runtime/CodeMode/Step" as const
@@ -91,7 +95,7 @@ export interface Options<
   readonly tools: Tools
   readonly agents: Agents
   readonly steps: Steps
-  readonly executor: Identity
+  readonly executor: CodeExecutorIdentity
   readonly maxSourceBytes: number
   readonly budget: Budget
 }
@@ -123,21 +127,9 @@ type GrantedAgent<C> = C extends { readonly agents: ReadonlyArray<AgentGrant<Any
   : never
 type GrantedStep<C> = C extends { readonly steps: ReadonlyArray<StepDeclaration> } ? C["steps"][number] : never
 
-type GrantedToolServices<C> = [GrantedTool<C>] extends [never]
-  ? never
-  : Exclude<Tool.HandlerServices<GrantedTool<C>>, ToolContext>
-type GrantedToolHandlers<C> = [GrantedTool<C>] extends [never]
-  ? never
-  : Tool.HandlersFor<{
-      readonly [Name in Tool.Name<GrantedTool<C>>]: Extract<GrantedTool<C>, { readonly name: Name }>
-    }>
-
-type GrantedAgentRequirements<A> = [A] extends [never]
-  ? never
-  : A extends AnyAgent
-    ? A["toolkit"] extends Toolkit.Toolkit<infer Tools>
-      ? AgentClosedServices<Tools, AgentRequirements<A>, A["input"], A["output"]> | A["input"]["DecodingServices"]
-      : never
+type GrantedAgentRequirements<A extends AnyAgent> =
+  A["toolkit"] extends Toolkit.Toolkit<infer Tools>
+    ? AgentClosedServices<Tools, AgentRequirements<A>, A["input"], A["output"]> | A["input"]["DecodingServices"]
     : never
 
 type StepCodecRequirements<S> = S extends {
@@ -151,8 +143,10 @@ type StepCodecRequirements<S> = S extends {
 /** Services inferred from one declaration without widening its handlers or step environments. */
 export type Requirements<C> =
   | (C extends AnyOptions ? CodeExecutor : never)
-  | GrantedToolServices<C>
-  | GrantedToolHandlers<C>
+  | Exclude<Tool.HandlerServices<GrantedTool<C>>, ToolContext>
+  | Tool.HandlersFor<{
+      readonly [Name in Tool.Name<GrantedTool<C>>]: Extract<GrantedTool<C>, { readonly name: Name }>
+    }>
   | GrantedAgentRequirements<Extract<GrantedAgent<C>, AnyAgent>>
   | StepRequirements<GrantedStep<C>>
   | StepCodecRequirements<GrantedStep<C>>
@@ -178,8 +172,8 @@ export class DeclarationError extends ActionableTaggedError<DeclarationError>()(
       "limit-invalid",
       "not-agent-tool",
     ]),
-    name: Schema.optionalKey(Schema.String),
-    hint: errorHint("Correct the declaration field so identities, versions, limits, and names are valid and unique."),
+    declarationName: Schema.optionalKey(Schema.String),
+    hint: errorHint("Repair the identified CodeMode declaration field before registering the Agent."),
   },
 ) {}
 
@@ -195,7 +189,7 @@ const BudgetFields = [
 
 /** @internal Immutable declaration snapshot retained by one registered revision. */
 export interface ValidatedOptions extends Omit<AnyOptions, "executor" | "budget" | "steps"> {
-  readonly executor: Identity
+  readonly executor: CodeExecutorIdentity
   readonly budget: Readonly<Budget>
   readonly steps: ReadonlyArray<Step<string, Schema.Top, Schema.Top, Schema.Top, unknown>>
 }
@@ -205,7 +199,11 @@ const declarationFailure = (
   reason: DeclarationError["reason"],
   name?: string,
 ): DeclarationError =>
-  DeclarationError.make({ field, reason, ...Object.assign({}, name === undefined ? undefined : { name }) })
+  DeclarationError.make({
+    field,
+    reason,
+    ...Object.assign({}, name === undefined ? undefined : { declarationName: name }),
+  })
 
 const validIdentity = (value: string): boolean => value.length > 0 && value.length <= 128 && value.trim() === value
 
@@ -279,9 +277,9 @@ export const validateOptions: {
   (options: AnyOptions): (toolkit: Toolkit.Any) => ValidatedOptions
   (toolkit: Toolkit.Any, options: AnyOptions): ValidatedOptions
 } = Function.dual(2, (toolkit: Toolkit.Any, options: AnyOptions): ValidatedOptions => {
-  let executor: Identity
+  let executor: CodeExecutorIdentity
   try {
-    executor = declareIdentity(options.executor)
+    executor = declareExecutorIdentity(options.executor)
   } catch {
     throw declarationFailure("executor", "identity-invalid")
   }

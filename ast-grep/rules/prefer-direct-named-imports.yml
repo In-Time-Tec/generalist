@@ -10,7 +10,7 @@ files:
   - "**/*.ts"
   - "**/*.tsx"
   - "**/*.ts.txt"
-  - "examples/docs-snippets/**/*.txt"
+  - "docs/src/snippets/**/*.txt"
 ignores:
   - "repos/effect/**"
   - "**/dist/**"

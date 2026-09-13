@@ -29,8 +29,6 @@ const program = Effect.gen(function* () {
 }).pipe(Effect.provide(AGUI.layer({ address: Address.make("agent:assistant") })), Effect.provide(runtimeLayer))
 ```
 
-See the runnable offline [plain-fetch AG-UI example](https://github.com/In-Time-Tec/generalist/tree/main/examples/ag-ui).
-
 ## Implemented from the spec
 
 - `RunAgentInput` admission and exact-wait resume handling.
@@ -97,6 +95,5 @@ TEXT_MESSAGE_END     messageId "run-1:1:text:0"
 
 ## Related
 
-- Example: `examples/ag-ui`
 - Source: `packages/generalist/src/unstable/ag-ui/...`
 - Site: `/docs/mcp`

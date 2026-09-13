@@ -2,7 +2,6 @@ import { Effect, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent, Any as AnyAgent, Requirements as AgentRequirements } from "../lifecycle/definition.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
-import type { SandboxService } from "../../../sandbox/service.js"
 
 /** Whether one completion gate accepted or rejected a proposed terminal output. */
 export const Verdict = Schema.Literals(["pass", "fail"])
@@ -102,30 +101,6 @@ export class GateFailed extends ActionableTaggedError<GateFailed>()("generalist/
   gate: Result,
   hint: errorHint("Inspect the gate evidence, correct the proposed output or its environment, and run again."),
 }) {}
-
-/** @internal Validate Agent-owned gate configuration while the Agent is constructed. */
-export const validateAgentGates = (input: {
-  readonly gates: ReadonlyArray<{ readonly _tag: string; readonly name: string }>
-  readonly sandbox: SandboxService | undefined
-  readonly failureMode: FailureMode
-}): void => {
-  if (input.failureMode !== "retry" && input.failureMode !== "fail") throw new TypeError("Invalid onGateFailure value")
-  const names = new Set<string>()
-  for (const gate of input.gates) {
-    validateName(gate.name)
-    if (names.has(gate.name)) throw new TypeError(`Duplicate gate name: ${gate.name}`)
-    names.add(gate.name)
-  }
-  if (!input.gates.some((gate) => gate._tag === "Command")) return
-  if (input.sandbox === undefined) throw new TypeError("Agent command gates require a Sandbox")
-  if (!input.sandbox.capabilities.commands.includes("Process")) {
-    throw new TypeError("Agent command gates require a Sandbox with the Process capability")
-  }
-}
-
-/** @internal One keyed result retained in the durable loop checkpoint. */
-export const Checkpoint = Schema.Struct({ key: Schema.String, turn: Schema.Finite, result: Result })
-export type Checkpoint = typeof Checkpoint.Type
 
 /** Verifier Agent shape retained after type erasure. */
 export type VerifierAgent<R> = Agent<Record<string, Tool.Any>, R, R, R, Schema.Top, Schema.Top>

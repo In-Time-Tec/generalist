@@ -107,7 +107,6 @@ Artifact registration is process-scoped even when storage is durable, so each se
 
 ## Related
 
-- Example: `examples/co-edit`
 - Source: `packages/generalist/src/unstable/artifact/`, `packages/generalist/src/core/artifact.ts`
 - Tests: `packages/generalist/test/artifact/`
 - Sibling features: [`fork.md`](./fork.md), [`host.md`](./host.md), [`media.md`](./media.md), [`server.md`](./server.md), [`tasks.md`](./tasks.md)

@@ -13,7 +13,8 @@ import {
 } from "../../trajectory/index.js"
 import { fromTurn as modelOperation, ModelCall, TokenId } from "./model-call.js"
 import { RewardInvalid, type Service as RewardService } from "./reward.js"
-import type { ExportRuntime, RewardWriteError } from "../../runtime/reward/writer.js"
+import type { DagRuntime } from "../../runtime/reward/export.js"
+import type { RewardWriteError } from "../../runtime/reward/writer.js"
 
 export * as Reward from "./reward.js"
 export { ModelCall } from "./model-call.js"
@@ -27,6 +28,7 @@ export {
   type RewardWriteError,
   type RewardWriter,
 } from "../../runtime/reward/writer.js"
+export type { DagRuntime } from "../../runtime/reward/export.js"
 
 /** Failures while projecting retained Runtime journals. @experimental */
 export type ProjectionError = FromJournalError
@@ -105,9 +107,6 @@ export interface Dag {
   readonly edges: ReadonlyArray<Edge>
   readonly leaves: ReadonlyArray<string>
 }
-
-/** @experimental Cross-driver Runtime methods required by `dag`. */
-export type DagRuntime = ExportRuntime
 
 interface DagState {
   readonly runtime: DagRuntime

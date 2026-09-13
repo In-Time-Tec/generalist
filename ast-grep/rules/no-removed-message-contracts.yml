@@ -79,10 +79,6 @@ rule:
 files:
   - "packages/**/*.ts"
   - "packages/**/*.tsx"
-  - "examples/**/*.ts"
-  - "examples/**/*.tsx"
-  - "scripts/**/*.ts"
-  - "scripts/**/*.tsx"
 ignores:
   - "**/dist/**"
   - "**/coverage/**"

@@ -1,10 +1,9 @@
 import { Effect, Option, Schema, Types } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { childEnd as applyChildEnd, childStart as applyChildStart } from "../../core/agent/lifecycle/hooks.js"
-import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Request, SettledOutcome, Success } from "../../core/tools/tool-executor.js"
-import { HookFailed, type Child, type ChildEndInput, type ChildStartInput } from "../../hooks/index.js"
+import type { Child, ChildEndInput, ChildStartInput, EvaluationFailure } from "../../hooks/index.js"
 import {
   GroupChildResult,
   GroupResult,
@@ -15,7 +14,7 @@ import {
   toolName,
 } from "./group.js"
 
-export type ChildHookError = HookFailed | DriverError | DriverStateInvalid
+export type ChildHookError = EvaluationFailure
 
 interface Blocked {
   readonly message: string

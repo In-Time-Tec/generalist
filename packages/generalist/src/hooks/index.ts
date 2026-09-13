@@ -1,14 +1,13 @@
-import { Context, Effect, Layer, Schema } from "effect"
+import { Context, Effect, Layer } from "effect"
 import { Prompt, Response } from "effect/unstable/ai"
 import type { RunId } from "../core/durable/run-id.js"
-import { Event, HookFailed } from "./event.js"
-import { CapabilityPin, makeCapability } from "../core/durable/pin.js"
-import { ReplayPolicy } from "../core/durable/driver/contract.js"
-import type { DriverError, DriverStateInvalid } from "../core/durable/service.js"
-import type { DriverUnknownReplay } from "../core/durable/driver/interpreter.js"
+import { CheckpointInvalid, Event, HookFailed, LifecyclePersistenceFailed, ReplayUnresolved } from "./event.js"
+import { Decision as DecisionSchema } from "./decision.js"
+import { Identity as IdentitySchema, type Declaration, type Service } from "./definition.js"
+import { make } from "./internal.js"
 import type { Exhausted } from "../core/durable/run-budget.js"
 
-export { Event, HookFailed } from "./event.js"
+export { CheckpointInvalid, Event, HookFailed, LifecyclePersistenceFailed, ReplayUnresolved } from "./event.js"
 
 /** Continue the guarded operation unchanged. */
 export interface Continue {
@@ -38,20 +37,8 @@ export interface Ask {
   readonly _tag: "Ask"
 }
 
-const ContinueDecision = Schema.TaggedStruct("Continue", {})
-const BlockDecision = Schema.TaggedStruct("Block", { reason: Schema.String })
-const ReplaceDecision = Schema.TaggedStruct("Replace", { value: Schema.Unknown })
-const AddContextDecision = Schema.TaggedStruct("AddContext", { prompt: Prompt.Prompt })
-const AskDecision = Schema.TaggedStruct("Ask", {})
-
 /** Serializable decision recorded in the durable driver checkpoint. */
-export const Decision = Schema.Union([
-  ContinueDecision,
-  BlockDecision,
-  ReplaceDecision,
-  AddContextDecision,
-  AskDecision,
-])
+export const Decision = DecisionSchema
 export type Decision<Value = unknown> = Continue | Block | Replace<Value> | AddContext | Ask
 
 /** Continue the guarded operation unchanged. */
@@ -179,40 +166,13 @@ type ChildStartDecision = Continue | Block
 type ChildEndDecision = Continue | Block | Replace<unknown>
 type RunEndDecision<Output> = Continue | Block | Replace<Output>
 
-const promptDecision = Schema.Union([ContinueDecision, BlockDecision, ReplaceDecision, AddContextDecision])
-const toolCallDecision = Schema.Union([ContinueDecision, BlockDecision, ReplaceDecision, AskDecision])
-const toolResultDecision = Schema.Union([ContinueDecision, BlockDecision, ReplaceDecision])
-const approvalDecision = Schema.Union([ContinueDecision, BlockDecision])
-const childStartDecision = Schema.Union([ContinueDecision, BlockDecision])
-const childEndDecision = Schema.Union([ContinueDecision, BlockDecision, ReplaceDecision])
-const runEndDecision = Schema.Union([ContinueDecision, BlockDecision, ReplaceDecision])
-
-/** @internal Event-scoped decision Schema enforced at each lifecycle boundary. */
-export const DecisionByEvent = {
-  RunStart: promptDecision,
-  TurnStart: promptDecision,
-  ModelCall: promptDecision,
-  Compaction: promptDecision,
-  Steer: promptDecision,
-  ToolCall: toolCallDecision,
-  ToolResult: toolResultDecision,
-  ApprovalRequest: approvalDecision,
-  ChildStart: childStartDecision,
-  ChildEnd: childEndDecision,
-  RunEnd: runEndDecision,
-} satisfies Record<Event, Schema.Decoder<Decision>>
-
 /** One Effectful typed lifecycle interceptor. `void` is shorthand for Continue. */
 export type Hook<Input, HookDecision extends Decision = Decision> = (
   input: Input,
   context: { readonly operationKey: string },
 ) => Effect.Effect<HookDecision | void, unknown>
 
-export const Identity = Schema.Struct({
-  key: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(255)),
-  version: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(128)),
-  replayPolicy: ReplayPolicy,
-})
+export const Identity = IdentitySchema
 export type Identity = typeof Identity.Type
 
 interface HookDeclaration<Name extends Event, Input, HookDecision extends Decision> extends Identity {
@@ -233,16 +193,7 @@ export type Steer = HookDeclaration<"Steer", SteerInput, PromptDecision>
 export type RunEnd<Output = unknown> = HookDeclaration<"RunEnd", RunEndInput<Output>, RunEndDecision<Output>>
 
 /** Plugin-facing type-erased declaration shape accepted by Hooks.layer. */
-export interface Declaration extends Identity {
-  readonly event: Event
-  readonly hook: Hook<never>
-}
-
-/** Ordered lifecycle hook declarations for one Agent execution context. */
-export interface Service {
-  readonly declarations: ReadonlyArray<Declaration>
-  readonly pin: CapabilityPin
-}
+export type { Declaration, Service } from "./definition.js"
 
 /** Optional ordered lifecycle interceptor service. */
 export class Hooks extends Context.Service<Hooks, Service>()("generalist/hooks/Hooks") {}
@@ -253,22 +204,6 @@ export const layer = (declarations: ReadonlyArray<Declaration>): Layer.Layer<Hoo
 
 /** Explicit empty hook chain. Omitting Hooks has the same behavior. */
 export const layerIdentity: Layer.Layer<Hooks> = layer([])
-
-export const chainPin = (declarations: ReadonlyArray<Declaration>): CapabilityPin => {
-  const identities = declarations.map((declaration) => ({
-    ...Schema.decodeSync(Identity)(declaration),
-    event: declaration.event,
-  }))
-  if (new Set(identities.map((identity) => identity.key)).size !== identities.length) {
-    throw new TypeError("Duplicate hook declaration key")
-  }
-  return makeCapability({ version: "1", declarations: identities })
-}
-
-export const make = (input: { readonly declarations: ReadonlyArray<Declaration> }): Service => {
-  const declarations = Object.freeze(input.declarations.map((declaration) => Object.freeze({ ...declaration })))
-  return { declarations, pin: chainPin(declarations) }
-}
 
 export const onRunStart = (input: Identity & { readonly hook: RunStart["hook"] }): RunStart => ({
   event: "RunStart",
@@ -314,14 +249,9 @@ export const onRunEnd = <Output = unknown>(
   ...input,
 })
 
-export type EvaluationFailure = HookFailed | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted
-
-/** @internal One completed declaration chain stored in the driver checkpoint. */
-export const Checkpoint = Schema.Struct({
-  chain: CapabilityPin,
-  key: Schema.String,
-  event: Event,
-  decisions: Schema.Array(Decision),
-  complete: Schema.Boolean,
-})
-export type Checkpoint = typeof Checkpoint.Type
+export type EvaluationFailure =
+  | HookFailed
+  | LifecyclePersistenceFailed
+  | CheckpointInvalid
+  | ReplayUnresolved
+  | Exhausted

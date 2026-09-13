@@ -1,2 +1,0 @@
-turns: 3
-Follow-up: the worker deploy is healthy too.

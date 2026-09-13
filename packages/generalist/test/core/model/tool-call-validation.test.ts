@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ModelRegistry, ModelToolCallValidation } from "../../../src/index.js"
+import * as ModelToolCallValidationInternal from "../../../src/core/model/tool-call-validation-internal.js"
 
 const compiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) => Effect.succeed(Tool.getJsonSchema(tool))
 
@@ -45,7 +46,7 @@ const metadata = (id: string) =>
 describe("model tool-call validation", () => {
   it.effect("projects exact JSON Schema while making model response decoding permissive", () =>
     Effect.gen(function* () {
-      const projected = yield* ModelToolCallValidation.projectToolkit(originalToolkit, compiler)
+      const projected = yield* ModelToolCallValidationInternal.projectToolkit(originalToolkit, compiler)
       const tool = projected.toolkit.tools.lookup!
 
       expect(Tool.isDynamic(tool)).toBe(true)
@@ -70,8 +71,8 @@ describe("model tool-call validation", () => {
         ],
         (tools) => (providerTools = tools),
       )
-      const projected = yield* ModelToolCallValidation.projectToolkit(originalToolkit, compiler)
-      const wrapped = ModelToolCallValidation.wrap(model, originalToolkit, projected.toolkit)
+      const projected = yield* ModelToolCallValidationInternal.projectToolkit(originalToolkit, compiler)
+      const wrapped = ModelToolCallValidationInternal.wrap(model, originalToolkit, projected.toolkit)
       const parts = yield* wrapped
         .streamText({ prompt: "lookup", toolkit: originalToolkit, disableToolCallResolution: true })
         .pipe(Stream.runCollect)
@@ -99,8 +100,8 @@ describe("model tool-call validation", () => {
         { type: "tool-params-end", id: "call-1" },
         { type: "tool-call", id: "call-1", name: "lookup", params: { value: 1 } },
       ])
-      const projected = yield* ModelToolCallValidation.projectToolkit(originalToolkit, compiler)
-      const wrapped = ModelToolCallValidation.wrap(model, originalToolkit, projected.toolkit)
+      const projected = yield* ModelToolCallValidationInternal.projectToolkit(originalToolkit, compiler)
+      const wrapped = ModelToolCallValidationInternal.wrap(model, originalToolkit, projected.toolkit)
       const seen: Array<Response.StreamPart<Record<string, Tool.Any>>> = []
       const failure = yield* wrapped
         .streamText({ prompt: "lookup", toolkit: originalToolkit, disableToolCallResolution: true })
@@ -132,7 +133,10 @@ describe("model tool-call validation", () => {
         args: Schema.Struct({ limit: Schema.Finite }),
         parameters: Schema.Struct({ query: Schema.String }),
       })({ limit: 3 })
-      const projected = yield* ModelToolCallValidation.projectToolkit(Toolkit.make(dynamic, providerDefined), compiler)
+      const projected = yield* ModelToolCallValidationInternal.projectToolkit(
+        Toolkit.make(dynamic, providerDefined),
+        compiler,
+      )
       const projectedDynamic = projected.toolkit.tools.dynamic!
       const projectedProvider = projected.toolkit.tools.ProviderSearch!
 
@@ -148,7 +152,7 @@ describe("model tool-call validation", () => {
       }
 
       const direct = yield* makeModel([])
-      yield* ModelToolCallValidation.prepare(direct, Toolkit.make(dynamic, providerDefined), 1)
+      yield* ModelToolCallValidationInternal.prepare(direct, Toolkit.make(dynamic, providerDefined), 1)
     }),
   )
 
@@ -156,13 +160,13 @@ describe("model tool-call validation", () => {
     Effect.gen(function* () {
       let calls = 0
       const model = yield* makeModel([], () => calls++)
-      const failure = yield* ModelToolCallValidation.prepare(model, originalToolkit, 1).pipe(Effect.flip)
+      const failure = yield* ModelToolCallValidationInternal.prepare(model, originalToolkit, 1).pipe(Effect.flip)
 
       expect(Schema.is(ModelToolCallValidation.ToolJsonSchemaCompilerMissing)(failure)).toBe(true)
       expect(calls).toBe(0)
 
       const attached = ModelRegistry.withToolJsonSchemaCompiler(model, compiler)
-      const prepared = yield* ModelToolCallValidation.prepare(attached, originalToolkit, 1)
+      const prepared = yield* ModelToolCallValidationInternal.prepare(attached, originalToolkit, 1)
       expect(ModelRegistry.toolJsonSchemaCompiler(prepared)).toBe(compiler)
     }),
   )

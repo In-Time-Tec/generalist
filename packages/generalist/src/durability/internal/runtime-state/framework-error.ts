@@ -3,11 +3,11 @@ import { Denied as NestedOperationDenied } from "../../../core/tools/nested-oper
 import { RunError } from "../../../core/agent/run/error.js"
 import { Denied as CapabilityDenied } from "../../../core/capability/errors.js"
 import { RunFailure } from "../../../runtime/run.js"
-import { HookFailed } from "../../../hooks/index.js"
 
-/** HookFailed is both a terminal RunFailure and an Agent RunError; keep one shared member. */
+/** Terminal RunFailure members also present in Agent RunError are included only once. */
+const runErrorMembers = new Set<unknown>(RunError.members)
 export const FrameworkError = Schema.Union([
-  ...RunFailure.members.filter((member) => member !== HookFailed),
+  ...RunFailure.members.filter((member) => !runErrorMembers.has(member)),
   ...RunError.members,
   NestedOperationDenied,
   CapabilityDenied,

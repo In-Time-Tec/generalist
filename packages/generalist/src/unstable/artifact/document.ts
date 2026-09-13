@@ -19,13 +19,13 @@ import {
   type ArtifactRegistryService,
   type CrdtService,
   type HumanEdit,
-  type ManagedArtifactTool,
   type RegisteredArtifact,
 } from "../../core/artifact.js"
 import { DriverInterpreter } from "../../core/durable/driver/interpreter.js"
 import { LoopDriverState } from "../../core/durable/loop-driver-state.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import type { Backend } from "../../runtime/artifact/export.js"
+import { EditParameters, ReadParameters, type Document } from "../../artifact/service.js"
 
 const toolSuffix = (name: string): string => Encoding.encodeBase64Url(name).replaceAll("=", "")
 
@@ -315,42 +315,6 @@ const editForHuman = (services: DocumentServices, artifact: string, crdt: CrdtSe
     operation: input.operation,
     attribution: input.attribution,
   })
-
-const ReadParameters = Schema.Struct({})
-const EditParameters = Schema.Struct({ base: Version, operation: RangeOperation })
-
-/** Model-facing tool that journals one exact artifact version read. @experimental */
-export type ReadTool = Tool.Tool<
-  `artifact_read_${string}`,
-  {
-    readonly parameters: typeof ReadParameters
-    readonly success: typeof ReadResult
-    readonly failure: typeof ArtifactError
-    readonly failureMode: "return"
-  },
-  DriverInterpreter | ToolContext
-> &
-  ManagedArtifactTool
-
-/** Model-facing exact-base text edit tool. @experimental */
-export type EditTool = Tool.Tool<
-  `artifact_edit_${string}`,
-  {
-    readonly parameters: typeof EditParameters
-    readonly success: typeof EditResult
-    readonly failure: typeof ArtifactError
-    readonly failureMode: "return"
-  },
-  DriverInterpreter | ToolContext
-> &
-  ManagedArtifactTool
-
-export interface Document {
-  readonly name: string
-  readonly read: Effect.Effect<ReadResult, ArtifactError>
-  readonly editTool: EditTool
-  readonly readTool: ReadTool
-}
 
 export const make = (options: {
   readonly name: string

@@ -6,16 +6,12 @@ import type { VectorStore } from "./vector-store.js"
 import { make as makeWorkingMemory, type Options as WorkingMemoryOptions } from "./working-memory.js"
 
 export * as SemanticRecall from "./semantic-recall.js"
-export * as Supermemory from "./supermemory.js"
 export * as VectorStore from "./vector-store.js"
 export * as WorkingMemory from "./working-memory.js"
 export interface Options {
   readonly working?: WorkingMemoryOptions
   readonly semantic?: SemanticRecallOptions
 }
-
-/** Hosted semantic Memory backed by Supermemory. */
-export { layer as layerSupermemory, SupermemoryError, type Options as SupermemoryOptions } from "./supermemory.js"
 
 /** @internal The ambient LanguageModel is required only when working memory summarizes without an explicit model layer. */
 type WorkingRequirement<O> = O extends { readonly working?: infer W }

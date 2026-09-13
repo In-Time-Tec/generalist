@@ -57,7 +57,7 @@ Consolidation uses the existing capability `learning` at level `ask`. It adds no
 
 - Consolidation reads durable Runtime journals, so process-local `Agent.run` calls are not episodes.
 - Only successful Runs are candidates. The current scan is bounded to the newest 10,000 successful Runs before applying `window`.
-- Versioning must be backed by a semantic adapter that implements `history` and `revert`. WorkingMemory and Supermemory do not.
+- Versioning must be backed by a semantic adapter that implements `history` and `revert`. WorkingMemory does not.
 - The recurrence subset and `BYHOUR` behavior are UTC-only; see [triggers](./triggers.md).
 
 ## Related

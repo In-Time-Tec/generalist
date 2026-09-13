@@ -31,7 +31,7 @@ import { TreePolicy } from "./tree/policy.js"
 import { ChildReadiness } from "./child/readiness.js"
 import { Remaining as RemainingBudget, type Remaining } from "../core/durable/run-budget.js"
 import { Result as CompletionGateResult, type Result as GateResult } from "../core/agent/gates/definition.js"
-import { HookFailed } from "../hooks/index.js"
+import { CheckpointInvalid, HookFailed, LifecyclePersistenceFailed, ReplayUnresolved } from "../hooks/index.js"
 
 export const ExecutionResult = ExecutionResultSchema
 export type ExecutionResult = ExecutionResultType
@@ -142,6 +142,9 @@ export const RunInspection: Schema.Codec<RunInspection, RunInspectionEncoded> = 
 export type RunFailure =
   | AgentExecutionFailure
   | HookFailed
+  | LifecyclePersistenceFailed
+  | CheckpointInvalid
+  | ReplayUnresolved
   | ExecutablePinMissing
   | ExecutableIdentityMismatch
   | ExecutableRegistrationInvalid
@@ -153,6 +156,9 @@ export type RunFailure =
 export const RunFailure = Schema.Union([
   AgentExecutionFailure,
   HookFailed,
+  LifecyclePersistenceFailed,
+  CheckpointInvalid,
+  ReplayUnresolved,
   ExecutablePinMissing,
   ExecutableIdentityMismatch,
   ExecutableRegistrationInvalid,

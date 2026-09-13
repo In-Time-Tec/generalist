@@ -10,20 +10,20 @@ Generalist does not currently require a contributor license agreement. By submit
 
 Imports under `generalist/*` are stable and follow semantic versioning. Imports under `generalist/unstable/*` may change in a minor release. Generalist does not re-export `effect/unstable/ai`; import `Prompt`, `Response`, `Tool`, `Toolkit`, and the other Effect AI types directly from that module.
 
-| Stable                                                         | Unstable                                             |
-| -------------------------------------------------------------- | ---------------------------------------------------- |
-| `generalist`                                                   | `generalist/unstable/a2a`                            |
-| `generalist/approvals`                                         | `generalist/unstable/ag-ui`                          |
-| `generalist/compaction`                                        | `generalist/unstable/cloudflare/*`                   |
-| `generalist/instructions` and `generalist/instructions/skills` | `generalist/unstable/foldkit`                        |
-| `generalist/host` and `generalist/server`                      |                                                      |
-| `generalist/memory`                                            | `generalist/unstable/mcp/*`                          |
-| `generalist/permissions`                                       | `generalist/unstable/providers/model-route`          |
-| `generalist/providers/*` except the unstable leaves at right   | `generalist/unstable/providers/openai-account-auth*` |
-| `generalist/repl` and `generalist/repl/bun`                    | `generalist/unstable/rivet`                          |
-| `generalist/runtime`                                           | `generalist/unstable/runtime/external-child-*`       |
-| `generalist/sandbox`                                           | `generalist/unstable/sandbox/*`                      |
-| `generalist/testing` and `generalist/testing/runtime-driver`   |                                                      |
+| Stable                                                         | Unstable                                       |
+| -------------------------------------------------------------- | ---------------------------------------------- |
+| `generalist`                                                   | `generalist/unstable/a2a`                      |
+| `generalist/approvals`                                         | `generalist/unstable/ag-ui`                    |
+| `generalist/compaction`                                        |                                                |
+| `generalist/instructions` and `generalist/instructions/skills` | `generalist/unstable/mcp/*`                    |
+| `generalist/host` and `generalist/server`                      |                                                |
+| `generalist/memory`                                            | `generalist/unstable/providers/model-route`    |
+| `generalist/permissions`                                       |                                                |
+| `generalist/providers/*` except the unstable leaves at right   |                                                |
+| `generalist/repl` and `generalist/repl/bun`                    |                                                |
+| `generalist/runtime`                                           | `generalist/unstable/runtime/external-child-*` |
+| `generalist/sandbox`                                           | `generalist/unstable/sandbox/*`                |
+| `generalist/testing` and `generalist/testing/runtime-driver`   |                                                |
 
 Stable modules must not import modules under `src/unstable`. A service can move to the stable tier only when it provides its production `layer`, a deterministic `layerTest`, and a reusable conformance suite exported from `generalist/testing`. Promotion also requires complete public documentation, a maintainer review of the resulting semver commitment, and all of the following:
 

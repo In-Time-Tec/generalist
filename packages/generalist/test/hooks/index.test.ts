@@ -16,6 +16,7 @@ import {
   ToolExecutor,
 } from "../../src/index.js"
 import { evaluate } from "../../src/core/agent/lifecycle/hooks.js"
+import { make as makeHooks } from "../../src/hooks/internal.js"
 import { Json } from "../core/json.js"
 import { ItLayer } from "../core/it-layer.js"
 import { unusedToolHandlerLayer } from "../core/tool-handler-layer.js"
@@ -584,7 +585,7 @@ layer(unusedToolHandlerLayer)("Hooks", (it) => {
           applyDecision: (current) => current,
         }).pipe(
           Effect.provideService(DurableDriver.DriverInterpreter, interpreter),
-          Effect.provideService(Hooks.Hooks, Hooks.make({ declarations })),
+          Effect.provideService(Hooks.Hooks, makeHooks({ declarations })),
         )
 
       expect((yield* run(first)).blocked).toBe("recorded veto")

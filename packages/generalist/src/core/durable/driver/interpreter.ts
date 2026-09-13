@@ -18,8 +18,8 @@ import type { ToolBatchCheckpoint } from "../../agent/tools/checkpoint.js"
 import { ActionableTaggedError, errorHint } from "../../error-hint.js"
 import { fromInput as operationFrom, modelCallOrdinal, type OperationSpec } from "./operation.js"
 import { scheduleOperations } from "./schedule.js"
-import { Checkpoint as HookCheckpoint } from "../../../hooks/index.js"
-import type { Checkpoint as GateCheckpoint } from "../../agent/gates/definition.js"
+import { Checkpoint as HookCheckpoint } from "../../../hooks/checkpoint.js"
+import type { Checkpoint as GateCheckpoint } from "../../agent/gates/checkpoint.js"
 import { capabilityCheckpointMethods, type CapabilityCheckpointService } from "./capability-checkpoint.js"
 import type { Registration } from "../component.js"
 import type { SessionState } from "../component/services.js"
@@ -104,6 +104,24 @@ export class DriverUnknownReplay extends ActionableTaggedError<DriverUnknownRepl
     hint: errorHint("Resolve the unknown never-replay operation from external evidence before resuming."),
   },
 ) {}
+
+type LifecyclePersistenceStage = "record" | "complete"
+const lifecyclePersistenceStages = new WeakMap<DriverError, LifecyclePersistenceStage>()
+
+/** @internal Narrow provenance used by lifecycle's public semantic failure boundary. */
+export const lifecyclePersistenceStage = (error: DriverError): LifecyclePersistenceStage | undefined =>
+  lifecyclePersistenceStages.get(error)
+
+const markLifecyclePersistence =
+  (stage: LifecyclePersistenceStage) =>
+  <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    effect.pipe(
+      Effect.tapError((error) =>
+        Effect.sync(() => {
+          if (Schema.is(DriverError)(error)) lifecyclePersistenceStages.set(error, stage)
+        }),
+      ),
+    )
 /** A process-local journal that records nothing; used when no host journal owns the operations. */
 export const journalNoop: Journal = {
   onScheduled: () => Effect.void,
@@ -140,6 +158,7 @@ export const make = (input: {
       Effect.flatMap((state) =>
         validateState({ state, registrations: input.components ?? [], sessionState: input.sessionState }),
       ),
+      Effect.mapError((error) => DriverStateInvalid.make({ message: `Invalid component checkpoint: ${error._tag}` })),
     )
     const schedule = scheduleOperations({ checkpointRef, driver: input.driver, journal, semaphore: commitSemaphore })
     const codecFailure = (spec: { readonly key: string }, branch: "success" | "failure", error: Schema.SchemaError) =>
@@ -233,7 +252,12 @@ export const make = (input: {
     > =>
       Effect.gen(function* () {
         yield* validateComponentState
-        const { operation, replay, batchTool, nested = false } = yield* schedule(spec)
+        const {
+          operation,
+          replay,
+          batchTool,
+          nested = false,
+        } = yield* schedule(spec).pipe(markLifecyclePersistence("record"))
         if (replay !== undefined) {
           yield* guardUnknownNeverReplay(operation, replay)
           if (replay._tag === "Succeeded") {
@@ -271,8 +295,14 @@ export const make = (input: {
         if (outcome !== undefined) {
           const encoded = yield* encodeOutcome(spec, outcome)
           yield* encoded._tag === "Unknown"
-            ? Effect.uninterruptible(commit(operation, encoded, batchTool, nested, spec.applyCheckpoint))
-            : commit(operation, encoded, batchTool, nested, spec.applyCheckpoint)
+            ? Effect.uninterruptible(
+                commit(operation, encoded, batchTool, nested, spec.applyCheckpoint).pipe(
+                  markLifecyclePersistence("complete"),
+                ),
+              )
+            : commit(operation, encoded, batchTool, nested, spec.applyCheckpoint).pipe(
+                markLifecyclePersistence("complete"),
+              )
         }
         return yield* Exit.isSuccess(exit) ? Effect.succeed(exit.value) : Effect.failCause(exit.cause)
       })

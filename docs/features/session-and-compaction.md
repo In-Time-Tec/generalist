@@ -74,7 +74,7 @@ The default strategy first bounds successful tool outputs, then keeps a safe rec
 
 ### Session-owned components
 
-A retained plan or workspace reference can outlive one Run without moving into an application cache. The existing durable component descriptor accepts `scope: "session"` with explicit `access: "session-owner"` and `inheritance: "none"`. The same registry, schema and handler pins, JSON byte bounds, deterministic transitions, and command receipts apply. This is a Runtime-backed lifetime; process-local Sessions do not provide durable component storage.
+A retained plan or workspace reference can outlive one Run without moving into an application cache. A declaration with `scope: "session"` derives owner-only access and no child inheritance; callers cannot weaken those rules. Generalist also derives the wire protocol, restore branch policy, and visible redaction policy. The same schema and handler pins, JSON byte bounds, deterministic transitions, and command receipts apply. This is a Runtime-backed lifetime; process-local Sessions do not provide durable component storage.
 
 An accepted component command commits its new value and immutable receipt through the Run checkpoint and the owning Runtime Session in one canonical transition. The next Run hydrates that Session materialization. A crash before the later tool-result publication preserves the accepted mutation but does not invent a successful tool result; replay returns the accepted receipt without repeating the transition. Missing registrations or incompatible pins fail before dispatch.
 
@@ -82,65 +82,45 @@ Only the fenced Run writer for that Session may accept a mutation. Child Runs us
 
 `Tasks` remains Run-scoped, including its existing explicit read-only child inheritance. Session components do not change task-list ownership, introduce a second registry, schedule work, restore external files, or roll back third-party effects.
 
-The scripted [Session tool recovery test](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/durable/driver/layer-for-run.test.ts) uses the public component API, interrupts execution after the accepted mutation, and reopens a fresh object Runtime Layer before continuing into a second Run. Shared runtime-driver expectations cover branch restoration and command receipt retention. The [packed consumer](https://github.com/In-Time-Tec/generalist/blob/main/scripts/package-smoke-components.ts) also registers, mutates, and reads a component across four Runs and fresh Runtime Layers using only package exports under Bun and Node. These use scripted models and a shared test bucket; they do not certify a cloud storage provider or simulate durable external files.
+The [Session tool recovery test](https://github.com/In-Time-Tec/generalist/blob/main/packages/generalist/test/core/durable/driver/layer-for-run.test.ts) uses the public component API, interrupts execution after the accepted mutation, and reopens a fresh object Runtime Layer before continuing into a second Run. Shared runtime-driver expectations cover branch restoration and command receipt retention. These use scripted models and a shared test bucket; they do not certify a cloud storage provider or simulate durable external files.
 
 ### Declare and use a Session component
 
-Import `generalist/components` to define application-owned state. This composition fragment adds a retained counter and its two Effect AI tools. Provide the resulting environment when registering the Agent and on each recovery host, along with an activated object Runtime, a model, and tool authorization. Production storage uses the existing S3 or native R2 Layer; `generalist/testing/durability` provides a test-only simulator and `layer(client)` for fresh-Layer tests.
+Import `generalist/components` to define application-owned state. `commandTool` binds the declaration and managed handler once; Runtime discovers and registers it without a separate component Layer or application handler. Provide the Agent and its ordinary services on each recovery host. Production storage uses an S3-compatible or local-directory Layer; `generalist/testing/durability` provides a test-only simulator and `layer(client)` for fresh-Layer tests.
 
 ```ts
-import { Layer, Schema } from "effect"
-import { Tool, Toolkit } from "effect/unstable/ai"
-import { Agent, DurableDriver } from "generalist"
+import { Schema } from "effect"
+import { Agent } from "generalist"
 import * as Components from "generalist/components"
 
 const counter = Components.make({
-  descriptor: {
-    version: "1",
-    key: "counter",
-    instance: "default",
-    schemaVersion: "1",
-    handler: "increment",
-    handlerVersion: "1",
-    scope: "session",
-    access: "session-owner",
-    inheritance: "none",
-    branch: "restore",
-    redaction: "visible",
-    maxStateBytes: 64,
-    maxCommandBytes: 64,
-    maxReceiptBytes: 4096,
-  },
+  key: "counter",
+  instance: "default",
+  schemaVersion: "1",
+  handler: "increment",
+  handlerVersion: "1",
+  scope: "session",
+  maxStateBytes: 64,
+  maxCommandBytes: 64,
+  maxReceiptBytes: 4096,
   state: Schema.Int,
   command: Schema.Int,
   initial: 0,
   transition: (state, amount) => state + amount,
 })
 
-const add = Tool.make("counter_add", {
+const add = Components.commandTool({
+  name: "counter_add",
+  description: "Add an amount to the retained counter.",
   parameters: Schema.Struct({ amount: Schema.Int }),
-  success: Schema.Int,
-  failure: Schema.Union([DurableDriver.DriverError, DurableDriver.DriverStateInvalid]),
-}).annotate(Components.CommandTool, counter.registration)
-const read = Tool.make("counter_read", {
-  parameters: Schema.Struct({}),
-  success: Schema.Int,
-  failure: DurableDriver.DriverStateInvalid,
-})
-const toolkit = Toolkit.make(add, read)
-const agent = Agent.make({ name: "counter-assistant", toolkit })
-const environment = Layer.mergeAll(
-  Components.layer([counter.registration]),
-  toolkit.toLayer({
-    counter_add: ({ amount }) => Components.command(counter, { command: amount }),
-    counter_read: () => Components.read(counter),
-  }),
-)
+  toCommand: ({ amount }) => amount,
+})(counter)
+const agent = Agent.make({ name: "counter-assistant", tools: [add] })
 ```
 
-`Components.command` encodes the typed command and uses the active tool's durable operation identity when `id` is omitted. Keep the `CommandTool` annotation on mutation tools: it selects the existing receipt-backed replay policy. Calls outside a tool must supply an explicit stable `id` and still execute inside an active Agent Run. `Components.read` returns the current schema-decoded value without appending a command or receipt. Both reject missing registrations or Session ownership; neither exposes a setter or a Session writer service.
+`Components.command` remains the advanced path for custom tools. It encodes the typed command and uses the active tool's durable operation identity when `id` is omitted; calls outside a tool must supply an explicit stable `id` and still execute inside an active Agent Run. Advanced tools annotate `Components.CommandTool` with the same registration, provide their own handler, and may combine that registration through `Components.layer`. `Components.read` returns the current schema-decoded value without appending a command or receipt. These APIs fail with sanitized semantic component errors and expose neither a setter nor Session writer authority.
 
-The same Session ID retains the counter across Runs; a different Session starts from zero. After rewind, `read` returns the restored value, while an exact retry of an abandoned command still returns its original immutable receipt result. Byte bounds also apply across successive Runs, so a full receipt budget rejects new mutations instead of growing indefinitely. The API is `@experimental`.
+The same Session ID retains the counter across Runs; a different Session starts from zero. After rewind, `read` returns the restored value, while an exact retry of an abandoned command still returns its original immutable receipt result, including `duplicate: false`. Byte bounds also apply across successive Runs, so a full receipt budget rejects new mutations without changing state or receipts. A fresh host reconstructs the exact retained declaration revision before replay. The API is `@experimental`.
 
 ### Conversation and compaction
 

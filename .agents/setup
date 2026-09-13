@@ -14,7 +14,7 @@ if [ "$(bun --version 2>/dev/null || true)" != "$BUN_VERSION" ]; then
 fi
 bun --version
 
-echo "==> Ensuring Node 22 (used by CI and the package smoke test)"
+echo "==> Ensuring Node 22 (used by CI)"
 if ! node --version 2>/dev/null | grep -q '^v22\.'; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
   sudo apt-get install -y nodejs

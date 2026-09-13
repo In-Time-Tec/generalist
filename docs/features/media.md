@@ -38,7 +38,7 @@ import { BlobStore } from "generalist"
 const blobs = BlobStore.layer({ environment: "development", tenant: "example-team" })
 ```
 
-Provide the same S3 or native R2 ObjectStore and Crypto used by the object engine. This is a Layer fragment; see [object durability](./durable-stores.md) for transport composition. The service exposes:
+Provide the same S3-compatible or local-directory ObjectStore and Crypto used by the object engine. This is a Layer fragment; see [object durability](./durable-stores.md) for transport composition. The service exposes:
 
 ```text
 put({ data, mediaType, filename? }) -> Media.Ref

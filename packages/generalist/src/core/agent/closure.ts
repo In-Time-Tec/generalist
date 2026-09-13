@@ -8,7 +8,7 @@ import type { ToolContext } from "../tools/tool-context.js"
 import type { Policy } from "../turn/policy.js"
 import { ClosedTypeId, isClosed as hasClosedIdentity } from "./lifecycle/closure-identity.js"
 import type { HandlersFor } from "./tool/fan-out.js"
-import type { ManagedArtifactTool } from "../artifact.js"
+import type { ManagedTool } from "../tools/managed-tool.js"
 import { copyCapabilities } from "./lifecycle/hosted/capability-binding.js"
 
 export { ClosedTypeId } from "./lifecycle/closure-identity.js"
@@ -30,7 +30,7 @@ export interface Any<PolicyServices = unknown> {
 }
 
 type ClosedToolServices<Tools extends Record<string, Tool.Any>> = {
-  [Name in keyof Tools]: Tools[Name] extends ManagedArtifactTool
+  [Name in keyof Tools]: Tools[Name] extends ManagedTool
     ? never
     : HandlersFor<Pick<Tools, Name>> | Exclude<Tool.HandlerServices<Tools[Name]>, ToolContext>
 }[keyof Tools]

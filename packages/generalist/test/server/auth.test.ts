@@ -1,4 +1,3 @@
-import "./example-auth-suite.js"
 import { expect, it as test, layer } from "@effect/vitest"
 import { vi } from "vitest"
 import { Config, Effect, Layer, Redacted, Schema } from "effect"

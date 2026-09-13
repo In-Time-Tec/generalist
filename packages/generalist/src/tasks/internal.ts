@@ -1,5 +1,5 @@
 /* oxlint-disable effecttsgo/missing-pipeable-signature -- Private prompt projection functions have direct internal call sites. */
-import { Context, Effect, Layer, Option, Schema } from "effect"
+import { Effect, Layer, Option, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../core/agent/lifecycle/definition.js"
 import { copyCapabilities } from "../core/agent/lifecycle/hosted/capability-binding.js"
@@ -7,13 +7,15 @@ import { DriverInterpreter } from "../core/durable/driver/interpreter.js"
 import { LoopDriverState } from "../core/durable/loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../core/durable/service.js"
 import { Items, readToolName, writeToolName, type Items as TaskItems } from "./item.js"
-import { CommandTool, layer as componentLayer } from "../core/durable/component.js"
+import { CommandTool } from "../core/durable/component.js"
 import { Inline } from "../core/tools/background/index.js"
 import { bounded, namespace } from "../core/durable/component/definition.js"
 import { ToolContext } from "../core/tools/tool-context.js"
+import { bindManagedTool } from "../core/tools/managed-tool.js"
 import { declaration } from "./component.js"
+import { Tasks } from "./service.js"
 
-const readTool = Tool.make(readToolName, {
+const unboundReadTool = Tool.make(readToolName, {
   description: "Read the current journaled task list.",
   parameters: Schema.Struct({}),
   success: Items,
@@ -21,7 +23,7 @@ const readTool = Tool.make(readToolName, {
   failureMode: "return",
   dependencies: [DriverInterpreter],
 }).annotate(Inline, true)
-const writeTool = Tool.make(writeToolName, {
+const unboundWriteTool = Tool.make(writeToolName, {
   description: "Replace the complete journaled task list. Preserve every task that should remain on the list.",
   parameters: Schema.Struct({ items: Items }),
   success: Items,
@@ -31,15 +33,7 @@ const writeTool = Tool.make(writeToolName, {
 })
   .annotate(CommandTool, declaration.registration)
   .annotate(Inline, true)
-const toolkit = Toolkit.make(readTool, writeTool)
-
-export interface Service {
-  readonly tools: ReadonlyArray<Tool.Any>
-}
-
-export class Configuration extends Context.Service<Configuration, Service>()(
-  "generalist/tasks/internal/Configuration",
-) {}
+const toolkit = Toolkit.make(unboundReadTool, unboundWriteTool)
 
 export const currentOption: Effect.Effect<Option.Option<TaskItems>, DriverStateInvalid, DriverInterpreter> = Effect.gen(
   function* () {
@@ -64,34 +58,38 @@ export const current: Effect.Effect<TaskItems, DriverStateInvalid, DriverInterpr
   Effect.map(Option.getOrElse(() => [])),
 )
 
-const handlers = toolkit.toLayer({
-  tasks_read: () => current,
-  tasks_write: ({ items }) =>
-    Effect.gen(function* () {
-      const driver = yield* DriverInterpreter
-      const context = yield* ToolContext
-      if (context.operationKey === undefined)
-        return yield* DriverStateInvalid.make({ message: "Tasks command requires a tool operation identity" })
-      const command = yield* Schema.encodeEffect(declaration.command)({ items }).pipe(
-        Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid Tasks component command" })),
-        Effect.flatMap((value) => bounded({ value, limit: declaration.registration.descriptor.maxCommandBytes })),
-      )
-      const result = yield* driver.componentCommand({
-        capability: declaration.registration.capability,
-        id: context.operationKey,
-        command,
-      })
-      return yield* Schema.decodeUnknownEffect(Items)(result).pipe(
-        Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid Tasks component state" })),
-      )
-    }),
-})
-
-export const layer = Layer.mergeAll(
-  Layer.succeed(Configuration, Configuration.of({ tools: [readTool, writeTool] })),
-  handlers,
-  componentLayer([declaration.registration]).pipe(Layer.orDie),
+const handlers = Effect.runSync(
+  toolkit.toHandlers({
+    tasks_read: () => current,
+    tasks_write: ({ items }) =>
+      Effect.gen(function* () {
+        const driver = yield* DriverInterpreter
+        const context = yield* ToolContext
+        if (context.operationKey === undefined)
+          return yield* DriverStateInvalid.make({ message: "Tasks command requires a tool operation identity" })
+        const command = yield* Schema.encodeEffect(declaration.command)({ items }).pipe(
+          Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid Tasks component command" })),
+          Effect.flatMap((value) => bounded({ value, limit: declaration.registration.descriptor.maxCommandBytes })),
+        )
+        const result = yield* driver
+          .componentCommand({
+            capability: declaration.registration.capability,
+            id: context.operationKey,
+            command,
+          })
+          .pipe(
+            Effect.mapError((error) => DriverStateInvalid.make({ message: `Tasks component failed: ${error._tag}` })),
+          )
+        return yield* Schema.decodeUnknownEffect(Items)(result).pipe(
+          Effect.mapError(() => DriverStateInvalid.make({ message: "Invalid Tasks component state" })),
+        )
+      }),
+  }),
 )
+const readTool = bindManagedTool({ tool: unboundReadTool, context: handlers })
+const writeTool = bindManagedTool({ tool: unboundWriteTool, context: handlers })
+
+export const layer: Layer.Layer<Tasks> = Layer.succeed(Tasks, Tasks.of({ tools: Object.freeze([readTool, writeTool]) }))
 
 export const eventFields = (input: {
   readonly name: string

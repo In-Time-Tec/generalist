@@ -1,6 +1,6 @@
 import { Effect, Encoding, Layer, Result, Stream } from "effect"
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai"
-import { adapt } from "../../core/model/middleware.js"
+import { adapt } from "../../core/model/service.js"
 
 const imageMediaTypes = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"])
 const base64Pattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/

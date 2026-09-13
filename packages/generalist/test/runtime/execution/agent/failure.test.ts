@@ -99,4 +99,12 @@ describe("terminal agent failure messages", () => {
     const error = Hooks.HookFailed.make({ event: "RunStart", cause: new TypeError("invalid replacement") })
     expect(toRunFailure(Cause.fail(error))).toStrictEqual(error)
   })
+
+  it.each([
+    Hooks.LifecyclePersistenceFailed.make({ operationKey: "hook:run:start", stage: "load", message: "unavailable" }),
+    Hooks.CheckpointInvalid.make({ checkpointKey: "hook:run:start", event: "RunStart", message: "invalid" }),
+    Hooks.ReplayUnresolved.make({ operationKey: "run:hook:1", replayKey: "operation:1", message: "unknown" }),
+  ])("preserves semantic lifecycle failure $_tag as the terminal RunFailure", (error) => {
+    expect(toRunFailure(Cause.fail(error))).toStrictEqual(error)
+  })
 })

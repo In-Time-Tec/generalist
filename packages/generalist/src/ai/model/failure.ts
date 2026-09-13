@@ -1,6 +1,6 @@
 import { Effect, Function, Layer, Stream } from "effect"
 import { AiError, LanguageModel, Response } from "effect/unstable/ai"
-import { adapt } from "../../core/model/middleware.js"
+import { adapt } from "../../core/model/service.js"
 export type Method = "generateText" | "generateObject" | "streamText"
 export interface FailureInput {
   readonly error: unknown

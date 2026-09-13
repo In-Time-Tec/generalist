@@ -1,11 +1,10 @@
 import { Effect } from "effect"
 import { RuntimeUnavailable } from "../../runtime/errors.js"
-import { get } from "../../runtime/reward/export.js"
+import { get, type DagRuntime } from "../../runtime/reward/export.js"
 import { Runtime } from "../../runtime/service.js"
-import type { ExportRuntime } from "../../runtime/reward/writer.js"
 
 /** Acquire journal reads and reward recording from the Runtime that owns them. @experimental */
-export const runtime: Effect.Effect<ExportRuntime, RuntimeUnavailable, Runtime> = Effect.flatMap(Runtime, (service) => {
+export const runtime: Effect.Effect<DagRuntime, RuntimeUnavailable, Runtime> = Effect.flatMap(Runtime, (service) => {
   const capability = get(service)
   return capability === undefined
     ? Effect.fail(RuntimeUnavailable.make({ message: "Runtime has no journal export capability" }))

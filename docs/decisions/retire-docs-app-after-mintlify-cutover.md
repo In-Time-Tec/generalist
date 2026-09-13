@@ -8,6 +8,5 @@ deployment target. The former `apps/docs` Foldkit site was removed instead of re
 rendering, and deployment system.
 
 The authored TypeScript pages were rendered to Markdown during migration. Their runnable sources live under
-`examples/docs-snippets` and remain part of the scripted-surface check. The Foldkit adapter and the independently useful
-deep-research web example remain supported; neither requires retaining a parallel docs shell. A future interactive demo
-must be an independently useful example rather than another documentation application.
+`docs/src/snippets` and remain part of the documentation source. A future interactive demo must be an independently
+useful product surface rather than another documentation application.

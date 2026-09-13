@@ -16,7 +16,7 @@ Developers compose typed behavior through Effect services and Layers. They choos
 
 ## The architectural bet
 
-Keep durable work independent of the machine executing it. `generalist` provides the process-local loop; `generalist/runtime` defines Runs, waits, replay, and typed recovery. `generalist/durability` implements that contract through one object-storage engine with S3 and native R2 transports. Local processes, servers, Cloudflare Durable Objects, and Rivet actors are compute hosts, not competing storage authorities.
+Keep durable work independent of the machine executing it. `generalist` provides the process-local loop; `generalist/runtime` defines Runs, waits, replay, and typed recovery. `generalist/durability` implements that contract through one object-storage engine with local-directory and S3 transports. Applications can host Runtime anywhere that can reconstruct its Effect Layers; Generalist does not ship vendor compute-host adapters.
 
 Independent partitions provide a route to scaling across workloads. A waiting Run does not require its original execution process to remain alive. A replacement host can reconstruct accepted state when it has the required code, configuration, and resource access. Caches, wake notifications, and client views help execute and observe work; they do not decide what committed.
 
@@ -31,7 +31,9 @@ Object storage is a design choice, not a performance result. Commands within a p
 
 ## What we are not building
 
-Generalist is not a hosted service, general workflow engine, identity system, deployment platform, or turnkey product UI. Demo interfaces show how to integrate the framework; they are not a managed agent product. We do not replace model providers, search databases, or application-owned security policy.
+Generalist is not a hosted service, general workflow engine, identity system, deployment platform, provider SDK, sandbox marketplace, or turnkey product UI. Demo interfaces show how to integrate the framework; they are not a managed agent product. We do not replace model providers, search databases, compute platforms, or application-owned security policy.
+
+The package owns stable semantic seams rather than every possible integration. Applications and third-party packages adapt model providers, compute hosts, sandboxes, memory services, and user-interface frameworks through Effect services and Layers. Generalist keeps only integrations that establish framework interoperability or its durability contract: the generic server, MCP and agent protocols, local-directory storage, and S3-compatible object storage.
 
 Core remains usable without Runtime or storage. Durable execution has one current object-native contract, not a collection of SQL, memory, filesystem, or compatibility backends.
 

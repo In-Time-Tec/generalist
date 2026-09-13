@@ -7,16 +7,20 @@ import {
   RewardStorageFailed,
   type RewardWriteError,
   type RewardWriter,
-  type ExportRuntime,
 } from "./writer.js"
 import type { RuntimeLifecycleService } from "../state/layer.js"
 import type { Service as RunStore } from "../run/store.js"
-import type { Service as ApplicationRuntime } from "../application.js"
-import type { Service as EngineRuntime } from "../engine.js"
 
-type RuntimeOwner = ApplicationRuntime | EngineRuntime
+interface RuntimeOwner {
+  readonly toString: () => string
+}
 
-const bindings = new WeakMap<RuntimeOwner, ExportRuntime>()
+/** Cross-driver Runtime methods required by trajectory export. @experimental */
+export interface DagRuntime extends JournalReader {
+  readonly rewards: RewardWriter
+}
+
+const bindings = new WeakMap<RuntimeOwner, DagRuntime>()
 
 export const bind = (input: {
   readonly runtime: RuntimeOwner
@@ -121,7 +125,7 @@ export const bind = (input: {
   )
 }
 
-export const get = (runtime: RuntimeOwner): ExportRuntime | undefined => bindings.get(runtime)
+export const get = (runtime: RuntimeOwner): DagRuntime | undefined => bindings.get(runtime)
 
 export const copy = <Runtime extends RuntimeOwner>(input: {
   readonly source: RuntimeOwner

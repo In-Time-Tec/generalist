@@ -25,7 +25,7 @@ const layer = ProgramRunner.layerDirect({ executor, handlers })
 const result = AgentProgram.run(program, { value: 41 }).pipe(Effect.provide(layer))
 ```
 
-`executor` is a production `CodeExecutor`; Generalist's shipped implementation is Cloudflare Worker Loader at `generalist/unstable/cloudflare/dynamic-workers`. Test-only examples may use `CodeExecutor.makeTest`.
+`executor` is an application-supplied production `CodeExecutor`. Generalist supplies trusted test constructors but no production isolation adapter.
 
 ## What runs
 
@@ -84,7 +84,7 @@ These are Program tools, not an automatic adapter for arbitrary Toolkit handlers
 - Executor admission fails before evaluation for absent/trusted isolation, non-fresh persistence, non-default-deny network, unenforced guarantees, or requested limits above an executor maximum.
 - Result validation binds protocol version, request ID, source digest, and both codec identities; the executor evaluates only the normalized request while `ProgramRunner` remains authoritative for closure, codecs, and budgets.
 - `sidecar-process-v8-isolate` means a native child-process sidecar owns the V8 isolate; it does not mean in-process execution, Wasm, a container, or a microVM.
-- Generalist ships a production Cloudflare Worker Loader executor, but no AgentOS or E2B executor.
+- Production `CodeExecutor` implementations are application- or ecosystem-owned and must qualify their isolation and capability claims independently.
 - `CodeExecutor.makeTest` and `layerTest` are trusted, unenforced fixtures rejected by production admission and provider conformance; conformance observes the boundary but cannot prove vendor physical isolation, and evidence must distinguish fixtures, local runtimes, and credentialed providers.
 - `ProgramAuthority` pins one sandbox and input/output codecs, bounds source bytes/catalogs/budgets, and exposes no general dynamic-executable admission operation.
 - Selection failures identify the catalog dimension, requested ID, and complete bounded allowed-ID catalog.
@@ -101,5 +101,4 @@ These are Program tools, not an automatic adapter for arbitrary Toolkit handlers
 
 ## Related
 
-- Source: `packages/generalist/src/core/program/`, `packages/generalist/src/runtime/code-mode.ts`, `packages/generalist/src/runtime/program/`, `packages/generalist/src/cloudflare/dynamic-workers/`
-- Decisions/tradeoffs: [`agentos-code-executor-rejected.md`](../decisions/agentos-code-executor-rejected.md), [`e2b-program-executor-rejected.md`](../decisions/e2b-program-executor-rejected.md)
+- Source: `packages/generalist/src/core/program/`, `packages/generalist/src/runtime/code-mode.ts`, `packages/generalist/src/runtime/program/`

@@ -16,11 +16,10 @@ import {
   type Inheritance,
   type InheritanceOptions,
 } from "../../core/agent/lifecycle/fan-out.js"
-import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import { inheritanceFor } from "../../core/tools/tool-context/internal.js"
-import { managedToolHandlers } from "../../core/artifact.js"
+import { managedToolHandlers } from "../../core/tools/managed-tool.js"
 import {
   type CancellationRequest,
   type DomainFailure,
@@ -34,7 +33,7 @@ import {
   route as toolExecutorRoute,
 } from "../../core/tools/tool-executor.js"
 import type { Route } from "../../core/tools/tool-placement.js"
-import { HookFailed } from "../../hooks/index.js"
+import { CheckpointInvalid, HookFailed, LifecyclePersistenceFailed, ReplayUnresolved } from "../../hooks/index.js"
 import { ChildDepthExceeded, ChildLimitExceeded } from "../errors.js"
 import type { FanOutJoin, FanOutRemainder } from "./fan-out.js"
 import {
@@ -135,8 +134,10 @@ export const catchDomainFailure = <A, E, R>(
   effect.pipe(
     Effect.catch((error): Effect.Effect<DomainFailure, ChildHookError> => {
       if (Schema.is(HookFailed)(error)) return Effect.fail(error)
-      if (Schema.is(DriverError)(error)) return Effect.fail(error)
-      if (Schema.is(DriverStateInvalid)(error)) return Effect.fail(error)
+      if (Schema.is(LifecyclePersistenceFailed)(error)) return Effect.fail(error)
+      if (Schema.is(CheckpointInvalid)(error)) return Effect.fail(error)
+      if (Schema.is(ReplayUnresolved)(error)) return Effect.fail(error)
+      if (Schema.is(Exhausted)(error)) return Effect.fail(error)
       return Effect.succeed(domainFailure(error))
     }),
   )

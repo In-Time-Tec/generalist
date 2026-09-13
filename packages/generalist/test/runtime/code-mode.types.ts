@@ -194,12 +194,7 @@ declare const selectedAgentWithTool: Agent.Agent<
 declare const codeModeStorage: Layer.Layer<ObjectStore | Crypto.Crypto>
 declare const modelRegistryAndExecutor: Layer.Layer<ModelRegistry.ModelRegistry | CodeExecutor.CodeExecutor>
 declare const modelExecutorAndStep: Layer.Layer<
-  | ModelRegistry.ModelRegistry
-  | CodeExecutor.CodeExecutor
-  | StepDependency
-  | StepInputDecoding
-  | StepOutputEncoding
-  | StepFailureEncoding
+  ModelRegistry.ModelRegistry | CodeExecutor.CodeExecutor | StepDependency
 >
 
 const selectedToolRoot = Agent.make({
@@ -223,15 +218,16 @@ const selectedToolRoot = Agent.make({
   },
 })
 
-// oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- This negative compile assertion intentionally omits a selected Agent's services.
-Runtime.layer({
-  agents: { "selected-tool-root": selectedToolRoot },
+const selectedToolAgents = { "selected-tool-root": selectedToolRoot }
+const selectedToolOptions: Runtime.Options<typeof selectedToolAgents> = {
+  agents: selectedToolAgents,
   revision: "selected-tool-root-v1",
   // @ts-expect-error a selected Agent's own Tool handler Layer is part of the root declaration environment.
   services: modelRegistryAndExecutor,
   storage: codeModeStorage,
   namespace: { environment: "test", tenant: "code-mode-types", partition: "local" },
-})
+}
+void selectedToolOptions
 
 const stepCodecRoot = Agent.make({
   name: "step-codec-root",
@@ -254,9 +250,6 @@ const stepCodecRoot = Agent.make({
   },
 })
 
-type _StepRootKeepsInputDecoding = Assert<IsAssignable<StepInputDecoding, Agent.Requirements<typeof stepCodecRoot>>>
-type _StepRootKeepsOutputEncoding = Assert<IsAssignable<StepOutputEncoding, Agent.Requirements<typeof stepCodecRoot>>>
-type _StepRootKeepsFailureEncoding = Assert<IsAssignable<StepFailureEncoding, Agent.Requirements<typeof stepCodecRoot>>>
 Runtime.layer({
   agents: { "step-codec-root": stepCodecRoot },
   revision: "step-codec-root-v1",

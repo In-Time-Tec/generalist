@@ -219,18 +219,17 @@ export const layer = (
               termination,
             )
           let triggersFirst = false
-          const allocateExternalFuel = (fuel: number): number => {
-            if (Option.isNone(peerRoutes)) return 0
-            if (fuel >= 3) return Math.max(1, Math.floor(fuel / 3))
-            return externalFirst ? 0 : 1
-          }
           const drain: SchedulerService["drain"] = ({ fuel = 64 } = {}) => {
             if (!Number.isSafeInteger(fuel) || fuel <= 0) {
               return RuntimeUnavailable.make({ message: "scheduler fuel must be a positive safe integer" })
             }
             triggersFirst = !triggersFirst
             externalFirst = !externalFirst
-            const externalFuel = allocateExternalFuel(fuel)
+            let externalFuel = 0
+            if (Option.isSome(peerRoutes)) {
+              if (fuel >= 3) externalFuel = Math.max(1, Math.floor(fuel / 3))
+              else if (!externalFirst) externalFuel = 1
+            }
             const internalFuel = fuel - externalFuel
             let triggerFuel = Math.ceil(internalFuel / 2)
             if (internalFuel === 1 && !triggersFirst) triggerFuel = 0

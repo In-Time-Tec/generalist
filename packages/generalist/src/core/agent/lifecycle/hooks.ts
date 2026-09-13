@@ -3,12 +3,12 @@ import { Cause, Effect, Option, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import {
   Continue,
-  chainPin,
+  CheckpointInvalid,
   Decision,
-  DecisionByEvent,
   HookFailed,
   Hooks,
-  type Checkpoint as HookCheckpoint,
+  LifecyclePersistenceFailed,
+  ReplayUnresolved,
   type Declaration,
   type Decision as HookDecision,
   type Event as HookEvent,
@@ -25,7 +25,10 @@ import {
   type ToolResultInput,
   type TurnStartInput,
 } from "../../../hooks/index.js"
-import { DriverInterpreter, DriverUnknownReplay } from "../../durable/driver/interpreter.js"
+import type { Checkpoint as HookCheckpoint } from "../../../hooks/checkpoint.js"
+import { DecisionByEvent } from "../../../hooks/decision.js"
+import { chainPin } from "../../../hooks/internal.js"
+import { DriverInterpreter, lifecyclePersistenceStage } from "../../durable/driver/interpreter.js"
 import { Exhausted } from "../../durable/run-budget.js"
 import { digest, type CapabilityPin } from "../../durable/pin.js"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
@@ -112,10 +115,16 @@ const invoke = <Input>(
 }
 
 /** Recorded decisions cross the checkpoint boundary; re-validate them against the event's allowed set. */
-const recordedDecision = (event: HookEvent, decision: HookDecision): Effect.Effect<HookDecision, DriverStateInvalid> =>
+const recordedDecision = (
+  checkpointKey: string,
+  event: HookEvent,
+  decision: HookDecision,
+): Effect.Effect<HookDecision, CheckpointInvalid> =>
   Schema.decodeEffect(DecisionByEvent[event])(decision).pipe(
     Effect.mapError(() =>
-      DriverStateInvalid.make({
+      CheckpointInvalid.make({
+        checkpointKey,
+        event,
         message: `Recorded ${event} hook decision is outside the event's allowed set`,
       }),
     ),
@@ -123,10 +132,33 @@ const recordedDecision = (event: HookEvent, decision: HookDecision): Effect.Effe
 
 /** Recorded decisions are re-validated against the allowed set, then prompt-boundary `Replace` values are checked before use. */
 const recordedDecisions = (
+  checkpointKey: string,
   event: HookEvent,
   decisions: ReadonlyArray<HookDecision>,
-): Effect.Effect<ReadonlyArray<HookDecision>, DriverStateInvalid | HookFailed> =>
-  Effect.forEach(decisions, (decision) => recordedDecision(event, decision).pipe(Effect.flatMap(checkDecision(event))))
+): Effect.Effect<ReadonlyArray<HookDecision>, CheckpointInvalid> =>
+  Effect.forEach(decisions, (decision) =>
+    recordedDecision(checkpointKey, event, decision).pipe(
+      Effect.flatMap((valid) =>
+        checkDecision(event)(valid).pipe(
+          Effect.mapError((error) => CheckpointInvalid.make({ checkpointKey, event, message: String(error.cause) })),
+        ),
+      ),
+    ),
+  )
+
+const checkpointInvalid = (checkpointKey: string, event: HookEvent, error: DriverStateInvalid) =>
+  CheckpointInvalid.make({ checkpointKey, event, message: error.message })
+
+const persistenceFailed = (
+  operationKey: string,
+  stage: "load" | "record" | "complete",
+  error: DriverError,
+): LifecyclePersistenceFailed | Exhausted => {
+  const exhausted = error.cause === undefined ? undefined : Schema.decodeUnknownOption(Exhausted)(error.cause)
+  return exhausted?._tag === "Some"
+    ? exhausted.value
+    : LifecyclePersistenceFailed.make({ operationKey, stage, message: error.message })
+}
 
 // SAFETY: typed prompt hook constructors only admit Replace<Prompt.RawInput>; invoke and replay validate the value before use.
 const replacementPrompt = (value: typeof Schema.Unknown.Type): Prompt.Prompt => Prompt.make(value as Prompt.RawInput)
@@ -190,21 +222,36 @@ const prepare = (options: {
     const allDeclarations = Option.isSome(service) ? service.value.declarations : []
     const chain = yield* Effect.try({
       try: () => chainPin(allDeclarations),
-      catch: () => DriverStateInvalid.make({ message: "Invalid hook chain declaration" }),
+      catch: () =>
+        CheckpointInvalid.make({
+          checkpointKey: options.key,
+          event: options.event,
+          message: "Invalid hook chain declaration",
+        }),
     })
     const loaded = Option.isSome(interpreter)
-      ? yield* loadRecorded(interpreter.value, options.key, options.event, chain)
+      ? yield* loadRecorded(interpreter.value, options.key, options.event, chain).pipe(
+          Effect.mapError((error) => checkpointInvalid(options.key, options.event, error)),
+        )
       : { recorded: undefined, logicalOperationId: options.input.runId, initialized: false }
     const recorded = loaded.recorded
     const declarations = allDeclarations.filter((declaration) => declaration.event === options.event)
     if (Option.isSome(interpreter) && recorded === undefined && (declarations.length > 0 || !loaded.initialized)) {
-      yield* interpreter.value.recordHookDecisions({
-        chain,
-        key: options.key,
-        event: options.event,
-        decisions: [],
-        complete: declarations.length === 0,
-      })
+      yield* interpreter.value
+        .recordHookDecisions({
+          chain,
+          key: options.key,
+          event: options.event,
+          decisions: [],
+          complete: declarations.length === 0,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            Schema.is(DriverError)(error)
+              ? persistenceFailed(options.key, declarations.length === 0 ? "complete" : "record", error)
+              : checkpointInvalid(options.key, options.event, error),
+          ),
+        )
     }
     return { interpreter, chain, recorded, declarations, logicalOperationId: loaded.logicalOperationId }
   })
@@ -221,18 +268,24 @@ export const evaluate = <
   readonly outputSchema?: S
 }): Effect.Effect<
   Result<Input>,
-  HookFailed | DriverError | DriverStateInvalid | DriverUnknownReplay | Exhausted,
+  HookFailed | LifecyclePersistenceFailed | CheckpointInvalid | ReplayUnresolved | Exhausted,
   S["EncodingServices"]
 > =>
   Effect.gen(function* () {
     const { interpreter, chain, recorded, declarations, logicalOperationId } = yield* prepare(options)
     if (recorded?.complete === true) {
-      return apply(options.input, yield* recordedDecisions(options.event, recorded.decisions), options.applyDecision)
+      return apply(
+        options.input,
+        yield* recordedDecisions(options.key, options.event, recorded.decisions),
+        options.applyDecision,
+      )
     }
-    const decisions = [...(yield* recordedDecisions(options.event, recorded?.decisions ?? []))]
+    const decisions = [...(yield* recordedDecisions(options.key, options.event, recorded?.decisions ?? []))]
     if (declarations.length === 0) return apply(options.input, decisions, options.applyDecision)
     if (decisions.length > declarations.length) {
-      return yield* DriverStateInvalid.make({
+      return yield* CheckpointInvalid.make({
+        checkpointKey: options.key,
+        event: options.event,
         message: `Hook checkpoint ${options.key} has more decisions than registered ${options.event} hooks`,
       })
     }
@@ -247,39 +300,65 @@ export const evaluate = <
       })
       const effect = invoke(declaration, current, operationKey)
       const outcome = yield* Option.isSome(interpreter)
-        ? interpreter.value.run(
-            {
-              kind: "hook",
-              key: operationKey,
-              input: {
-                chain,
-                event: options.event,
-                key: declaration.key,
-                version: declaration.version,
-                input: operationInput,
+        ? interpreter.value
+            .run(
+              {
+                kind: "hook",
+                key: operationKey,
+                input: {
+                  chain,
+                  event: options.event,
+                  key: declaration.key,
+                  version: declaration.version,
+                  input: operationInput,
+                },
+                replayPolicy: declaration.replayPolicy,
+                success: Decision,
+                failure: HookFailed,
               },
-              replayPolicy: declaration.replayPolicy,
-              success: Decision,
-              failure: HookFailed,
-            },
-            effect,
-          )
+              effect,
+            )
+            .pipe(
+              Effect.catchTags({
+                "generalist/core/DriverError": (error) =>
+                  Effect.fail(persistenceFailed(operationKey, lifecyclePersistenceStage(error) ?? "load", error)),
+                "generalist/core/DriverStateInvalid": (error) =>
+                  Effect.fail(checkpointInvalid(options.key, options.event, error)),
+                "generalist/core/DriverUnknownReplay": (error) =>
+                  Effect.fail(
+                    ReplayUnresolved.make({
+                      operationKey: error.operationKey,
+                      replayKey: error.operationId,
+                      message: `Replay outcome is unresolved for ${error.operationKey}`,
+                    }),
+                  ),
+              }),
+            )
         : effect
-      const decision = yield* recordedDecision(options.event, outcome)
+      const decision = yield* recordedDecision(options.key, options.event, outcome)
       decisions.push(decision)
       current = options.applyDecision(current, decision)
       if (Option.isSome(interpreter)) {
-        const checkpoint = yield* interpreter.value.recordHookDecisions({
-          chain,
-          key: options.key,
-          event: options.event,
-          decisions: [...decisions],
-          complete: decision._tag === "Block" || index === declarations.length - 1,
-        })
+        const complete = decision._tag === "Block" || index === declarations.length - 1
+        const checkpoint = yield* interpreter.value
+          .recordHookDecisions({
+            chain,
+            key: options.key,
+            event: options.event,
+            decisions: [...decisions],
+            complete,
+          })
+          .pipe(
+            Effect.mapError((error) =>
+              Schema.is(DriverError)(error)
+                ? persistenceFailed(operationKey, complete ? "complete" : "record", error)
+                : checkpointInvalid(options.key, options.event, error),
+            ),
+          )
         if (checkpoint.decisions.length !== decisions.length) {
           return apply(
             options.input,
-            yield* recordedDecisions(options.event, checkpoint.decisions),
+            yield* recordedDecisions(options.key, options.event, checkpoint.decisions),
             options.applyDecision,
           )
         }

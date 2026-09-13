@@ -1,5 +1,0 @@
-mounted: workspace.read
-allowed: Success
-denied: Failure generalist/docs/WorkspaceDenied
-generalist/repl/HostModuleNotFound module=web
-generalist/repl/HostModuleSchemaFailure stage=decode-input

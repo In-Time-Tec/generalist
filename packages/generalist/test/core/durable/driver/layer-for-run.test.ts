@@ -8,8 +8,7 @@ import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { makeObjectStorage, objectRuntimeLayer } from "../../../runtime/execution/object.js"
 import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.js"
-import { DriverError, DriverStateInvalid } from "../../../../src/core/durable/service.js"
-import { CommandTool, command, layer, make, read } from "generalist/components"
+import { CommandTool, ComponentFailure, command, layer, make, read } from "generalist/components"
 
 const usage = Response.Usage.make({
   inputTokens: { total: 1, uncached: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -26,22 +25,15 @@ it.effect("recovers an accepted Session tool mutation without applying it twice,
     let transitions = 0
     const reads: Array<number> = []
     const component = make({
-      descriptor: {
-        version: "1",
-        key: "session-counter",
-        instance: "default",
-        schemaVersion: "1",
-        handler: "increment",
-        handlerVersion: "1",
-        scope: "session",
-        access: "session-owner",
-        inheritance: "none",
-        branch: "restore",
-        redaction: "visible",
-        maxStateBytes: 64,
-        maxCommandBytes: 64,
-        maxReceiptBytes: 4096,
-      },
+      key: "session-counter",
+      instance: "default",
+      schemaVersion: "1",
+      handler: "increment",
+      handlerVersion: "1",
+      scope: "session",
+      maxStateBytes: 64,
+      maxCommandBytes: 64,
+      maxReceiptBytes: 4096,
       state: Schema.Int,
       command: Schema.Int,
       initial: 0,
@@ -51,15 +43,17 @@ it.effect("recovers an accepted Session tool mutation without applying it twice,
       },
     })
     expect(yield* read(component).pipe(Effect.flip)).toMatchObject({
-      message: "Component read requires an active Agent Run",
+      _tag: "generalist/components/ComponentUnavailable",
+      reason: "outside-run",
     })
     expect(yield* command(component, { command: 1 }).pipe(Effect.flip)).toMatchObject({
-      message: "Component command requires an active Agent Run",
+      _tag: "generalist/components/ComponentUnavailable",
+      reason: "outside-run",
     })
     const tool = Tool.make("increment", {
       parameters: Schema.Struct({ amount: Schema.Int }),
       success: Schema.Json,
-      failure: Schema.Union([DriverError, DriverStateInvalid]),
+      failure: ComponentFailure,
       failureMode: "return",
     }).annotate(CommandTool, component.registration)
     const toolkit = Toolkit.make(tool)

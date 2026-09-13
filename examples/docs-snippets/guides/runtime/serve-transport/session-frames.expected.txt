@@ -1,2 +1,0 @@
-live:   0:RunAccepted 1:RunAttemptStarted 2:TurnStarted 3:ModelCallStarted 4:ModelAttemptStarted 5:ModelAttemptFirstOutput 6:ModelResponseCommitted 7:ModelAttemptCompleted 8:ModelCallCompleted 9:TurnCompleted 10:RunCompleted
-replay: 3:ModelCallStarted 4:ModelAttemptStarted 5:ModelAttemptFirstOutput 6:ModelResponseCommitted 7:ModelAttemptCompleted 8:ModelCallCompleted 9:TurnCompleted 10:RunCompleted

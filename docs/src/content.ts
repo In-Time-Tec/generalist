@@ -1,43 +1,27 @@
 import manifest from "../../package.json" with { type: "json" }
-import firstAgent from "../../examples/docs-snippets/website/first-agent.ts?raw"
-import tools from "../../examples/docs-snippets/website/tools.ts?raw"
-import repositoryTools from "../../examples/docs-snippets/website/repository.ts?raw"
-import liveModel from "../../examples/docs-snippets/website/live-model.ts?raw"
-import structuredOutput from "../../examples/docs-snippets/website/structured-output.ts?raw"
-import approvals from "../../examples/docs-snippets/website/approvals.ts?raw"
-import streaming from "../../examples/docs-snippets/website/streaming.ts?raw"
-import instructions from "../../examples/docs-snippets/website/instructions.ts?raw"
-import sessions from "../../examples/docs-snippets/website/sessions.ts?raw"
-import tasks from "../../examples/docs-snippets/website/tasks.ts?raw"
-import fanOut from "../../examples/docs-snippets/website/fan-out.ts?raw"
-import qualityGates from "../../examples/docs-snippets/website/quality-gates.ts?raw"
-import middleware from "../../examples/docs-snippets/website/middleware.ts?raw"
-import memo from "../../examples/docs-snippets/website/memo.ts?raw"
-import compaction from "../../examples/docs-snippets/website/compaction.ts?raw"
-import agentTest from "../../examples/docs-snippets/website/test/agent.test.ts?raw"
-import hooks from "../../examples/docs-snippets/website/hooks.ts?raw"
-import mcpServer from "../../examples/docs-snippets/website/mcp-server.ts?raw"
-import mcpClient from "../../examples/docs-snippets/website/mcp-client.ts?raw"
-import memory from "../../examples/docs-snippets/website/memory.ts?raw"
-import skills from "../../examples/docs-snippets/website/skills.ts?raw"
-import sandbox from "../../examples/docs-snippets/website/sandbox.ts?raw"
-import { websiteCheckpoints } from "../../examples/docs-snippets/website/checkpoints"
-import codingFixture from "../../examples/coding-agent-rivet/src/fixture.ts?raw"
-import codingAgents from "../../examples/coding-agent-rivet/src/agents.ts?raw"
-import codingModel from "../../examples/coding-agent-rivet/src/model.ts?raw"
-import codingServices from "../../examples/coding-agent-rivet/src/services.ts?raw"
-import codingMessaging from "../../examples/coding-agent-rivet/src/messaging.ts?raw"
-import codingExecutable from "../../examples/coding-agent-rivet/src/executable.ts?raw"
-import codingConfig from "../../examples/coding-agent-rivet/src/config.ts?raw"
-import codingCommand from "../../examples/coding-agent-rivet/src/command.ts?raw"
-import codingActor from "../../examples/coding-agent-rivet/src/actor.ts?raw"
-import codingRegistry from "../../examples/coding-agent-rivet/src/registry.ts?raw"
-import codingErrors from "../../examples/coding-agent-rivet/src/errors.ts?raw"
-import codingMain from "../../examples/coding-agent-rivet/src/main.ts?raw"
-import codingDemo from "../../examples/coding-agent-rivet/src/demo.ts?raw"
-import codingTest from "../../examples/coding-agent-rivet/test/coding-agent.test.ts?raw"
-import codingCompose from "../../examples/coding-agent-rivet/compose.yaml?raw"
-import codingEnvironment from "../../examples/coding-agent-rivet/.env.example?raw"
+import firstAgent from "./snippets/first-agent.ts?raw"
+import tools from "./snippets/tools.ts?raw"
+import repositoryTools from "./snippets/repository.ts?raw"
+import liveModel from "./snippets/live-model.ts?raw"
+import structuredOutput from "./snippets/structured-output.ts?raw"
+import approvals from "./snippets/approvals.ts?raw"
+import streaming from "./snippets/streaming.ts?raw"
+import instructions from "./snippets/instructions.ts?raw"
+import sessions from "./snippets/sessions.ts?raw"
+import tasks from "./snippets/tasks.ts?raw"
+import fanOut from "./snippets/fan-out.ts?raw"
+import qualityGates from "./snippets/quality-gates.ts?raw"
+import middleware from "./snippets/middleware.ts?raw"
+import memo from "./snippets/memo.ts?raw"
+import compaction from "./snippets/compaction.ts?raw"
+import agentTest from "./snippets/test/agent.test.ts?raw"
+import hooks from "./snippets/hooks.ts?raw"
+import mcpServer from "./snippets/mcp-server.ts?raw"
+import mcpClient from "./snippets/mcp-client.ts?raw"
+import memory from "./snippets/memory.ts?raw"
+import skills from "./snippets/skills.ts?raw"
+import sandbox from "./snippets/sandbox.ts?raw"
+import { websiteCheckpoints } from "./snippets/checkpoints"
 import type { DiagramName } from "./diagrams"
 
 export const version = manifest.version
@@ -145,7 +129,7 @@ export const sections: ReadonlyArray<Section> = [
       ),
       heading("Start local. Keep what matters."),
       p(
-        "Short-lived work can stay a normal Effect. When a task crosses tool calls, human decisions, or host lifetimes, add the object-backed Runtime. S3, native R2, or a local directory owns the durable state; your process, server, Rivet actor, or Cloudflare host executes the work.",
+        "Short-lived work can stay a normal Effect. When a task crosses tool calls, human decisions, or host lifetimes, add the object-backed Runtime. S3-compatible storage or a local directory owns durable state; an application-owned process or server executes the work.",
       ),
       links([
         {
@@ -186,7 +170,7 @@ export const sections: ReadonlyArray<Section> = [
       heading("Separate the work from its host"),
       diagram("durability"),
       p(
-        "Generalist has one production durability engine, backed by object storage over S3, native R2, or a local directory. Compute hosts can be replaced when their code, configuration, and resource access can reconstruct the accepted work. Actor memory, caches, and notifications are not the commit authority.",
+        "Generalist has one production durability engine, backed by S3-compatible object storage or a local directory. Compute hosts can be replaced when their code, configuration, and resource access can reconstruct the accepted work. Process memory, caches, and notifications are not the commit authority.",
       ),
       heading("Preserve the consequences"),
       p(
@@ -286,33 +270,27 @@ export const sections: ReadonlyArray<Section> = [
   },
   {
     id: "models",
-    title: "Replace the script with a live model",
+    title: "Choose a model Layer",
     label: "Models and providers",
-    description: "Swap the model Layer without replacing your agent or its tools.",
+    description: "Swap model Layers without replacing your agent or its tools.",
     group: "Build",
     blocks: [
       p(
-        "Keep the agent definition and change the model Layer. This checkpoint asks OpenAI to explain the same empty-array bug. It needs an API key with model access and incurs provider costs.",
-      ),
-      code(
-        "install-openai",
-        "Terminal",
-        `bun add @effect/ai-openai@${effectVersion}\nread -s OPENAI_API_KEY\nexport OPENAI_API_KEY`,
-        "bash",
+        "Keep the agent definition and change only the model Layer. This checkpoint remains deterministic so it runs without credentials or network access.",
       ),
       p(
-        "Enter the key at the hidden prompt, save `live-model.ts`, and run `bun live-model.ts`. Store credentials in the host environment, never in instructions or browser code.",
+        "Save `live-model.ts` and run `bun live-model.ts`. Replace its deterministic Layer with an upstream Effect AI provider Layer when you need a live model; configure credentials in the host environment, never in instructions or browser code.",
       ),
-      code("live-model", "live-model.ts · live provider", liveModel),
+      code("live-model", "live-model.ts · model boundary", liveModel),
       p(
-        "The program prints the model’s answer; wording varies. To connect the repository checkpoint, replace its scripted model Layer with this provider Layer while retaining its toolkit, authorization, and final test check. This guide does not claim to have run the live request.",
+        "The program prints the scripted answer. A live provider can change wording and incur cost, but it should not change the Agent, toolkit, authorization, or final verification boundary.",
       ),
       table(
         ["Choose a provider", "How it fits"],
         [
           [
-            "OpenAI, Anthropic, Bedrock, OpenRouter",
-            "Provide the matching client configuration, model Layer, and required HTTP/platform services.",
+            "Upstream Effect AI provider",
+            "Install the upstream provider package and provide its client, model Layer, and required platform services directly.",
           ],
           [
             "OpenAI-compatible endpoint",
@@ -693,10 +671,7 @@ export const sections: ReadonlyArray<Section> = [
             "REPL / TypeScript cells",
             "Execute typed cells through a kernel with explicit host bindings, resource ownership, snapshots, and lifecycle.",
           ],
-          [
-            "E2B, Daytona, Fly Sprites, Modal, AgentOS, Cloudflare",
-            "Optional provider adapters. Check the actual provider’s capabilities, credentials, limits, and deployment requirements.",
-          ],
+          ["External adapters", "Check the adapter’s actual isolation, capabilities, credentials, and limits."],
           ["Completion command gates", "Run verification through the Sandbox owned by the agent proposing completion."],
         ],
       ),
@@ -798,76 +773,6 @@ export const sections: ReadonlyArray<Section> = [
     ],
   },
   {
-    id: "coding-team",
-    title: "Build the durable coding team",
-    label: "Coding-team capstone",
-    description: "Assemble a lead, reviewer, and test writer, then run their work through an S3-backed Rivet actor.",
-    group: "Coordinate",
-    blocks: [
-      p(
-        "This capstone keeps one parent Run, two specialist Runs, their Sessions, and their messages in one durable partition. The model is scripted and the coding tools operate on allowlisted source snapshots; they do not read or edit your checkout. MinIO and a local Rivet engine provide real storage and hosting without cloud credentials.",
-      ),
-      heading("Prepare the project"),
-      p(
-        "Continue in the quickstart project with Bun 1.4.0 and Docker running. Add the S3 transport and Rivet dependencies, then create the source and test directories. Every required module appears on the following pages; save each block at the path named in its surrounding instructions.",
-      ),
-      code(
-        "coding-team-install",
-        "Terminal",
-        `bun add @aws-sdk/client-s3@${manifest.workspaces.catalog["@aws-sdk/client-s3"]} @smithy/fetch-http-handler@${manifest.workspaces.catalog["@smithy/fetch-http-handler"]} @standard-schema/spec@${manifest.workspaces.catalog["@standard-schema/spec"]} rivetkit@${manifest.workspaces.catalog.rivetkit}\nbun add -d @effect/vitest@${effectVersion} vitest@${manifest.workspaces.catalog.vitest} @types/bun@${manifest.workspaces.catalog["@types/bun"]} typescript@${manifest.workspaces.catalog.typescript}\nmkdir -p src test`,
-        "bash",
-      ),
-      p(
-        "Replace the tutorial project's `tsconfig.json` with this configuration. It checks the complete service and recovery test without depending on this repository's build settings.",
-      ),
-      code(
-        "coding-team-tsconfig",
-        "TypeScript configuration",
-        `{
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["bun"],
-    "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "skipLibCheck": true,
-    "noEmit": true
-  },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
-}`,
-        "json",
-      ),
-      heading("Bound the coding environment"),
-      p(
-        "Save this as `src/fixture.ts`. The workspace can read one fixture revision, validate its one permitted patch, and run three fixed cases. It never evaluates supplied source text. A scoped service closes the workspace when its Run releases it.",
-      ),
-      code("coding-fixture", "Fixture workspace", codingFixture),
-      heading("Declare the lead and specialists"),
-      p(
-        "Save this as `src/agents.ts`. The reviewer may inspect the fixture; the test writer may run the fixture tests. Both receive the parent-note tool from the messaging page. Their tools and budgets stay within the lead's authority.",
-      ),
-      code("coding-agents", "Coding team", codingAgents),
-      heading("Make the demonstration deterministic"),
-      p(
-        "Save this as `src/model.ts`. This provider chooses a fixed sequence of tool calls from the tool results already in the prompt. It tests the execution protocol, not a model's ability to solve an unfamiliar coding task.",
-      ),
-      code("coding-model", "Scripted model", codingModel),
-      p(
-        "Save this composition as `src/services.ts`. Permission and approval defaults are appropriate only for these allowlisted fixtures; replace them before granting access to a real repository.",
-      ),
-      code("coding-services", "Agent services", codingServices),
-      links([
-        {
-          title: "Wire the specialist messages",
-          description: "Keep sender identity in the Runtime and retries under explicit command keys.",
-          href: "/docs/messaging",
-        },
-      ]),
-    ],
-  },
-  {
     id: "architecture",
     title: "How durable state stays honest",
     label: "Architecture",
@@ -890,11 +795,11 @@ export const sections: ReadonlyArray<Section> = [
           ],
           [
             "Compute host",
-            "A process, server, Cloudflare Durable Object, or Rivet actor that runs and wakes the engine. It is replaceable compute, not a storage backend.",
+            "An application-owned process or generic server that runs and wakes the engine. It is replaceable compute, not a storage backend.",
           ],
           [
             "Object storage",
-            "The canonical record, through the S3, native R2, or local-directory transport. Recovery also needs the registered executable code and services; stored state is not stored code.",
+            "The canonical record, through an S3-compatible or local-directory transport. Recovery also needs registered executable code and services; stored state is not stored code.",
           ],
         ],
       ),
@@ -931,7 +836,7 @@ export const sections: ReadonlyArray<Section> = [
       ),
       heading("A familiar pattern, not the same system"),
       p(
-        "Other systems — turbopuffer's namespace-scoped object storage, WarpStream's object-storage data plane, SlateDB's embedded engine over objects — put object storage on their primary write path. Those first-party designs explain the storage/compute separation pattern, not Generalist's feature set: they establish no cost, throughput, or benchmark equivalence, and Generalist's live AWS and R2 behavior remains unqualified by local emulator evidence.",
+        "Other systems — turbopuffer's namespace-scoped object storage, WarpStream's object-storage data plane, SlateDB's embedded engine over objects — put object storage on their primary write path. Those first-party designs explain the storage/compute separation pattern, not Generalist's feature set: they establish no cost, throughput, or benchmark equivalence, and local MinIO evidence does not qualify a live provider.",
       ),
       links([
         {
@@ -975,21 +880,15 @@ export const sections: ReadonlyArray<Section> = [
         ],
       ),
       p(
-        "The coding-team capstone supplies the concrete composition across this page and the Rivet host page. You need a bucket with the required conditional-create, read-after-write, and listing semantics. Its local MinIO configuration requires no AWS account.",
+        "Use the S3 transport for storage reachable by replacement hosts, or the local-directory transport for one machine. A custom S3-compatible endpoint must provide the required conditional-create, read-after-write, and listing semantics; an API shape alone is not qualification.",
       ),
-      heading("Load the host configuration"),
-      p(
-        "In the capstone project, save this as `src/config.ts`. Credentials remain on the host; they are not part of an executable manifest or model prompt. A custom S3 endpoint requires an explicit acknowledgement of the transport assumptions.",
-      ),
-      code("coding-config", "Host configuration", codingConfig),
       heading("Register reconstructible behavior"),
       p(
-        "Save this as `src/executable.ts`. The registrations identify the lead and both child selections, including their model, tool, and policy pins. The resolver closes each agent over its services so a replacement host can reconstruct the same accepted definition.",
+        "Register each Agent and its model, tool, policy, and service pins through the executable resolver. A replacement process or generic server must reconstruct the exact retained revision; credentials remain host configuration and never enter the executable manifest or prompt.",
       ),
-      code("coding-executable", "Executable registration", codingExecutable),
       note(
         "One engine, not several backends",
-        "S3, native R2, and a local directory are transports for the same production durability engine. There is no production SQL, memory, or filesystem Runtime. Separate partitions can progress independently, but mutations inside a partition serialize.",
+        "S3-compatible storage and a local directory are transports for the same production durability engine. There is no production SQL or memory Runtime. The directory transport is canonical state for one host, not a separate Runtime. Separate partitions can progress independently, but mutations inside a partition serialize.",
       ),
     ],
   },
@@ -1004,9 +903,8 @@ export const sections: ReadonlyArray<Section> = [
         "Give each coding conversation a stable identity. A request to fix the bug and a later request to add documentation should be ordered work, not competing writers to one transcript.",
       ),
       p(
-        "Save the capstone's admission command as `src/command.ts`. The actor client sends this same value on retries. Its tree policy admits the lead and at most two children; a new partition is a new coding family, not a retry of this one.",
+        "The application owns a stable command identity and sends the same value on retries. A new partition or command identity means new work, not a retry of the original request.",
       ),
-      code("coding-command", "Stable admission command", codingCommand),
       table(
         ["Operation", "Contract to preserve"],
         [
@@ -1069,21 +967,14 @@ export const sections: ReadonlyArray<Section> = [
       ),
       note(
         "Qualification has a scope",
-        "A close-and-reopen test establishes its exercised recovery scenario. MinIO and Miniflare/workerd tests are local evidence, not certification of live AWS S3, deployed R2, or a hosted Rivet deployment.",
+        "A close-and-reopen test establishes only its exercised recovery scenario. Local-directory and MinIO tests are local evidence, not certification of AWS or another live S3-compatible provider.",
       ),
-      heading("Prove the capstone survives a fresh Layer"),
+      heading("Prove recovery across a fresh Layer"),
       p(
-        "After assembling the capstone modules, save this as `test/coding-agent.test.ts`. It admits work without starting a worker, closes that Layer, reconnects to the same object simulator, and runs the parent and both children. Each specialist sends its own note. Retrying those notes leaves exactly two inbox entries, and a final fresh Layer observes the completed family without executing it again.",
-      ),
-      code("coding-recovery-test", "Recovery test", codingTest),
-      code(
-        "coding-recovery-command",
-        "Terminal",
-        "bun --bun vitest run test/coding-agent.test.ts --no-file-parallelism\nbun --bun tsc --noEmit",
-        "bash",
+        "A focused recovery test should admit work, close the owning Runtime Layer, reconstruct the same namespace with the same executable registrations, and observe completion from a fresh Layer. It must prove that recorded model and tool outcomes replay without redispatch and that exact command retries return their original receipts.",
       ),
       p(
-        "Expect two passing tests and no type errors. The simulator is test-only; it is not an alternate production Runtime or evidence that a hosted provider has been qualified.",
+        "Use `generalist/testing/runtime-driver` for shared host behavior and the test-only durability simulator for deterministic scenarios. Neither is an alternate production Runtime or provider qualification.",
       ),
     ],
   },
@@ -1098,9 +989,8 @@ export const sections: ReadonlyArray<Section> = [
         "The test writer should be able to tell the lead which regression cases matter. Address a related Run through the Runtime directory and admit the message into the same authoritative inbox used for steering.",
       ),
       p(
-        "For the coding-team capstone, save this as `src/messaging.ts`. The tool derives its sender and parent from the Runtime-owned execution context; the model supplies only the note and its stable command key. The host helper exercises exact retries in the recovery test, not arbitrary client impersonation.",
+        "The sender comes from Runtime-owned execution context; model-authored input supplies message content, not caller identity or authority. Every mutation carries a stable command identity for safe retries.",
       ),
-      code("coding-messaging", "Family messaging", codingMessaging),
       diagram("agents"),
       table(
         ["Address", "Resolution"],
@@ -1123,36 +1013,34 @@ export const sections: ReadonlyArray<Section> = [
       ),
       links([
         {
-          title: "Register the durable definitions",
-          description: "Give replacement hosts the code and services they need to recover the team.",
-          href: "/docs/durability",
+          title: "Serve sessions through the generic server",
+          description: "Authenticate commands and reconnect clients through snapshots and replay cursors.",
+          href: "/docs/server",
         },
       ]),
     ],
   },
   {
-    id: "rivet",
-    title: "Host each coding family in a Rivet actor",
-    label: "Rivet actors",
-    description: "Host a coordinated agent family without making actor memory the source of truth.",
+    id: "server",
+    title: "Serve durable sessions",
+    label: "Generic server",
+    description: "Expose authenticated commands and observation without making server memory authoritative.",
     group: "Keep work",
     blocks: [
       p(
-        "Use one stable actor key for a coordinated coding partition. The actor provides wake, sleep, scheduling, and execution scope; S3 keeps the canonical work.",
+        "Use `generalist/server` to expose Host commands, snapshots, event replay, and optional operator routes. The application provides authentication and resource authorization before dispatch.",
       ),
       diagram("durability"),
       p(
-        "`makeRuntimeActor` wires the host lifecycle around the object Runtime. Map an authorized key such as `[tenant, rootSessionId]` to a deterministic namespace. The lead, reviewer, and test-writer children stay in that partition; a child conversation is not automatically another actor.",
+        "The server projects Runtime-owned state. It does not own execution, conversation history, or recovery authority, and disconnecting a client does not cancel accepted work.",
       ),
-      heading("Bind one authorized coding family"),
+      heading("Bind authenticated callers to authorized resources"),
       p(
-        "Save this as `src/actor.ts`. This host accepts only the configured tenant and partition. It composes the S3 transport, Crypto, and executable resolver around the actor's scoped Runtime. It does not derive authorization from arbitrary actor-key text.",
+        "Build `Server.layer({ host, auth, authorization })` over an application Host. Authentication establishes a principal; authorization decides which Sessions and Runs that principal may read or mutate. IDs parsed from a route never grant authority.",
       ),
-      code("coding-actor", "Runtime actor", codingActor),
       p(
-        "Save this as `src/registry.ts`. Rivet owns actor routing and lifecycle; its local engine can be managed by the demo process or replaced with an explicitly configured hosted endpoint.",
+        "The generic server supports HTTP commands, snapshots, server-sent events, and WebSocket observation. Enable operator mutations explicitly and authorize them separately from ordinary session access.",
       ),
-      code("coding-registry", "Actor registry", codingRegistry),
       table(
         ["Lifecycle", "What the host does"],
         [
@@ -1160,12 +1048,9 @@ export const sections: ReadonlyArray<Section> = [
             "Wake",
             "Resolve the namespace, reconstruct services, and arrange background execution without blocking control actions.",
           ],
-          ["Drain", "Claim eligible canonical work and observe active work under the host’s scope."],
+          ["Execute", "Claim eligible canonical work and observe active work under the host’s scope."],
           ["Reconciliation", "Use scheduled and periodic wake hints to discover outstanding journal obligations."],
-          [
-            "Sleep / destroy",
-            "Dispose the scoped runtime. Recovery must not depend on a shutdown callback having completed.",
-          ],
+          ["Shutdown", "Dispose the scoped runtime. Recovery must not depend on a shutdown callback having completed."],
           [
             "Control actions",
             "Validate commands and admit them through Runtime, even while long model or tool operations are active.",
@@ -1173,25 +1058,25 @@ export const sections: ReadonlyArray<Section> = [
         ],
       ),
       note(
-        "Scale by ownership boundaries",
-        "Independent actor partitions can progress separately. That is not automatic sharding, unlimited throughput in one hot partition, or portable credentials. Your application owns routing, identity, authorization, capacity, and executable registration.",
+        "Keep transport separate from authority",
+        "Snapshots and cursors rebuild disposable client state. Canonical object storage, not a connection or server cache, decides what committed. Your application owns routing, identity, authorization, capacity, and executable registration.",
       ),
     ],
   },
   {
-    id: "deployment",
-    title: "Deploy the coding-agent service",
-    label: "Deployment",
-    description: "Configure the services, credentials, and execution host your durable agent needs.",
+    id: "operations",
+    title: "Operate durable workers",
+    label: "Operations",
+    description: "Configure the services, credentials, and application-owned workers durable work needs.",
     group: "Keep work",
     blocks: [
       p(
-        "Deploy code that can reconstruct accepted work, not a process with irreplaceable memory. Keep the same actor-key mapping, namespace, executable definitions, and storage configuration across replacements.",
+        "Deploy code that can reconstruct accepted work, not a process with irreplaceable memory. Keep namespace mapping, executable definitions, and storage configuration stable across replacements.",
       ),
       table(
         ["Configure", "Before sending real work"],
         [
-          ["Rivet", "Register the actor definition and route each authorized coding root to its stable key."],
+          ["Worker", "Register exact executable definitions and route each authorized partition consistently."],
           [
             "S3",
             "Provision the bucket and scoped credentials; verify the transport’s required consistency and conditional-write behavior.",
@@ -1215,49 +1100,18 @@ export const sections: ReadonlyArray<Section> = [
         ],
       ),
       p(
-        "The following modules complete the coding-team capstone. A local run exercises MinIO and a managed local Rivet engine; it does not establish live AWS S3 behavior or a hosted Rivet deployment.",
+        "Own the worker scope, reconciliation loop, and shutdown behavior. Host shutdown interrupts local execution for recovery; it is not a user cancellation request and does not erase accepted work.",
       ),
       heading("Own startup and shutdown"),
       p(
-        "Save the typed host failure as `src/errors.ts` and the long-running entrypoint as `src/main.ts`. The process boundary starts Rivet, holds its scope open, and closes it on interruption. Host shutdown does not cancel accepted Runs.",
+        "Acquire Runtime and server Layers in a visible application scope. Reconstruct the same executable registrations before activating work, run reconciliation independently of wake notifications, and close scopes on shutdown.",
       ),
-      code("coding-errors", "Host failures", codingErrors),
-      code("coding-main", "Service entrypoint", codingMain),
-      heading("Submit and observe the coding task"),
+      heading("Qualify the deployment you operate"),
       p(
-        "Save this as `src/demo.ts`. It owns both the registry and client, sends the stable command, and waits for the parent and specialists to settle. It prints identifiers from the actual execution; those identifiers will differ between fresh namespaces.",
-      ),
-      code("coding-demo", "Local demo", codingDemo),
-      heading("Start local storage"),
-      p(
-        "Save the following configuration as `compose.yaml` and the local-only environment as `.env`. Do not commit `.env`. These credentials belong only to the loopback MinIO fixture and must not be reused for a public service.",
-      ),
-      code("coding-compose", "Local object storage", codingCompose, "yaml"),
-      code("coding-environment", "Local environment", codingEnvironment, "bash"),
-      code(
-        "coding-start",
-        "Terminal",
-        "docker compose up -d minio\ndocker compose run --rm create-bucket\nbun src/demo.ts",
-        "bash",
+        "Test admission, interrupted operations, replacement-host recovery, and strict replay against the exact storage and worker configuration you deploy. Keep credentials in the host's secret store and preserve caller command identities across ambiguous network outcomes.",
       ),
       p(
-        "Success prints JSON with a succeeded parent and two succeeded children, then keeps the actor host running. Press Ctrl-C to release its scope. Starting the demo again with the same namespace and command key observes that original Run. Choose a fresh `GENERALIST_PARTITION` for a separate task; do not delete stored objects to make recovery work.",
-      ),
-      p(
-        "A connection refusal usually means MinIO or the bucket-creation step is not ready. A Rivet registration timeout can mean the configured Rivet namespace does not exist: the local engine starts with `default`. A reconstruction mismatch means definitions changed under an existing identity: restore the expected code, or use a fresh Generalist namespace for a new experiment. `docker compose stop` stops MinIO without deleting its named volume.",
-      ),
-      heading("Run the service on a hosted worker"),
-      p(
-        "Run `bun src/main.ts` when the caller lives elsewhere. Set `RIVET_START_ENGINE=false` and supply `RIVET_ENDPOINT`, `RIVET_NAMESPACE`, `RIVET_POOL_NAME`, and any required `RIVET_TOKEN`. Configure the S3 environment for a pre-created bucket. The bucket's credentials and the Rivet token stay in your host's secret store.",
-      ),
-      p(
-        "For a containerized worker, save this as `Dockerfile` beside the tutorial project's manifest and committed lockfile. Build it from that project, then configure the worker and its secrets in your Rivet deployment. This image has no application-authentication endpoint; authorize callers before giving them actor access.",
-      ),
-      code(
-        "coding-worker-image",
-        "Worker image",
-        'FROM oven/bun:1.4.0\nWORKDIR /app\nCOPY package.json bun.lock ./\nRUN bun install --frozen-lockfile\nCOPY src ./src\nCMD ["bun", "src/main.ts"]',
-        "dockerfile",
+        "Local-directory and MinIO checks establish only their exercised local behavior. They do not certify AWS or another S3-compatible provider, deployment capacity, credentials, networking, or recovery policy.",
       ),
     ],
   },
@@ -1280,14 +1134,7 @@ export const sections: ReadonlyArray<Section> = [
           ],
           ["Transport", "Commands plus snapshot-first observation and replay. Reconnect from committed state."],
           ["Foldkit", "Headless Chat and Connection state for your own rendered interface."],
-          [
-            "Cloudflare Workers / Durable Objects",
-            "Compute hosts using the same object engine, with native R2 or S3 transport as configured.",
-          ],
-          [
-            "Dynamic Workers / worker loader",
-            "Explicitly supported dynamic execution boundaries, not unrestricted portable JavaScript.",
-          ],
+          ["Application workers", "Reconstruct and execute work using the same canonical object engine."],
           [
             "Triggers / watchers",
             "Admit or wake work under configured policy; notifications are not the commit authority.",

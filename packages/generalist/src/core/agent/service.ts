@@ -22,24 +22,24 @@ import { allocateRun } from "./lifecycle/run-handle.js"
 import { encode as encodeInput } from "./lifecycle/input.js"
 import { defaultToolScheduling } from "./tools/scheduler.js"
 import type { ToolBatchResolution } from "./tools/checkpoint.js"
-import {
-  validateAgentGates,
-  type Any as AnyGate,
-  type FailureMode as GateFailureMode,
-  type Gate,
-  type Requirements as GateRequirements,
+import type {
+  Any as AnyGate,
+  FailureMode as GateFailureMode,
+  Gate,
+  Requirements as GateRequirements,
 } from "./gates/definition.js"
+import { validateAgentGates } from "./gates/validation.js"
 import type { SandboxService } from "../../sandbox/service.js"
 import { make as makeFanOut, processRunner, ProcessRunner, recursiveAgentRunner } from "./lifecycle/fan-out.js"
 import type { HandlersFor } from "./tool/fan-out.js"
-import { Configuration as Tasks } from "../../tasks/internal.js"
-import type { ManagedArtifactTool } from "../artifact.js"
+import { Tasks } from "../../tasks/service.js"
+import type { ManagedTool } from "../tools/managed-tool.js"
 import { definitionCapabilities } from "./lifecycle/construction.js"
 import { projectPublicRunOptions, type PublicRunOptionGuard } from "./lifecycle/hosted/options.js"
 import {
-  validateOptions as validateCodeModeOptions,
-  type AnyOptions as CodeModeAnyOptions,
+  type AnyOptions as CodeModeOptions,
   type Requirements as CodeModeRequirements,
+  validateOptions as validateCodeModeOptions,
 } from "../program/code-mode-declaration.js"
 export {
   AgentTypeId,
@@ -109,7 +109,7 @@ export interface MakeOptions<
   readonly gates?: ReadonlyArray<Gate<OutputSchema["Type"], unknown>>
   readonly onGateFailure?: GateFailureMode
   readonly sandbox?: SandboxService
-  readonly codeMode?: CodeModeAnyOptions
+  readonly codeMode?: CodeModeOptions
 }
 /** Agent options with ordered static declarations instead of a pre-built toolkit. */
 export interface MakeToolsOptions<
@@ -145,7 +145,7 @@ type CodeModeRequirement<O> = O extends { readonly codeMode: infer C } ? CodeMod
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> = {
-  [Name in keyof Tools]: Tools[Name] extends ManagedArtifactTool
+  [Name in keyof Tools]: Tools[Name] extends ManagedTool
     ? never
     : HandlersFor<Pick<Tools, Name>> | Exclude<Tool.HandlerServices<Tools[Name]>, ToolContext>
 }[keyof Tools]
@@ -180,7 +180,7 @@ type GateOutputConstraint<O> = {
   >
 }
 
-const validateDeclaredCodeMode = (toolkit: Toolkit.Any, codeMode: CodeModeAnyOptions | undefined): void => {
+const validateDeclaredCodeMode = (toolkit: Toolkit.Any, codeMode: CodeModeOptions | undefined): void => {
   if (codeMode !== undefined) validateCodeModeOptions(toolkit, codeMode)
 }
 
@@ -322,8 +322,6 @@ export interface RunOptions {
     readonly attempt: number
     readonly admittedAt?: string
     readonly inheritedSandboxSnapshot?: Ref.Ref<string | undefined>
-    /** @internal Exact storage-issued authority propagated to Runtime-hosted tools. */
-    readonly executionClaim?: NonNullable<import("../tools/tool-context.js").Service["executionClaim"]>
   }
   /** First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number

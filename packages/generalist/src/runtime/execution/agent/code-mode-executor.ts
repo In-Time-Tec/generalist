@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Option, Schema } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import type { Agent, ClosedServices } from "../../../core/agent/service.js"
 import type { ToolContext } from "../../../core/tools/tool-context.js"
-import { managedToolHandlers } from "../../../core/artifact.js"
+import { managedToolHandlers } from "../../../core/tools/managed-tool.js"
 import {
   type CancellationRequest,
   FrameworkFailure,

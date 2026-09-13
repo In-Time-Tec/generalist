@@ -117,49 +117,14 @@ and are not rewound by semantic reversion.
 
 There is no durable `VectorStore` adapter documented here. Object durability persists the Runtime journal and Run state; semantic vectors remain process-local unless an application supplies its own `VectorStore` service.
 
-### Supermemory
-
-Supermemory replaces both local embeddings and `VectorStore`:
-
-```ts
-import { Config } from "effect"
-import { layerSupermemory } from "generalist/memory"
-
-const memory = layerSupermemory({
-  apiKey: Config.redacted("SUPERMEMORY_API_KEY"),
-  containerTag: "session:user-ada",
-})
-```
-
-A string binds the layer to one Supermemory container. For one layer shared by
-many keys, also pass `containerTagForKey: (key) => key.subject`; the host remains
-the authority that maps keys to tenant-safe container tags. Whole-key `forget`
-deletes that container through Supermemory's container-tag endpoint, which
-requires an organization owner or admin API key. One-item `forget` uses the v4
-memory endpoint. HTTP and response-decoding failures become `MemoryError` with
-a typed `SupermemoryError { status, body }` in `cause`.
-
-Supermemory's remote API does not expose append-only history or atomic revert.
-Its ordinary `recall`, new-entry `remember`, and `forget` operations remain
-available, but superseding `remember`, `history`, and `revert` fail explicitly
-with `MemoryError { reason: "unsupported" }`. It does not register the
-`versioning` conformance capability.
-
-Tests use recorded HTTP responses. A live run is intentionally opt-in: set
-`SUPERMEMORY_API_KEY` and use the same layer with `FetchHttpClient.layer`; do
-not put the key in source control.
+Applications may provide a remote `VectorStore` or complete `Memory` Layer. That adapter owns its credentials, tenancy mapping, persistence semantics, and live-provider qualification; Generalist does not ship a hosted memory-service adapter.
 
 ## Embedding models
 
 Semantic recall accepts the provider-neutral `EmbeddingModel` from
 `effect/unstable/ai`:
 
-- OpenAI: `generalist/providers/openai-embedding`.
-- Amazon Bedrock Titan: `layerEmbedding` from
-  `generalist/providers/amazon-bedrock`. Titan v2 supports 256, 512, and 1024
-  dimensions; its default is 1024.
-- Ollama and other OpenAI-compatible servers:
-  `generalist/providers/openai-compatible-embedding` with the server base URL.
+Provide an upstream Effect AI embedding Layer or implement the interface directly. Generalist does not wrap or republish vendor embedding SDKs.
 
 To bring your own provider, implement the batch boundary once:
 
@@ -204,9 +169,9 @@ The vector-store `dimensions` must exactly equal the model output length.
   participates in recall.
 - `forget({ key })` is host-requested cleanup for the whole key;
   `forget({ key, id })` removes one implementation-owned item.
-- Core defines the seam and a no-op layer. Retention policy remains host-owned; `VectorStore.layerMemory` does not survive process loss, while hosted adapters such as Supermemory have their own persistence semantics outside object Runtime durability.
+- Core defines the seam and a no-op layer. Retention policy remains host-owned; `VectorStore.layerMemory` does not survive process loss, while external adapters have their own persistence semantics outside object Runtime durability.
 
-The Memory conformance suite records `versioning` separately. The local SemanticRecall/VectorStore composition registers it; WorkingMemory and Supermemory do not.
+The Memory conformance suite records `versioning` separately. The local SemanticRecall/VectorStore composition registers it; WorkingMemory does not.
 
 ## Related
 

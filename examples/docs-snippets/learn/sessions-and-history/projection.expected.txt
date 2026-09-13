@@ -1,3 +1,0 @@
-before: system user assistant user
-after: user
-log entries: 5

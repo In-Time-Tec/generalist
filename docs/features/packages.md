@@ -46,4 +46,4 @@ Package tool modules should be bundled except for host peer dependencies such as
 - Cached archives are hashed on every Layer construction. A changed package list, package identity, or archive hash fails with `PackageIntegrityMismatch` instead of silently rewriting the lock.
 - Remove the lock file deliberately to select newer matching npm versions or move a Git ref.
 
-Publish the package with the normal npm publishing flow after checking that every path in `generalist` is included by `files`. The workspace reference package at `examples/packages/generalist-skills-example` demonstrates the complete shape; publishing it under the organization is a follow-up release action.
+Publish the package with the normal npm publishing flow after checking that every path in `generalist` is included by `files`. Package-catalog behavior is covered by the package test fixture.

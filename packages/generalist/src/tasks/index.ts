@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { layer as taskLayer } from "./internal.js"
 import { Item, Items, readToolName, Status, writeToolName } from "./item.js"
+export { Tasks, type Service } from "./service.js"
 
 export { Item, Items, Status, type Item as TaskItem, type Items as TaskItems, type Status as TaskStatus }
 

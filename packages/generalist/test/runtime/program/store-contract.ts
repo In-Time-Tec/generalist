@@ -1,9 +1,9 @@
-import { Runtime, type SendError } from "../../../src/runtime/engine.js"
 import { expect } from "@effect/vitest"
 import { Effect } from "effect"
 import { TestClock } from "effect/testing"
 import { Pins, ProgramCapabilities } from "../../../src/index.js"
 import { Errors } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
 import {
   RunStore,
   type ExecutionClaim,
@@ -54,7 +54,7 @@ const claimExistingProgram = (runId: string, label: string) =>
 
 const claimProgram = (label: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime
+    const runtime = yield* Runtime.Runtime
     const receipt = yield* runtime.send({
       to: programAddress,
       sessionId: `program-contract-${label}`,
@@ -64,9 +64,9 @@ const claimProgram = (label: string) =>
     return yield* claimExistingProgram(receipt.runId, label)
   })
 
-type ProgramContractServices = Runtime | RunStore
+type ProgramContractServices = Runtime.Runtime | RunStore
 
-type ProgramContractError = SendError | WorkerMutationError | ProgramStoreFailure
+type ProgramContractError = Runtime.SendError | WorkerMutationError | ProgramStoreFailure
 
 export const programBudgetContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(
   function* () {
@@ -153,7 +153,7 @@ export const programReplayDivergenceContract: Effect.Effect<void, ProgramContrac
 
 export const programCancellationFenceContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> =
   Effect.gen(function* () {
-    const runtime = yield* Runtime
+    const runtime = yield* Runtime.Runtime
     const store = yield* RunStore
     const execution = yield* claimProgram("cancel-fence")
     yield* reserve(store, execution, "cancelled-operation", program.pinned.manifest.budget, {
@@ -290,7 +290,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
 
 export const programCancellationFinalizerContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> =
   Effect.gen(function* () {
-    const runtime = yield* Runtime
+    const runtime = yield* Runtime.Runtime
     const store = yield* RunStore
     const execution = yield* claimProgram("cancel-finalizer")
     const reason = "cancel finalizer settlement"
@@ -331,7 +331,7 @@ export const programUnknownOutcomeContract = (
   ProgramContractServices | RunExecutor
 > =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime
+    const runtime = yield* Runtime.Runtime
     const store = yield* RunStore
     const host = yield* RunExecutor
     const execution = yield* claimProgram("unknown-outcome")

@@ -216,6 +216,26 @@ const cancellationCannotFinalize = (state: RuntimeState, run: StoredRun, runId: 
   hasUnknownOperation(state, runId) ||
   hasUnsettledChild(state, runId)
 
+const finalizeCancellation = (state: RuntimeState, run: StoredRun, reason: string | undefined) =>
+  Effect.gen(function* () {
+    const current = state.runs.get(run.runId)
+    if (current === undefined || cancellationCannotFinalize(state, current, run.runId)) return state
+    const [event, cancelled] = yield* appendLifecycle(
+      state,
+      run.runId,
+      cancelledEvent(reason ?? current.cancelReason),
+      "cancelled",
+    )
+    let next = cancelled
+    const settled = next.runs.get(run.runId)
+    if (settled?.terminalEventId !== undefined) {
+      next = yield* settleParentChild(next, settled, settled.terminalEventId)
+      next = yield* reconcileFanOut(next, settled, event, settlePendingOutcome)
+      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
+    }
+    return settled === undefined ? next : yield* afterTerminal(next, settled)
+  })
+
 export { respond, signal } from "./control/wait.js"
 
 export const cancel: {
@@ -242,26 +262,7 @@ export const cancel: {
     }
     next = yield* cancelDescendants(next, run, input.reason)
     if (cancellationStopsBeforeFinalize(run, terminal)) return next
-    const current = next.runs.get(run.runId)
-    if (current === undefined) return next
-    if (cancellationCannotFinalize(next, current, run.runId)) return next
-    const [event, cancelled] = yield* appendLifecycle(
-      next,
-      run.runId,
-      cancelledEvent(input.reason ?? current.cancelReason),
-      "cancelled",
-    )
-    next = cancelled
-    const settled = next.runs.get(run.runId)
-    if (settled?.terminalEventId !== undefined) {
-      next = yield* settleParentChild(next, settled, settled.terminalEventId)
-      next = yield* reconcileFanOut(next, settled, event, settlePendingOutcome)
-      if (settled.parentRunId !== undefined) next = yield* finalizeCancellingParent(next, settled.parentRunId)
-    }
-    if (settled !== undefined) {
-      next = yield* afterTerminal(next, settled)
-    }
-    return next
+    return yield* finalizeCancellation(next, run, input.reason)
   }),
 )
 

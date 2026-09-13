@@ -5,7 +5,13 @@ import type { DurabilityFailure } from "../durability/errors.js"
 import type { ClientEvent } from "../server/projection/index.js"
 import type { Address } from "./address.js"
 import type { PayloadTooLarge, RunNotFound, RuntimeAvailabilityError, UnknownAgent } from "./errors.js"
-import type { Child, Cursor, Run, RunStatus, Session } from "./inspection.js"
+import type {
+  Child as ChildInspection,
+  Cursor as InspectionCursor,
+  Run as RuntimeInspection,
+  RunStatus as InspectionRunStatus,
+  Session as SessionInspection,
+} from "./inspection.js"
 import type { MessageReceipt } from "./messaging/mailbox.js"
 import type { RunInspection } from "./run.js"
 import type { SessionConflict, SessionError, SessionEventsError as StoredSessionEventsError } from "./session/host.js"
@@ -74,7 +80,7 @@ export interface SessionQueueEntry {
 
 export interface SessionHandle {
   readonly sessionId: string
-  readonly inspect: Effect.Effect<Session, SessionReadError>
+  readonly inspect: Effect.Effect<SessionInspection, SessionReadError>
   readonly queue: Effect.Effect<ReadonlyArray<SessionQueueEntry>, SessionReadError>
   readonly submit: <A extends AnyAgent>(
     agent: A,
@@ -93,7 +99,7 @@ export interface SessionHandle {
     readonly expectedRevision: number
     readonly commandId: string
   }) => Effect.Effect<void, SessionAdmissionError>
-  readonly events: (cursor?: Cursor) => Stream.Stream<ClientEvent, SessionEventsError>
+  readonly events: (cursor?: InspectionCursor) => Stream.Stream<ClientEvent, SessionEventsError>
   readonly control: (action: "stop" | "close" | "resume", commandId: string) => Effect.Effect<void, SessionControlError>
 }
 
@@ -103,7 +109,7 @@ export interface SessionService {
     readonly title?: string
   }) => Effect.Effect<SessionHandle, SessionCreateError>
   readonly get: (sessionId: string) => Effect.Effect<SessionHandle, SessionReadError>
-  readonly list: Effect.Effect<ReadonlyArray<Session>, RuntimeReadError>
+  readonly list: Effect.Effect<ReadonlyArray<SessionInspection>, RuntimeReadError>
 }
 
 export interface MessagingService {
@@ -130,11 +136,11 @@ export interface ChildSettlement {
 export type ChildReadError = RuntimeReadError | RunNotFound | import("./child/admission.js").ChildParentageInvalid
 
 export interface ChildObservationService {
-  readonly list: (parentRunId: string) => Effect.Effect<ReadonlyArray<Child>, ChildReadError>
+  readonly list: (parentRunId: string) => Effect.Effect<ReadonlyArray<ChildInspection>, ChildReadError>
   readonly inspect: (input: {
     readonly parentRunId: string
     readonly childRunId: string
-  }) => Effect.Effect<Child, ChildReadError>
+  }) => Effect.Effect<ChildInspection, ChildReadError>
   readonly settlements: (input: {
     readonly parentRunId: string
     readonly afterSequence?: number
@@ -172,11 +178,11 @@ export interface Service {
     options: HoldOptions,
   ) => Effect.Effect<HeldRunHandle<OutputCodec["Type"]>, StartError | RuntimeAvailabilityError>
   readonly schedule: EngineService["schedule"]
-  readonly inspect: (runId: string) => Effect.Effect<Run, RunNotFound | RuntimeReadError>
+  readonly inspect: (runId: string) => Effect.Effect<RuntimeInspection, RunNotFound | RuntimeReadError>
   readonly list: (input: {
-    readonly status?: RunStatus
+    readonly status?: InspectionRunStatus
     readonly limit: number
-  }) => Effect.Effect<ReadonlyArray<Run>, RuntimeReadError>
+  }) => Effect.Effect<ReadonlyArray<RuntimeInspection>, RuntimeReadError>
   readonly events: (
     input: EventsInput,
   ) => Stream.Stream<import("./run/event.js").RunEvent, EventsError | RuntimeAvailabilityError>

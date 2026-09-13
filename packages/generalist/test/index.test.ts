@@ -162,18 +162,13 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   ],
   ["ag-ui", () => import("../src/unstable/ag-ui/index.js"), ["AGUI", "Errors"]],
   ["a2a", () => import("../src/unstable/a2a/index.js"), ["A2A", "Content", "Errors", "Projection"]],
-  ["foldkit", () => import("../src/unstable/foldkit/index.js"), ["Chat", "Connection"]],
-  [
-    "memory",
-    () => import("../src/memory/index.js"),
-    ["SemanticRecall", "Supermemory", "SupermemoryError", "VectorStore", "WorkingMemory", "layer", "layerSupermemory"],
-  ],
+  ["memory", () => import("../src/memory/index.js"), ["SemanticRecall", "VectorStore", "WorkingMemory", "layer"]],
   [
     "memo",
     () => import("../src/memo.js"),
     ["Dependencies", "MemoError", "Store", "layerDependencies", "layerMemory", "models", "pure"],
   ],
-  ["tasks", () => import("../src/tasks/index.js"), ["Item", "Items", "Status", "Update", "layer", "update"]],
+  ["tasks", () => import("../src/tasks/index.js"), ["Item", "Items", "Status", "Tasks", "Update", "layer", "update"]],
 ]
 
 describe("generalist public surface", () => {
@@ -297,4 +292,16 @@ describe("generalist public surface", () => {
       "layerSinkNoop",
     ])
   })
+
+  it.effect("keeps lifecycle mechanics internal", () =>
+    Effect.gen(function* () {
+      const { Gate, Hooks } = yield* Effect.promise(() => import("../src/index.js"))
+      expect("validateAgentGates" in Gate).toBe(false)
+      expect("Checkpoint" in Gate).toBe(false)
+      expect("chainPin" in Hooks).toBe(false)
+      expect("make" in Hooks).toBe(false)
+      expect("Checkpoint" in Hooks).toBe(false)
+      expect("DecisionByEvent" in Hooks).toBe(false)
+    }),
+  )
 })

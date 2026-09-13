@@ -56,7 +56,7 @@ export interface Invocation<O = unknown, E = ProgramInvocationFailure | ProgramS
   readonly authorize: (
     operation: ProgramOperationName,
   ) => Effect.Effect<boolean, ProgramAuthorizationFailure | ProgramCapabilityDenied | ProgramSuspended>
-  readonly execute: Effect.Effect<O, E>
+  readonly execute: (operation: ProgramOperationName) => Effect.Effect<O, E>
 }
 
 /** One decoded Agent invocation, exposing only the prompt every Agent input must produce. */
@@ -144,14 +144,15 @@ export const tool = <I, IE, O, OE, E>(
       decodeInput(handler.input, encoded),
       (input): Invocation<O> => ({
         authorize: (operation) => handler.authorize({ operation, input }),
-        execute: Effect.suspend(() => handler.execute(input)).pipe(
-          Effect.catch(
-            (cause): Effect.Effect<O, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> =>
-              Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
-                ? Effect.fail(cause)
-                : Effect.fail(ProgramInvocationFailure.make({ cause })),
+        execute: () =>
+          Effect.suspend(() => handler.execute(input)).pipe(
+            Effect.catch(
+              (cause): Effect.Effect<O, ProgramInvocationFailure | ProgramSuspended | ProgramCancelled> =>
+                Schema.is(ProgramSuspended)(cause) || Schema.is(ProgramCancelled)(cause)
+                  ? Effect.fail(cause)
+                  : Effect.fail(ProgramInvocationFailure.make({ cause })),
+            ),
           ),
-        ),
       }),
     ),
 })

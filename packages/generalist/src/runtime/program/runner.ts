@@ -239,7 +239,7 @@ export const make = (input: {
         reservation: kind === "tool" ? { toolCalls: 1, activeSlots: 1 } : { activeSlots: 1 },
         prepare: Authorization.authorize(input.claimed, invocation, operation, capability),
         validateResult,
-        dispatch: invocation.execute.pipe(
+        dispatch: invocation.execute(operation).pipe(
           Effect.mapError((cause) =>
             kind === "tool"
               ? ProgramToolFailure.make({

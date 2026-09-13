@@ -2,6 +2,7 @@ import { Context, Effect, Option, Schema, Stream } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { ActionableTaggedError, errorHint } from "./error-hint.js"
 import { Ref as MediaRef } from "../media/ref.js"
+import { bindManagedTool, type ManagedTool, managedToolHandlers } from "./tools/managed-tool.js"
 
 /** Monotonic operation position within one artifact branch. @experimental */
 export const Version = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
@@ -334,26 +335,15 @@ export interface ArtifactRegistryService {
   readonly get: (name: string) => Effect.Effect<RegisteredArtifact, ArtifactNotFound>
 }
 
-const ManagedArtifactToolTypeId: unique symbol = Symbol("generalist/artifact/ManagedArtifactTool")
-
 /** @internal Nominal marker for an Artifact tool with framework-owned handlers. */
-export interface ManagedArtifactTool {
-  readonly [ManagedArtifactToolTypeId]: true
-}
-
-const managedHandlers = new WeakMap<Tool.Any, Context.Context<never>>()
+export type ManagedArtifactTool = ManagedTool
 
 /** @internal Bind handlers to one exact framework-created Artifact tool without widening its public shape. */
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Internal tool binding receives its exact tool and handler context together.
 export const bindManagedArtifactTool = <T extends Tool.Any>(
   tool: T,
   handlers: Context.Context<never>,
-): T & ManagedArtifactTool => {
-  const managed = Object.assign(tool, { [ManagedArtifactToolTypeId]: true as const })
-  Object.defineProperty(managed, ManagedArtifactToolTypeId, { enumerable: false })
-  managedHandlers.set(managed, handlers)
-  return managed
-}
+): T & ManagedArtifactTool => bindManagedTool({ tool, context: handlers })
 
 /** @internal Resolve handler Context only for the original framework-created Artifact tool identity. */
-export const managedToolHandlers = (tool: Tool.Any): Context.Context<never> | undefined => managedHandlers.get(tool)
+export { managedToolHandlers }

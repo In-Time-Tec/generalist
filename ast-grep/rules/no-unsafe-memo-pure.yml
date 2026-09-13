@@ -20,4 +20,3 @@ rule:
         stopBy: end
 files:
   - "packages/*/src/**/*.ts"
-  - "examples/**/*.ts"

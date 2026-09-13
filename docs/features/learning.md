@@ -12,7 +12,7 @@ import * as Learning from "generalist/unstable/learning"
 const proposal: Learning.Proposal = {
   _tag: "RefineInstruction",
   target: "release-guidance",
-  diff: "Require a clean package smoke test before publishing.",
+  diff: "Require clean checks and package construction before publishing.",
   evidence: [{ runId: "run:release-review", turn: 2 }],
 }
 ```

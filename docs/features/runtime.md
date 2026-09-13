@@ -3,7 +3,7 @@ title: "Runtime"
 description: "Run typed Agents and manage Sessions through scoped commands and bounded observations."
 ---
 
-The Runtime turns a declared Agent and typed input into a durable Run. Applications use semantic commands and bounded observations; the engine owns registration, claims, persistence, and scheduling. One object-native engine supplies recovery through S3 or native R2, independently of the compute host.
+The Runtime turns a declared Agent and typed input into a durable Run. Applications use semantic commands and bounded observations; the engine owns registration, claims, persistence, and scheduling. One object-native engine supplies recovery through S3-compatible storage or a local directory, independently of the compute host.
 
 ## Usage
 
@@ -37,7 +37,7 @@ const program = Effect.gen(function* () {
 Effect.runPromise(program.pipe(Effect.provide(runtimeLayer), Effect.scoped))
 ```
 
-This composition fragment needs the model/tool services required by the Agent and an object transport plus Crypto. See [object durability](./durable-stores.md) for S3 and native R2 configuration. Declaring the Layer performs no I/O; acquiring it validates and registers the declarations, acquires execution ownership, and starts the scheduler before publishing Runtime.
+This composition fragment needs the model/tool services required by the Agent and an object transport plus Crypto. See [object durability](./durable-stores.md) for S3-compatible and local-directory configuration. Declaring the Layer performs no I/O; acquiring it validates and registers the declarations, acquires execution ownership, and starts the scheduler before publishing Runtime.
 
 `start` admits work for immediate execution. `hold(agent, input, { idempotencyKey })` instead returns a held handle; only `handle.activate(commandId)` opens its execution gate. Both handles expose the Run ID, schema-decoded `await`, replay-then-live `events`, and `send` for an existing Run's inbox. `schedule` registers a durable recurrence for a declared Agent.
 
@@ -102,7 +102,7 @@ worker/process loss
 
 ### Admission and identity
 
-- `generalist/runtime` is the Worker-safe execution contract. Compose `generalist/durability` with S3 or native R2; Core remains process-local without either. A blocking ask is not a Runtime primitive.
+- `generalist/runtime` is the execution contract. Compose `generalist/durability` with S3-compatible storage or a local directory; Core remains process-local without either. A blocking ask is not a Runtime primitive.
 - `Address` is an opaque routing key bound by a Layer to a pinned executable. `Message` carries Effect AI `Prompt`, idempotency, Session/lane, and correlation fields; Runtime adds no content vocabulary.
 - Layer acquisition rejects duplicate Agent names and captures each declaration's service environment. `start(agent, input, options)` requires a declared Agent, Schema-encodes the input, and atomically persists its identity and Run. An exact `{ sessionId, idempotencyKey }` retry returns the same Run ID without another admission.
 - Recovery uses the persisted revision and executable identity. An exact retained-revision loader can reconstruct its declarations and services; missing or mismatched definitions fail closed rather than substituting the current Agent revision.

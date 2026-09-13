@@ -3,7 +3,8 @@ import { AiError, LanguageModel } from "effect/unstable/ai"
 import { Memory, type MemoryError } from "../../core/context/memory.js"
 import { ModelRegistry } from "../../core/model/registry.js"
 import { Approvals, type Service as ApprovalsService } from "../../core/policy/approvals.js"
-import { type Declaration, Hooks, make as makeHooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
+import { type Declaration, Hooks, onRunEnd, type RunEndInput } from "../../hooks/index.js"
+import { make as makeHooks } from "../../hooks/internal.js"
 import {
   Denied as NestedOperationDenied,
   Operations,

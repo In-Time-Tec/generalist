@@ -22,7 +22,7 @@ await Effect.gen(function* () {
 
 The program prints `Agent check passed`. The model returns the scripted response regardless of the prompt, so this checks your application's handling of the response—not whether a real model follows instructions. Use [evals](evals.md) to measure behavior with real models.
 
-For tool-calling tests, script a `toolCall(...)` followed by the final `text(...)`, and provide the toolkit's handler Layer and authorization policy. The runnable website checkpoints under [`examples/docs-snippets/website`](../../examples/docs-snippets/website) show a complete example.
+For tool-calling tests, script a `toolCall(...)` followed by the final `text(...)`, and provide the toolkit's handler Layer and authorization policy.
 
 ## Test a custom adapter
 
@@ -106,7 +106,7 @@ Effect.runPromise(writeCertification.pipe(Effect.provide(MyDriver.platformLayer)
 
 The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; Sandbox entries use `sandbox:<provider-name>`; service suites use `blobStore`, `memory`, and `ruleStore`.
 
-The repository's Vitest reporter writes passing runtime-driver suites to the committed `docs/features/hosts-report.json`, preserving prior evidence for database suites skipped because their URL is unset. `scripts/render-hosts.ts` turns that report into `docs/features/hosts.md`; `bun run test` fails when the generated page has drifted.
+The runtime-driver suite records capability evidence in `docs/features/hosts-report.json`. Treat that file as retained evidence for its recorded revision, not as live provider certification.
 
 ## Scripted model fixtures
 

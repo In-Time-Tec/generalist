@@ -13,11 +13,13 @@ import { withWireCache } from "../../model/prompt-cache.js"
 import type { AnyToolCall } from "../tools/result.js"
 import type { ActiveModelServices, ModelTurnServices, RuntimeContext } from "./context.js"
 import {
+  prepare as prepareToolCallValidation,
+  validateDecodedToolCall,
+} from "../../model/tool-call-validation-internal.js"
+import {
   InvalidToolCallParameters,
   isInvalidToolCallParameters,
-  prepare as prepareToolCallValidation,
   ToolJsonSchemaCompilerMissing,
-  validateDecodedToolCall,
 } from "../../model/tool-call-validation.js"
 import type { RunError, ToolSchedulingPolicy } from "../service.js"
 import type { TurnOverrides } from "../../turn/policy.js"

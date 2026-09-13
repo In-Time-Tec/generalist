@@ -34,7 +34,11 @@ import { StoreActivation, layerActivation, make as makeState, type Options } fro
 import type { Definition } from "../../durability/internal/runtime-command.js"
 import { commands as admissionCommands } from "../../durability/internal/runtime-command-admission.js"
 import { commands as operationCommands } from "../../durability/internal/runtime-command-operation.js"
-import { commands as controlCommands, externalCommands } from "../../durability/internal/runtime-command-control.js"
+import {
+  commands as controlCommands,
+  externalChildCommands,
+  externalRootCommands,
+} from "../../durability/internal/runtime-command-control.js"
 import { idempotencyKey, waitMapKey, type RuntimeState } from "./projection.js"
 import { make as makeInspectionViews } from "./inspection/views.js"
 import { ChildParentageInvalid } from "../child/admission.js"
@@ -924,7 +928,7 @@ const makeStoreServices = (options: Options) =>
       reserve: (input) =>
         validatePayload({ value: input, boundary: "external child reservation" }).pipe(
           Effect.andThen(
-            modifyState(externalCommands.reserve, [input], (state, [prepared]) =>
+            modifyState(externalChildCommands.reserve, [input], (state, [prepared]) =>
               prepared.request.parent.partition === options.partition
                 ? externalChildOperations.reserve(state, prepared)
                 : RuntimeUnavailable.make({ message: "External child parent belongs to another partition" }),
@@ -935,7 +939,7 @@ const makeStoreServices = (options: Options) =>
       reserveScoped: (input) =>
         validatePayload({ value: input, boundary: "external scoped child reservation" }).pipe(
           Effect.andThen(
-            fencedModify(externalCommands.reserveScoped, [input], (state, [prepared]) =>
+            fencedModify(externalChildCommands.reserveScoped, [input], (state, [prepared]) =>
               prepared.request.parent.partition === options.partition
                 ? externalChildOperations.reserveScoped(state, prepared)
                 : RuntimeUnavailable.make({ message: "External child parent belongs to another partition" }),
@@ -944,11 +948,11 @@ const makeStoreServices = (options: Options) =>
           withDomainConflict(ExternalChildPlacementConflict.make({ placementId: input.placementId })),
         ),
       acknowledge: (placementId) =>
-        modifyState(externalCommands.acknowledge, [placementId], (state, [preparedPlacementId]) =>
+        modifyState(externalChildCommands.acknowledge, [placementId], (state, [preparedPlacementId]) =>
           externalChildOperations.acknowledge(state, preparedPlacementId),
         ),
       settle: (input) =>
-        modifyState(externalCommands.settle, [input], (state, [preparedInput]) =>
+        modifyState(externalChildCommands.settle, [input], (state, [preparedInput]) =>
           externalChildOperations.settle(state, preparedInput),
         ).pipe(
           withDomainConflict(
@@ -956,17 +960,17 @@ const makeStoreServices = (options: Options) =>
           ),
         ),
       cancel: (placementId) =>
-        modifyState(externalCommands.cancel, [placementId], (state, [preparedPlacementId]) =>
+        modifyState(externalChildCommands.cancel, [placementId], (state, [preparedPlacementId]) =>
           externalChildOperations.cancel(state, preparedPlacementId),
         ),
       cancelScoped: (input) =>
-        fencedModify(externalCommands.cancelScoped, [input], (state, [preparedInput]) =>
+        fencedModify(externalChildCommands.cancelScoped, [input], (state, [preparedInput]) =>
           externalChildOperations.cancelScoped(state, preparedInput),
         ).pipe(withDomainConflict(ExternalChildPlacementConflict.make({ placementId: input.placementId }))),
       admitRoot: (input) =>
         validatePayload({ value: input, boundary: "external root admission" }).pipe(
           Effect.andThen(
-            modifyState(externalCommands.admitRoot, [input], (state, [prepared]) =>
+            modifyState(externalRootCommands.admitRoot, [input], (state, [prepared]) =>
               prepared.ref.partition === options.partition
                 ? externalChildOperations.admitRoot(state, prepared)
                 : RuntimeUnavailable.make({ message: "External root belongs to another partition" }),
@@ -975,7 +979,7 @@ const makeStoreServices = (options: Options) =>
           withDomainConflict(ExternalRootConflict.make({ placementId: input.placementId })),
         ),
       activateRoot: (placementId) =>
-        modifyState(externalCommands.activateRoot, [placementId], (state, [preparedPlacementId]) =>
+        modifyState(externalRootCommands.activateRoot, [placementId], (state, [preparedPlacementId]) =>
           externalChildOperations.activateRoot(state, preparedPlacementId),
         ),
       inspectRoot: (placementId) =>
@@ -984,7 +988,7 @@ const makeStoreServices = (options: Options) =>
         readState.pipe(Effect.flatMap((state) => externalChildOperations.inspectRootRun(state, placementId))),
       cancelRoot: (placementId, reason) =>
         modifyState(
-          externalCommands.cancelRoot,
+          externalRootCommands.cancelRoot,
           [placementId, reason],
           (state, [preparedPlacementId, preparedReason]) =>
             externalChildOperations.cancelRoot(state, preparedPlacementId, preparedReason),
@@ -992,7 +996,7 @@ const makeStoreServices = (options: Options) =>
       rootSettlement: (placementId) =>
         readState.pipe(Effect.flatMap((state) => externalChildOperations.rootSettlement(state, placementId))),
       acknowledgeRootSettlement: (input) =>
-        modifyState(externalCommands.acknowledgeRootSettlement, [input], (state, [preparedInput]) =>
+        modifyState(externalRootCommands.acknowledgeRootSettlement, [input], (state, [preparedInput]) =>
           externalChildOperations.acknowledgeRootSettlement(state, preparedInput),
         ),
     })

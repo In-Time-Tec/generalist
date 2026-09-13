@@ -15,7 +15,7 @@ import {
   type CrdtService,
 } from "generalist/unstable/artifact"
 import { managedToolHandlers } from "../../src/core/artifact.js"
-import type { EditTool as SourceEditTool } from "../../src/unstable/artifact/document.js"
+import type { EditTool as SourceEditTool } from "../../src/artifact/service.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
 import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/object.js"
 

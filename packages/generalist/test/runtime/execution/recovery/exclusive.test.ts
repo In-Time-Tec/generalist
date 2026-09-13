@@ -1,9 +1,9 @@
-import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore, type ExecutionClaim, type WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.js"
@@ -143,7 +143,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
 
     const runId = yield* scopedWith(firstLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime
+        const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)
@@ -185,7 +185,7 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
 
     yield* scopedWith(recoveredLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime
+        const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)
@@ -266,7 +266,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
       ).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
-        const runtime = yield* Runtime
+        const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -355,7 +355,7 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
       ).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
-        const runtime = yield* Runtime
+        const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
 
@@ -478,7 +478,7 @@ it.live("keeps one tool operation key across approval suspension and object stor
       ).pipe(Layer.provide(firstResolverLayer)),
     )(
       Effect.gen(function* () {
-        const runtime = yield* Runtime
+        const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -567,7 +567,7 @@ it.live("keeps one tool operation key across approval suspension and object stor
       ).pipe(Layer.provide(recoveredResolverLayer)),
     )(
       Effect.gen(function* () {
-        const runtime = yield* Runtime
+        const runtime = yield* Runtime.Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const reopened = yield* store.loadExecution(suspended.runId)
@@ -638,7 +638,7 @@ it.effect("object storage reconciles every running operation before execution", 
   )
   return scopedWith(runtimeLayer)(
     Effect.gen(function* () {
-      const runtime = yield* Runtime
+      const runtime = yield* Runtime.Runtime
       const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: address,

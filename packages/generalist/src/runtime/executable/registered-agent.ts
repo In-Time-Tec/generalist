@@ -21,10 +21,11 @@ import { make as makeExecutable } from "./manifest.js"
 import type { Input as ResolverInput, ProgramResolution, Resolution, Service as ResolverService } from "./resolver.js"
 import { requiredPins, type ExecutableRegistration } from "./registration.js"
 import { definition as fanOutDefinition } from "../../core/agent/tool/fan-out.js"
-import { Configuration as Tasks } from "../../tasks/internal.js"
+import { Tasks } from "../../tasks/service.js"
 import { CommandTool } from "../../core/durable/component.js"
 import { namespace } from "../../core/durable/component/definition.js"
 import { Hooks } from "../../hooks/index.js"
+import { chainPin as hookChainPin } from "../../hooks/internal.js"
 import { codec as toolCodec, type RegisteredTool } from "./registered-tool.js"
 import { AgentBuildRevision } from "./build-revision.js"
 import type { ErasedExecutionServicesFactory, RegisteredExecutionBinding } from "../execution/scope.js"
@@ -231,13 +232,17 @@ const graphFor = (root: AnyAgent, available: ReadonlyArray<AnyAgent> = [root]): 
   return { agents, children }
 }
 
-export const validateProfiles = (agents: ReadonlyArray<AnyAgent>): Effect.Effect<void, ExecutableRegistrationInvalid> =>
+/** @internal Complete registration graph for the declared Agent profiles. */
+export const registrationGraphAgents = (
+  agents: ReadonlyArray<AnyAgent>,
+): Effect.Effect<ReadonlyArray<AnyAgent>, ExecutableRegistrationInvalid> =>
   Effect.try({
-    try: () => {
-      for (const agent of agents) graphFor(agent, agents)
-    },
+    try: () => [...new Set(agents.flatMap((agent) => graphFor(agent, agents).agents))],
     catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
   })
+
+export const validateProfiles = (agents: ReadonlyArray<AnyAgent>): Effect.Effect<void, ExecutableRegistrationInvalid> =>
+  registrationGraphAgents(agents).pipe(Effect.asVoid)
 
 const pinnedAgent = (
   agent: AnyAgent,
@@ -460,7 +465,9 @@ const captureFrom = (
         graphIdentities(
           agent,
           Option.isSome(tasks) ? tasks.value.tools : [],
-          Option.isSome(hooks) && hooks.value.declarations.length > 0 ? hooks.value.pin : undefined,
+          Option.isSome(hooks) && hooks.value.declarations.length > 0
+            ? hookChainPin(hooks.value.declarations)
+            : undefined,
           profiles,
           revision,
         ),

@@ -321,7 +321,7 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
           .pipe(Effect.mapError(schemaFailure("tool-input", input.tool)))
         yield* authorize(invocation, input.operation, input.tool)
         const output = yield* semaphore
-          .withPermits(1)(invocation.execute)
+          .withPermits(1)(invocation.execute(input.operation))
           .pipe(
             Effect.catch(
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramToolFailure> =>
@@ -359,7 +359,7 @@ const makeCapabilities = (handlers: Handlers, budget: ProgramBudget) =>
           .pipe(Effect.mapError(schemaFailure("step-input", input.step)))
         yield* authorize(invocation, input.operation, input.step)
         const output = yield* semaphore
-          .withPermits(1)(invocation.execute)
+          .withPermits(1)(invocation.execute(input.operation))
           .pipe(
             Effect.catch(
               (cause): Effect.Effect<never, ProgramSuspended | ProgramCancelled | ProgramStepFailure> =>

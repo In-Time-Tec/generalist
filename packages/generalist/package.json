@@ -8,24 +8,11 @@
   "peerDependencies": {
     "@a2a-js/sdk": "catalog:",
     "@ag-ui/core": "catalog:",
-    "@aws-sdk/client-bedrock-runtime": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
-    "@aws-sdk/credential-provider-node": "catalog:",
-    "@effect/ai-anthropic": "catalog:",
-    "@effect/ai-openai": "catalog:",
-    "@effect/ai-openai-compat": "catalog:",
-    "@effect/ai-openrouter": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
-    "@rivet-dev/agentos": "catalog:",
-    "@smithy/types": "catalog:",
     "@smithy/fetch-http-handler": "catalog:",
-    "@standard-schema/spec": "catalog:",
     "effect": "4.0.0-rc.112",
-    "es-module-lexer": "catalog:",
-    "foldkit": "catalog:peer",
-    "modal": "catalog:",
-    "rivetkit": "catalog:",
     "vitest": "catalog:",
     "yjs": "catalog:"
   },
@@ -83,10 +70,6 @@
     "./durability/s3": {
       "types": "./dist/durability/s3.d.ts",
       "import": "./dist/durability/s3.js"
-    },
-    "./durability/r2": {
-      "types": "./dist/durability/r2.d.ts",
-      "import": "./dist/durability/r2.js"
     },
     "./compaction": {
       "types": "./dist/core/turn/compaction.d.ts",
@@ -200,45 +183,9 @@
       "types": "./dist/ai/model-catalog.d.ts",
       "import": "./dist/ai/model-catalog.js"
     },
-    "./providers/openai": {
-      "types": "./dist/ai/provider/openai.d.ts",
-      "import": "./dist/ai/provider/openai.js"
-    },
-    "./providers/anthropic": {
-      "types": "./dist/ai/provider/anthropic.d.ts",
-      "import": "./dist/ai/provider/anthropic.js"
-    },
-    "./providers/amazon-bedrock": {
-      "types": "./dist/ai/provider/amazon-bedrock/service.d.ts",
-      "import": "./dist/ai/provider/amazon-bedrock/service.js"
-    },
-    "./providers/openrouter": {
-      "types": "./dist/ai/provider/openrouter.d.ts",
-      "import": "./dist/ai/provider/openrouter.js"
-    },
-    "./providers/openai-responses": {
-      "types": "./dist/ai/provider/openai-responses.d.ts",
-      "import": "./dist/ai/provider/openai-responses.js"
-    },
-    "./providers/openai-chat-completions": {
-      "types": "./dist/ai/provider/openai-chat-completions.d.ts",
-      "import": "./dist/ai/provider/openai-chat-completions.js"
-    },
     "./providers/deterministic": {
       "types": "./dist/ai/provider/deterministic.d.ts",
       "import": "./dist/ai/provider/deterministic.js"
-    },
-    "./providers/openai-compatible": {
-      "types": "./dist/ai/openai-compatible.d.ts",
-      "import": "./dist/ai/openai-compatible.js"
-    },
-    "./providers/openai-embedding": {
-      "types": "./dist/ai/model/openai-embedding.d.ts",
-      "import": "./dist/ai/model/openai-embedding.js"
-    },
-    "./providers/openai-compatible-embedding": {
-      "types": "./dist/ai/model/openai-compatible-embedding.d.ts",
-      "import": "./dist/ai/model/openai-compatible-embedding.js"
     },
     "./unstable/runtime/external-child-placement": {
       "types": "./dist/runtime/child/external/placement.d.ts",
@@ -276,10 +223,6 @@
       "types": "./dist/unstable/mcp/tools.d.ts",
       "import": "./dist/unstable/mcp/tools.js"
     },
-    "./unstable/foldkit": {
-      "types": "./dist/unstable/foldkit/index.d.ts",
-      "import": "./dist/unstable/foldkit/index.js"
-    },
     "./unstable/learning": {
       "types": "./dist/unstable/learning/index.d.ts",
       "import": "./dist/unstable/learning/index.js"
@@ -299,58 +242,6 @@
     "./unstable/providers/model-route": {
       "types": "./dist/unstable/providers/model-route.d.ts",
       "import": "./dist/unstable/providers/model-route.js"
-    },
-    "./unstable/providers/openai-account-auth": {
-      "types": "./dist/unstable/providers/openai-account-auth.d.ts",
-      "import": "./dist/unstable/providers/openai-account-auth.js"
-    },
-    "./unstable/providers/openai-account-auth-http": {
-      "types": "./dist/unstable/providers/openai-account-auth-http.d.ts",
-      "import": "./dist/unstable/providers/openai-account-auth-http.js"
-    },
-    "./unstable/sandbox/e2b": {
-      "types": "./dist/unstable/sandbox/e2b/index.d.ts",
-      "import": "./dist/unstable/sandbox/e2b/index.js"
-    },
-    "./unstable/sandbox/daytona": {
-      "types": "./dist/unstable/sandbox/daytona/index.d.ts",
-      "import": "./dist/unstable/sandbox/daytona/index.js"
-    },
-    "./unstable/sandbox/fly-sprites": {
-      "types": "./dist/unstable/sandbox/fly-sprites/index.d.ts",
-      "import": "./dist/unstable/sandbox/fly-sprites/index.js"
-    },
-    "./unstable/sandbox/modal": {
-      "types": "./dist/unstable/sandbox/modal/index.d.ts",
-      "import": "./dist/unstable/sandbox/modal/index.js"
-    },
-    "./unstable/sandbox/agentos": {
-      "types": "./dist/unstable/sandbox/agentos/index.d.ts",
-      "import": "./dist/unstable/sandbox/agentos/index.js"
-    },
-    "./unstable/sandbox/cloudflare": {
-      "types": "./dist/unstable/sandbox/cloudflare/index.d.ts",
-      "import": "./dist/unstable/sandbox/cloudflare/index.js"
-    },
-    "./unstable/sandbox/worker-loader": {
-      "types": "./dist/unstable/sandbox/worker-loader.d.ts",
-      "import": "./dist/unstable/sandbox/worker-loader.js"
-    },
-    "./unstable/cloudflare/workers": {
-      "types": "./dist/unstable/cloudflare/workers/index.d.ts",
-      "import": "./dist/unstable/cloudflare/workers/index.js"
-    },
-    "./unstable/cloudflare/durable-objects": {
-      "types": "./dist/unstable/cloudflare/durable-objects/index.d.ts",
-      "import": "./dist/unstable/cloudflare/durable-objects/index.js"
-    },
-    "./unstable/cloudflare/dynamic-workers": {
-      "types": "./dist/unstable/cloudflare/dynamic-workers/index.d.ts",
-      "import": "./dist/unstable/cloudflare/dynamic-workers/index.js"
-    },
-    "./unstable/rivet": {
-      "types": "./dist/unstable/rivet/actors/index.d.ts",
-      "import": "./dist/unstable/rivet/actors/index.js"
     }
   },
   "scripts": {
@@ -362,31 +253,16 @@
   "devDependencies": {
     "@a2a-js/sdk": "catalog:",
     "@ag-ui/core": "catalog:",
-    "@aws-sdk/client-bedrock-runtime": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
-    "@aws-sdk/credential-provider-node": "catalog:",
-    "@effect/ai-anthropic": "catalog:",
-    "@effect/ai-openai": "catalog:",
-    "@effect/ai-openai-compat": "catalog:",
-    "@effect/ai-openrouter": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/vitest": "catalog:",
     "@modelcontextprotocol/sdk": "catalog:",
-    "@rivet-dev/agentos": "catalog:",
-    "@smithy/types": "catalog:",
     "@smithy/fetch-http-handler": "catalog:",
-    "@standard-schema/spec": "catalog:",
     "@types/bun": "catalog:",
     "effect": "catalog:",
     "esbuild": "catalog:",
-    "es-module-lexer": "catalog:",
-    "foldkit": "catalog:",
-    "modal": "catalog:",
-    "miniflare": "5.20260811.1-alpha",
-    "rivetkit": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "workerd": "1.20260819.1",
     "yjs": "catalog:"
   },
   "repository": {
@@ -401,25 +277,7 @@
     "@ag-ui/core": {
       "optional": true
     },
-    "@aws-sdk/client-bedrock-runtime": {
-      "optional": true
-    },
     "@aws-sdk/client-s3": {
-      "optional": true
-    },
-    "@aws-sdk/credential-provider-node": {
-      "optional": true
-    },
-    "@effect/ai-anthropic": {
-      "optional": true
-    },
-    "@effect/ai-openai": {
-      "optional": true
-    },
-    "@effect/ai-openai-compat": {
-      "optional": true
-    },
-    "@effect/ai-openrouter": {
       "optional": true
     },
     "@effect/vitest": {
@@ -428,28 +286,7 @@
     "@modelcontextprotocol/sdk": {
       "optional": true
     },
-    "@rivet-dev/agentos": {
-      "optional": true
-    },
-    "@smithy/types": {
-      "optional": true
-    },
     "@smithy/fetch-http-handler": {
-      "optional": true
-    },
-    "@standard-schema/spec": {
-      "optional": true
-    },
-    "es-module-lexer": {
-      "optional": true
-    },
-    "foldkit": {
-      "optional": true
-    },
-    "modal": {
-      "optional": true
-    },
-    "rivetkit": {
       "optional": true
     },
     "vitest": {

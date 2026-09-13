@@ -68,6 +68,7 @@ import { BlobStore } from "../blob-store/index.js"
 import { make as makeHostRun, type HostRun } from "./run.js"
 export type { HostRun, ChildHandle, ChildSpawnOptions, WaitOptions } from "./run.js"
 export { WaitInvalid, WaitResult } from "./run.js"
+import { Artifacts as ArtifactCapability } from "../artifact/service.js"
 import { AgentBuildRevision, AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
 import {
@@ -83,7 +84,7 @@ export type {
   QueueEditOptions,
   QueueError,
 } from "./session.js"
-import { ArtifactCapability, type Artifacts, make as makeArtifacts } from "./artifacts.js"
+import { type Artifacts, make as makeArtifacts } from "./artifacts.js"
 const rejectedPreview: Result.Result<PreviewDelivery, void> = Result.failVoid
 export type { HostSession } from "../runtime/session/host.js"
 export { SessionFamilyInput, SessionFamilyPage } from "../runtime/session/retained.js"

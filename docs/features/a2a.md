@@ -22,8 +22,6 @@ const handler = Effect.gen(function* () {
 }).pipe(Effect.provide(A2A.layer(deployment)), Effect.provide(runtimeLayer))
 ```
 
-See the runnable offline [two-host A2A example](https://github.com/In-Time-Tec/generalist/tree/main/examples/a2a).
-
 ## Implemented from the spec
 
 - A2A v1 message send and streaming through the SDK `DefaultRequestHandler`.
@@ -97,6 +95,5 @@ cancelled → CANCELED
 
 ## Related
 
-- Example: `examples/a2a`
 - Source: `packages/generalist/src/unstable/a2a/...`
 - Site: `/docs/mcp`

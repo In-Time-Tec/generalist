@@ -6,7 +6,6 @@ import { encode as encodeAgentInput } from "../../core/agent/lifecycle/input.js"
 import { digest } from "../../core/durable/canonical-json.js"
 import type { Exhausted as RunBudgetExhausted } from "../../core/durable/run-budget.js"
 import type { DurabilityFailure } from "../../durability/errors.js"
-import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { make as makeAddress } from "../address.js"
 import type { ChildParentageInvalid } from "../child/admission.js"
 import { childSessionId } from "../child/session.js"
@@ -29,6 +28,7 @@ import { Runtime, type Service as RuntimeService } from "../service.js"
 import { get as getExternalChildRuntime } from "../child/external/binding.js"
 import { ExternalChildStore, type Service as ExternalChildStoreService } from "../child/external/store.js"
 import type { Placement, ScopedAdmissionRequest } from "../child/external/placement.js"
+import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 
 const ExecutionScopeTypeId: unique symbol = Symbol("generalist/runtime/ExecutionScope")
 const ChildReceiptTypeId: unique symbol = Symbol("generalist/runtime/ChildReceipt")
@@ -78,7 +78,9 @@ export class ExecutionScopeRetired extends ActionableTaggedError<ExecutionScopeR
   {
     runId: Schema.String,
     incarnation: Schema.String,
-    hint: errorHint("Stop issuing commands from this retired attempt and reacquire the current execution scope."),
+    hint: errorHint(
+      "Use the newly issued execution scope; reconcile uncertain admission with the original command identity.",
+    ),
   },
 ) {}
 
@@ -89,7 +91,7 @@ export class ChildCommandConflict extends ActionableTaggedError<ChildCommandConf
     parentRunId: Schema.String,
     commandId: Schema.String,
     existingChildRunId: Schema.String,
-    hint: errorHint("Retry the original child command unchanged, or use a new command identity for different work."),
+    hint: errorHint("Retry the original immutable child command, or use a new command identity for different work."),
   },
 ) {}
 
@@ -99,7 +101,7 @@ export class ChildPlacementDenied extends ActionableTaggedError<ChildPlacementDe
   {
     parentRunId: Schema.String,
     partition: Schema.String,
-    hint: errorHint("Choose a child partition authorized and reachable from the parent Runtime."),
+    hint: errorHint("Configure an authorized route from the parent partition to the requested child partition."),
   },
 ) {}
 
@@ -543,31 +545,6 @@ export const issue = (options: {
         ),
       )
     }
-    const matchesLocalCommand = (
-      existing: ExecutionRecord,
-      input: { readonly invocationId: string; readonly commandIdentity: string; readonly factsIdentity: string },
-    ): boolean =>
-      existing.parentRunId === options.claim.runId &&
-      existing.invocationId === input.invocationId &&
-      existing.message.metadata.executionScopeCommand === input.commandIdentity &&
-      existing.message.metadata.executionScopeFacts === input.factsIdentity
-    const matchesExternalCommand = (
-      placement: Placement,
-      input: {
-        readonly invocationId: string
-        readonly commandIdentity: string
-        readonly factsIdentity: string
-        readonly requestedPartition: string
-        readonly childRunId: string
-      },
-    ): boolean =>
-      placement.parentRunId === options.claim.runId &&
-      placement.invocationId === input.invocationId &&
-      placement.request.parent.partition === options.binding.partition &&
-      placement.request.ref.partition === input.requestedPartition &&
-      placement.request.ref.runId === input.childRunId &&
-      placement.request.root.message.metadata.executionScopeCommand === input.commandIdentity &&
-      placement.request.root.message.metadata.executionScopeFacts === input.factsIdentity
     const start: ChildCapabilities<Readonly<Record<string, AnyAgent>>>["start"] = (input) =>
       admissions.withPermit(
         Effect.gen(function* () {
@@ -644,86 +621,125 @@ export const issue = (options: {
             receipts.set(receipt, external === undefined ? receiptMetadata : { ...receiptMetadata, external })
             return Object.freeze(receipt)
           }
-          const existing = yield* options.store.loadExecution(childRunId).pipe(
-            Effect.map(Option.some),
-            Effect.catchTag("generalist/runtime/RunNotFound", () => Effect.succeed(Option.none())),
-          )
-          if (Option.isSome(existing)) {
-            if (!matchesLocalCommand(existing.value, { invocationId, commandIdentity, factsIdentity })) {
-              return yield* ChildCommandConflict.make({
+          const reuseLocal = (existing: ExecutionRecord) => {
+            if (
+              existing.parentRunId !== options.claim.runId ||
+              existing.invocationId !== invocationId ||
+              existing.message.metadata.executionScopeCommand !== commandIdentity ||
+              existing.message.metadata.executionScopeFacts !== factsIdentity
+            ) {
+              return ChildCommandConflict.make({
                 parentRunId: options.claim.runId,
                 commandId: input.commandId,
                 existingChildRunId: childRunId,
               })
             }
-            yield* assertLive
-            return receiptFor(childRunId, false)
+            return assertLive.pipe(Effect.andThen(Effect.sync(() => receiptFor(childRunId, false))))
           }
-          const existingPlacement =
-            externalRuntime === undefined
-              ? Option.none<Placement>()
-              : yield* externalRuntime.store.inspectPlacement(placementId).pipe(
-                  Effect.map(Option.some),
-                  Effect.catchTag("generalist/runtime/ExternalChildPlacementNotFound", () =>
-                    Effect.succeed(Option.none<Placement>()),
-                  ),
-                )
-          if (Option.isSome(existingPlacement)) {
-            const placement = existingPlacement.value
+          const reuseExternal = (placement: Placement) => {
             if (
-              !matchesExternalCommand(placement, {
-                invocationId,
-                commandIdentity,
-                factsIdentity,
-                requestedPartition,
-                childRunId,
-              })
+              placement.parentRunId !== options.claim.runId ||
+              placement.invocationId !== invocationId ||
+              placement.request.parent.partition !== options.binding.partition ||
+              placement.request.ref.partition !== requestedPartition ||
+              placement.request.ref.runId !== childRunId ||
+              placement.request.root.message.metadata.executionScopeCommand !== commandIdentity ||
+              placement.request.root.message.metadata.executionScopeFacts !== factsIdentity
             ) {
-              return yield* ChildCommandConflict.make({
+              return ChildCommandConflict.make({
                 parentRunId: options.claim.runId,
                 commandId: input.commandId,
                 existingChildRunId: placement.request.ref.runId,
               })
             }
-            yield* routeFor(requestedPartition)
-            yield* assertLive
-            return receiptFor(childRunId, false, { partition: requestedPartition, placementId })
+            return routeFor(requestedPartition).pipe(
+              Effect.andThen(assertLive),
+              Effect.andThen(
+                Effect.sync(() => receiptFor(childRunId, false, { partition: requestedPartition, placementId })),
+              ),
+            )
           }
-          if (requestedPartition !== options.binding.partition) {
-            yield* routeFor(requestedPartition)
-            yield* assertLive
-            if (externalRuntime === undefined || options.claim.session === undefined) {
-              return yield* RuntimeUnavailable.make({
-                message: "External child placement requires a claimed parent Session",
+          const admitExternal = () =>
+            Effect.gen(function* () {
+              yield* routeFor(requestedPartition)
+              yield* assertLive
+              if (externalRuntime === undefined || options.claim.session === undefined) {
+                return yield* RuntimeUnavailable.make({
+                  message: "External child placement requires a claimed parent Session",
+                })
+              }
+              const request: ScopedAdmissionRequest = {
+                parent: { partition: options.binding.partition, runId: options.claim.runId },
+                ref: { partition: requestedPartition, runId: childRunId },
+                root: {
+                  message,
+                  executableRef: selected.value.executable.ref,
+                  executableManifest: selected.value.executable.manifest,
+                  registrations: selected.value.registrations,
+                },
+              }
+              const reserved = yield* externalRuntime.store
+                .reserveScoped({
+                  runId: options.claim.runId,
+                  ownerId: options.claim.ownerId,
+                  attemptFence: options.claim.attemptFence,
+                  session: options.claim.session,
+                  placementId,
+                  invocationId,
+                  request,
+                })
+                .pipe(
+                  Effect.catchTags({
+                    "generalist/runtime/ExternalChildPlacementConflict": () =>
+                      ChildCommandConflict.make({
+                        parentRunId: options.claim.runId,
+                        commandId: input.commandId,
+                        existingChildRunId: childRunId,
+                      }),
+                    "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
+                    "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
+                    "generalist/runtime/PayloadTooLarge": (error) =>
+                      RuntimeUnavailable.make({ message: error.message }),
+                    "generalist/durability/DurabilityFailure": (error) =>
+                      error.reason === "input-conflict"
+                        ? ChildCommandConflict.make({
+                            parentRunId: options.claim.runId,
+                            commandId: input.commandId,
+                            existingChildRunId: childRunId,
+                          })
+                        : Effect.fail(error),
+                    "generalist/core/RunBudgetExhausted": (error) => Effect.fail(error),
+                  }),
+                )
+              return receiptFor(reserved.request.ref.runId, false, {
+                partition: requestedPartition,
+                placementId: reserved.placementId,
               })
-            }
-            const request: ScopedAdmissionRequest = {
-              parent: { partition: options.binding.partition, runId: options.claim.runId },
-              ref: { partition: requestedPartition, runId: childRunId },
-              root: {
-                message,
+            })
+          const admitLocal = () =>
+            options.store
+              .admitProgramChild({
+                ...options.claim,
+                childRunId,
+                invocationId,
                 executableRef: selected.value.executable.ref,
                 executableManifest: selected.value.executable.manifest,
                 registrations: selected.value.registrations,
-              },
-            }
-            const reserved = yield* externalRuntime.store
-              .reserveScoped({
-                runId: options.claim.runId,
-                ownerId: options.claim.ownerId,
-                attemptFence: options.claim.attemptFence,
-                session: options.claim.session,
-                placementId,
-                invocationId,
-                request,
+                message,
               })
               .pipe(
                 Effect.catchTags({
-                  "generalist/runtime/ExternalChildPlacementConflict": () =>
+                  "generalist/runtime/IdempotencyConflict": (error) =>
                     ChildCommandConflict.make({
                       parentRunId: options.claim.runId,
                       commandId: input.commandId,
-                      existingChildRunId: childRunId,
+                      existingChildRunId: error.existingRunId,
+                    }),
+                  "generalist/runtime/RunIdConflict": (error) =>
+                    ChildCommandConflict.make({
+                      parentRunId: options.claim.runId,
+                      commandId: input.commandId,
+                      existingChildRunId: error.existingRunId,
                     }),
                   "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
                   "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
@@ -738,51 +754,31 @@ export const issue = (options: {
                       : Effect.fail(error),
                   "generalist/core/RunBudgetExhausted": (error) => Effect.fail(error),
                 }),
+                Effect.map((admitted) => receiptFor(admitted.runId, admitted.duplicate)),
               )
-            return receiptFor(reserved.request.ref.runId, false, {
-              partition: requestedPartition,
-              placementId: reserved.placementId,
-            })
+          const existing = yield* options.store.loadExecution(childRunId).pipe(
+            Effect.map(Option.some),
+            Effect.catchTag("generalist/runtime/RunNotFound", () => Effect.succeed(Option.none())),
+          )
+          if (Option.isSome(existing)) {
+            return yield* reuseLocal(existing.value)
           }
-          const admitted = yield* options.store
-            .admitProgramChild({
-              ...options.claim,
-              childRunId,
-              invocationId,
-              executableRef: selected.value.executable.ref,
-              executableManifest: selected.value.executable.manifest,
-              registrations: selected.value.registrations,
-              message,
-            })
-            .pipe(
-              Effect.catchTags({
-                "generalist/runtime/IdempotencyConflict": (error) =>
-                  ChildCommandConflict.make({
-                    parentRunId: options.claim.runId,
-                    commandId: input.commandId,
-                    existingChildRunId: error.existingRunId,
-                  }),
-                "generalist/runtime/RunIdConflict": (error) =>
-                  ChildCommandConflict.make({
-                    parentRunId: options.claim.runId,
-                    commandId: input.commandId,
-                    existingChildRunId: error.existingRunId,
-                  }),
-                "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
-                "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
-                "generalist/runtime/PayloadTooLarge": (error) => RuntimeUnavailable.make({ message: error.message }),
-                "generalist/durability/DurabilityFailure": (error) =>
-                  error.reason === "input-conflict"
-                    ? ChildCommandConflict.make({
-                        parentRunId: options.claim.runId,
-                        commandId: input.commandId,
-                        existingChildRunId: childRunId,
-                      })
-                    : Effect.fail(error),
-                "generalist/core/RunBudgetExhausted": (error) => Effect.fail(error),
-              }),
-            )
-          return receiptFor(admitted.runId, admitted.duplicate)
+          const existingPlacement =
+            externalRuntime === undefined
+              ? Option.none<Placement>()
+              : yield* externalRuntime.store.inspectPlacement(placementId).pipe(
+                  Effect.map(Option.some),
+                  Effect.catchTag("generalist/runtime/ExternalChildPlacementNotFound", () =>
+                    Effect.succeed(Option.none<Placement>()),
+                  ),
+                )
+          if (Option.isSome(existingPlacement)) {
+            return yield* reuseExternal(existingPlacement.value)
+          }
+          if (requestedPartition !== options.binding.partition) {
+            return yield* admitExternal()
+          }
+          return yield* admitLocal()
         }),
       )
     const awaitChild = <Name extends string, ChildOutput>(

@@ -11,7 +11,7 @@ import type { ToolOrigin } from "../event.js"
 import type { Any as AnyGate, FailureMode as GateFailureMode } from "../gates/definition.js"
 import type { SandboxService } from "../../../sandbox/service.js"
 import type { HandlersFor } from "../tool/fan-out.js"
-import type { ManagedArtifactTool } from "../../artifact.js"
+import type { ManagedTool } from "../../tools/managed-tool.js"
 import { copyCapabilities } from "./hosted/capability-binding.js"
 import type { AnyOptions as CodeModeOptions } from "../../program/code-mode-declaration.js"
 
@@ -103,7 +103,7 @@ export interface Any {
 }
 
 type ClosedToolServices<Tools extends Record<string, Tool.Any>> = {
-  [Name in keyof Tools]: Tools[Name] extends ManagedArtifactTool
+  [Name in keyof Tools]: Tools[Name] extends ManagedTool
     ? never
     : HandlersFor<Pick<Tools, Name>> | Exclude<Tool.HandlerServices<Tools[Name]>, ToolContext>
 }[keyof Tools]
@@ -179,8 +179,7 @@ export type ExecutionServices<A> =
         | R
         | PolicyServices
         | AuthorizationServices
-        | HandlersFor<Tools>
-        | Exclude<Tool.HandlerServices<Tools[keyof Tools]>, ToolContext>
+        | ClosedToolServices<Tools>
         | InputCodec["EncodingServices"]
         | OutputCodec["DecodingServices"]
         | OutputCodec["EncodingServices"]

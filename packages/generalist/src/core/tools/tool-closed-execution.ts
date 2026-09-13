@@ -10,9 +10,13 @@ import {
   type SchemaTool,
   type ToolSchemaServices,
 } from "./tool-result-codec.js"
-import { HookFailed, type EvaluationFailure } from "../../hooks/index.js"
-import { DriverError, DriverStateInvalid } from "../durable/service.js"
-import { DriverUnknownReplay } from "../durable/driver/interpreter.js"
+import {
+  CheckpointInvalid,
+  HookFailed,
+  LifecyclePersistenceFailed,
+  ReplayUnresolved,
+  type EvaluationFailure,
+} from "../../hooks/index.js"
 import { Exhausted } from "../durable/run-budget.js"
 import { suspendedFromCause, suspendedOutcome } from "../agent/tools/wake-event.js"
 
@@ -129,9 +133,9 @@ export const executeWithClosedToolkit: {
     }
     const isHookFailure = (error: typeof Schema.Unknown.Type): error is EvaluationFailure =>
       Schema.is(HookFailed)(error) ||
-      Schema.is(DriverError)(error) ||
-      Schema.is(DriverStateInvalid)(error) ||
-      Schema.is(DriverUnknownReplay)(error) ||
+      Schema.is(LifecyclePersistenceFailed)(error) ||
+      Schema.is(CheckpointInvalid)(error) ||
+      Schema.is(ReplayUnresolved)(error) ||
       Schema.is(Exhausted)(error)
     return toolResultCodec.decodeInput(toolkit.tool, request.call.params).pipe(
       Effect.flatMap(toolkit.invoke),

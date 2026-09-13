@@ -4,15 +4,14 @@ import { Prompt, Response } from "effect/unstable/ai"
 import {
   AddContext,
   Ask,
-  chainPin,
   Continue,
   Replace,
   type Declaration,
   Hooks,
   layer,
-  make,
   onRunStart,
 } from "../../../../src/hooks/index.js"
+import { chainPin, make } from "../../../../src/hooks/internal.js"
 import { evaluate } from "../../../../src/core/agent/lifecycle/hooks.js"
 import {
   DriverInterpreter,
@@ -162,7 +161,7 @@ it.effect("does not redispatch an unsafe hook with an unknown outcome", () =>
       },
     })
     expect(yield* run(reopened, [declaration]).pipe(Effect.flip)).toMatchObject({
-      _tag: "generalist/core/DriverUnknownReplay",
+      _tag: "generalist/lifecycle/ReplayUnresolved",
     })
     expect(calls).toBe(1)
   }),
@@ -193,7 +192,7 @@ it.effect("rejects removed, reordered, or version-changed hooks even when decisi
     ]) {
       const reopened = yield* makeInterpreter({ ...input, initial })
       expect(yield* run(reopened, declarations).pipe(Effect.flip)).toMatchObject({
-        _tag: "generalist/core/DriverStateInvalid",
+        _tag: "generalist/lifecycle/CheckpointInvalid",
       })
       expect(yield* reopened.checkpoint).toEqual(initial)
     }
@@ -254,7 +253,7 @@ it.effect("rejects an unusable Replace value as HookFailed before recording the 
 
     // A checkpoint written by a build that recorded the unusable decision still fails typed on replay.
     const base = yield* makeInterpreter(input)
-    const chain = make({ declarations: [declaration] }).pin
+    const chain = chainPin(make({ declarations: [declaration] }).declarations)
     yield* base.recordHookDecisions({
       chain,
       key: "hook:run:start",
@@ -264,7 +263,7 @@ it.effect("rejects an unusable Replace value as HookFailed before recording the 
     })
     const reopened = yield* makeInterpreter({ ...input, initial: yield* base.checkpoint })
     expect(yield* run(reopened, [declaration]).pipe(Effect.flip)).toMatchObject({
-      _tag: "generalist/core/HookFailed",
+      _tag: "generalist/lifecycle/CheckpointInvalid",
       event: "RunStart",
     })
     expect(calls).toBe(1)
@@ -297,7 +296,11 @@ it.effect("does not invoke a hook after its schedule is rejected and fences late
           return Continue()
         }),
     })
-    expect(yield* run(interpreter, [declaration]).pipe(Effect.flip)).toBe(failure)
+    expect(yield* run(interpreter, [declaration]).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/lifecycle/LifecyclePersistenceFailed",
+      stage: "record",
+      message: failure.message,
+    })
     const checkpoint = yield* interpreter.checkpoint
     expect(yield* interpreter.setBudget(checkpoint.budget).pipe(Effect.flip)).toMatchObject({
       _tag: "generalist/core/DriverError",
@@ -335,11 +338,16 @@ it.effect("does not checkpoint a decision after its outcome journal rejects comp
           return AddContext("not accepted")
         }),
     })
-    expect(yield* run(interpreter, [declaration]).pipe(Effect.flip)).toBe(failure)
+    expect(yield* run(interpreter, [declaration]).pipe(Effect.flip)).toMatchObject({
+      _tag: "generalist/lifecycle/LifecyclePersistenceFailed",
+      stage: "complete",
+      message: failure.message,
+    })
     const checkpoint = yield* interpreter.checkpoint
     expect(checkpoint.state).toMatchObject({ hooks: [{ decisions: [], complete: false }] })
     expect(yield* run(interpreter, [declaration]).pipe(Effect.flip)).toMatchObject({
-      _tag: "generalist/core/DriverError",
+      _tag: "generalist/lifecycle/LifecyclePersistenceFailed",
+      stage: "record",
       message: "Journal acknowledgement failed; reconstruct the interpreter before continuing",
     })
     expect(yield* interpreter.recorded).toEqual([])
@@ -463,7 +471,7 @@ it.effect("rejects an out-of-set decision already recorded as complete", () =>
       Effect.provideService(Hooks, make({ declarations: [declaration] })),
       Effect.flip,
     )
-    expect(failure).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+    expect(failure).toMatchObject({ _tag: "generalist/lifecycle/CheckpointInvalid" })
     expect(failure.message).toContain("RunEnd")
   }),
 )
@@ -504,7 +512,7 @@ it.effect("rejects an out-of-set decision in an incomplete recorded prefix", () 
       Effect.provideService(Hooks, make({ declarations: [declaration] })),
       Effect.flip,
     )
-    expect(failure).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+    expect(failure).toMatchObject({ _tag: "generalist/lifecycle/CheckpointInvalid" })
     expect(failure.message).toContain("RunEnd")
   }),
 )
@@ -554,7 +562,7 @@ it.effect("rejects an out-of-set decision replayed from the operation journal", 
       },
     })
     const failure = yield* evaluateRunStart(reopened).pipe(Effect.flip)
-    expect(failure).toMatchObject({ _tag: "generalist/core/DriverStateInvalid" })
+    expect(failure).toMatchObject({ _tag: "generalist/lifecycle/CheckpointInvalid" })
     expect(failure.message).toContain("RunStart")
   }),
 )

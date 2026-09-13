@@ -83,6 +83,91 @@ const immutableScopedEqual = (placement: Placement, input: ScopedReserveInput): 
   placement.invocationId === input.invocationId &&
   Equal.equals(scopedRequest(placement.request), input.request)
 
+const authorizeScopedRegistrations = (parent: StoredRun, input: ScopedReserveInput) =>
+  Effect.gen(function* () {
+    const executable = yield* Effect.try({
+      try: () =>
+        decodePinned({
+          ref: input.request.root.executableRef,
+          manifest: input.request.root.executableManifest,
+        }),
+      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
+    })
+    if (!containsChild({ ref: parent.executableRef, manifest: parent.executableManifest }, executable)) {
+      return yield* RuntimeUnavailable.make({ message: "External child is not an authorized pinned child profile" })
+    }
+    const registrations = yield* narrow(executable, input.request.root.registrations).pipe(
+      Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
+    )
+    const grantedRegistrations = new Map(
+      parent.registrations.map((registration) => [registration.pin, registrationDigest(registration)]),
+    )
+    if (
+      !registrations.every(
+        (registration) => grantedRegistrations.get(registration.pin) === registrationDigest(registration),
+      )
+    ) {
+      return yield* RuntimeUnavailable.make({ message: "External child registration differs from the parent grant" })
+    }
+    return registrations
+  })
+
+const validateScopedCapacity = (state: RuntimeState, parent: StoredRun, input: ScopedReserveInput) =>
+  Effect.gen(function* () {
+    const depth = parent.depth + 1
+    yield* reserveSessions(state, parent, [input.request.root.message.sessionId])
+    if (depth > parent.treePolicy.maxDepth) {
+      return yield* ChildDepthExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: depth,
+        current: parent.depth,
+        limit: parent.treePolicy.maxDepth,
+      })
+    }
+    const sessions = new Set(
+      familyRuns(state, parent.rootRunId)
+        .filter((run) =>
+          run.executableManifest.entries.some(
+            (entry) => entry.pin === run.executableRef.active && entry._tag === "Agent",
+          ),
+        )
+        .map((run) => run.message.sessionId),
+    )
+    for (const placement of state.externalChildPlacements.values()) {
+      if (state.runs.get(placement.parentRunId)?.rootRunId === parent.rootRunId) {
+        sessions.add(placement.request.root.message.sessionId)
+      }
+    }
+    const currentSessions = sessions.size
+    sessions.add(input.request.root.message.sessionId)
+    if (sessions.size > parent.treePolicy.maxSessions) {
+      return yield* ChildLimitExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: sessions.size - currentSessions,
+        current: currentSessions,
+        limit: parent.treePolicy.maxSessions,
+      })
+    }
+    if (parent.treePolicy.concurrency.agents === 0) {
+      return yield* ChildLimitExceeded.make({
+        parentRunId: parent.runId,
+        rootRunId: parent.rootRunId,
+        parentDepth: parent.depth,
+        depth,
+        requested: 1,
+        current: 0,
+        limit: parent.treePolicy.concurrency.agents,
+      })
+    }
+    return depth
+  })
+
 const reserve = (state: RuntimeState, input: ReserveInput) =>
   Effect.gen(function* () {
     const identity = yield* identifyRequest(input.request)
@@ -152,38 +237,6 @@ const reserve = (state: RuntimeState, input: ReserveInput) =>
     return [placement, next] as const
   })
 
-const scopedRegistrations = (parent: StoredRun, input: ScopedReserveInput) =>
-  Effect.gen(function* () {
-    const executable = yield* Effect.try({
-      try: () =>
-        decodePinned({
-          ref: input.request.root.executableRef,
-          manifest: input.request.root.executableManifest,
-        }),
-      catch: (error) => RuntimeUnavailable.make({ message: String(error) }),
-    })
-    if (!containsChild({ ref: parent.executableRef, manifest: parent.executableManifest }, executable)) {
-      return yield* RuntimeUnavailable.make({ message: "External child is not an authorized pinned child profile" })
-    }
-    const registrations = yield* narrow(executable, input.request.root.registrations).pipe(
-      Effect.mapError((error) => RuntimeUnavailable.make({ message: String(error) })),
-    )
-    const granted = new Map(
-      parent.registrations.map((registration) => [registration.pin, registrationDigest(registration)]),
-    )
-    if (!registrations.every((registration) => granted.get(registration.pin) === registrationDigest(registration))) {
-      return yield* RuntimeUnavailable.make({ message: "External child registration differs from the parent grant" })
-    }
-    return registrations
-  })
-
-const scopedParent = (state: RuntimeState, runId: string) => {
-  const parent = state.runs.get(runId)
-  if (parent === undefined) return RunNotFound.make({ runId })
-  if (isTerminal(parent.status)) return RunTerminal.make({ runId: parent.runId, status: parent.status })
-  return Effect.succeed(parent)
-}
-
 const reserveScoped = (state: RuntimeState, input: ScopedReserveInput) =>
   Effect.gen(function* () {
     yield* requireExecutionClaim(state, input)
@@ -206,59 +259,11 @@ const reserveScoped = (state: RuntimeState, input: ScopedReserveInput) =>
     ) {
       return yield* ExternalChildPlacementConflict.make({ placementId: input.placementId })
     }
-    const parent = yield* scopedParent(state, input.runId)
-    const registrations = yield* scopedRegistrations(parent, input)
-    const depth = parent.depth + 1
-    yield* reserveSessions(state, parent, [input.request.root.message.sessionId])
-    if (depth > parent.treePolicy.maxDepth) {
-      return yield* ChildDepthExceeded.make({
-        parentRunId: parent.runId,
-        rootRunId: parent.rootRunId,
-        parentDepth: parent.depth,
-        depth,
-        requested: depth,
-        current: parent.depth,
-        limit: parent.treePolicy.maxDepth,
-      })
-    }
-    const sessions = new Set(
-      familyRuns(state, parent.rootRunId)
-        .filter((run) =>
-          run.executableManifest.entries.some(
-            (entry) => entry.pin === run.executableRef.active && entry._tag === "Agent",
-          ),
-        )
-        .map((run) => run.message.sessionId),
-    )
-    for (const placement of state.externalChildPlacements.values()) {
-      if (state.runs.get(placement.parentRunId)?.rootRunId === parent.rootRunId) {
-        sessions.add(placement.request.root.message.sessionId)
-      }
-    }
-    const currentSessions = sessions.size
-    sessions.add(input.request.root.message.sessionId)
-    if (sessions.size > parent.treePolicy.maxSessions) {
-      return yield* ChildLimitExceeded.make({
-        parentRunId: parent.runId,
-        rootRunId: parent.rootRunId,
-        parentDepth: parent.depth,
-        depth,
-        requested: sessions.size - currentSessions,
-        current: currentSessions,
-        limit: parent.treePolicy.maxSessions,
-      })
-    }
-    if (parent.treePolicy.concurrency.agents === 0) {
-      return yield* ChildLimitExceeded.make({
-        parentRunId: parent.runId,
-        rootRunId: parent.rootRunId,
-        parentDepth: parent.depth,
-        depth,
-        requested: 1,
-        current: 0,
-        limit: parent.treePolicy.concurrency.agents,
-      })
-    }
+    const parent = state.runs.get(input.runId)
+    if (parent === undefined) return yield* RunNotFound.make({ runId: input.runId })
+    if (isTerminal(parent.status)) return yield* RunTerminal.make({ runId: parent.runId, status: parent.status })
+    const registrations = yield* authorizeScopedRegistrations(parent, input)
+    const depth = yield* validateScopedCapacity(state, parent, input)
     const readiness = readinessForAdmission(state, parent)
     const parentBudget = yield* budgetForEvents({ events: parent.events, observedMillis: yield* occurredAtMillis })
     if (parentBudget.children === 0) {
@@ -361,14 +366,14 @@ const cancelScoped = (state: RuntimeState, input: ScopedCancelInput) =>
     return [updated, { ...state, externalChildPlacements: placements }] as const
   })
 
-interface SettlementInput {
+interface SettleInput {
   readonly placementId: string
   readonly settlementId: string
   readonly outcome: RunOutcome
   readonly spend?: NonNullable<Placement["spend"]>
 }
 
-const settleParent = (state: RuntimeState, placement: Placement, input: SettlementInput) =>
+const settleParentLifecycle = (state: RuntimeState, placement: Placement, input: SettleInput) =>
   Effect.gen(function* () {
     let next = state
     let parent = next.runs.get(placement.parentRunId)
@@ -418,7 +423,7 @@ const settleParent = (state: RuntimeState, placement: Placement, input: Settleme
 
 const settle = (
   state: RuntimeState,
-  input: SettlementInput,
+  input: SettleInput,
 ): Effect.Effect<
   readonly [Placement, RuntimeState],
   ExternalChildPlacementNotFound | ExternalChildSettlementConflict | RuntimeUnavailable,
@@ -450,7 +455,7 @@ const settle = (
     }
     const placements = new Map(state.externalChildPlacements)
     placements.set(input.placementId, updated)
-    const next = yield* settleParent({ ...state, externalChildPlacements: placements }, placement, input)
+    const next = yield* settleParentLifecycle({ ...state, externalChildPlacements: placements }, placement, input)
     return [updated, next] as const
   })
 
