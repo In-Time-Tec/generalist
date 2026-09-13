@@ -22,6 +22,19 @@ export interface Service {
   readonly attempt?: number
   readonly admittedAt?: string
   readonly deadline?: string
+  /** @internal Exact storage-issued authority for a Runtime-hosted tool call. */
+  readonly executionClaim?: {
+    readonly runId: string
+    readonly ownerId: string
+    readonly attemptFence: number
+    readonly session?: {
+      readonly sessionId: string
+      readonly runId: string
+      readonly ownerId: string
+      readonly runAttemptFence: number
+      readonly epoch: string
+    }
+  }
 }
 export class ToolContext extends Context.Service<ToolContext, Service>()(
   "generalist/core/tools/tool-context/ToolContext",

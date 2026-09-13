@@ -52,6 +52,7 @@ export const make = (input: {
       rootRunId: input.execution.rootRunId,
       attempt: input.attempt,
       admittedAt: input.execution.admittedAt,
+      executionClaim: input.claim,
       ...sandboxInvocation(input.inheritedSandboxSnapshot),
     },
     executableRef: input.execution.executableRef,
