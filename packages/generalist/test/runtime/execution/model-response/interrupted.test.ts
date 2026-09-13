@@ -3,15 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Schedule, Schema, Scope, Stream } from "effect"
 import { AiError, LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Compaction, ModelResilience, Pins } from "../../../../src/index.js"
-import {
-  Address,
-  Cursor,
-  Errors,
-  ExecutableResolver,
-  RunExecutor,
-  Runtime,
-  RunStore,
-} from "../../../../src/runtime/index.js"
+import { Address, Cursor, Errors, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { testExecutable } from "../../run/identity.js"
 import { assistantAddress, objectLayer, registrationsFor, textPrompt } from "../fixtures.js"
 import { CompletedModelResponse } from "../../../../src/runtime/run/event.js"
@@ -55,7 +50,7 @@ const directCommit = () =>
   scopedWith(objectLayer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:interrupted-direct:object",
@@ -239,8 +234,8 @@ const backend = "object" as const
       yield* scopedWith(hosted.layer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
-          const host = yield* RunExecutor.RunExecutor
+          const store = yield* RunStore
+          const host = yield* RunExecutor
           const sessionId = `session:interrupted-cancel:${backend}`
           const first = yield* runtime.send({
             to: hosted.address,
@@ -334,8 +329,8 @@ const backend = "object" as const
     return scopedWith(hosted.layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const receipt = yield* runtime.send({
           to: hosted.address,
           sessionId: `session:interrupted-failure:${backend}`,
@@ -390,8 +385,8 @@ it.effect("fails an empty model operation without writing an interrupted event o
   return scopedWith(hosted.layer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
       const receipt = yield* runtime.send({
         to: hosted.address,
         sessionId: "session:interrupted-empty",
@@ -471,8 +466,8 @@ it.effect("commits only the authoritative internal retry response", () => {
   return scopedWith(hosted.layer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
       const receipt = yield* runtime.send({
         to: hosted.address,
         sessionId: "session:interrupted-internal-retry",

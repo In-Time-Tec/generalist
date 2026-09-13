@@ -55,6 +55,15 @@ const moduleRequest = (source: string, deadlineMillis: number): ProgramRequest =
     signal: new AbortController().signal,
     deadlineMillis,
     limits: { cpuMillis: 1_000, subrequests: 1, outputBytes: 4_096 },
+    budget: {
+      agentRuns: 0,
+      concurrency: 1,
+      toolCalls: 0,
+      tokens: 0,
+      wallClockMillis: Math.max(0, deadlineMillis),
+      logBytes: 0,
+      outputBytes: 4_096,
+    },
     capabilities: [],
   }
 }

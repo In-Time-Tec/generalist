@@ -1,6 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Runtime, RunStore } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import type { ExecutableRef } from "../../../src/runtime/executable/manifest.js"
 import { assistantAddress, assistantRef, resolverLayer, registrationsFor, textPrompt } from "../execution/fixtures.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
@@ -38,7 +39,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     const crashAfterStart = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: "session:tracer:crash-start",
@@ -72,7 +73,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     const afterCrashStart = yield* withObject(storage)(
       Effect.gen(function* () {
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const claim = yield* driver.claimExecution({
           commandId: "runtime-executable-manifest-test-ts-claim-3",
           runId: crashAfterStart.runId,
@@ -94,7 +95,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     const crashAfterObserve = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: "session:tracer:crash-observe",
@@ -129,7 +130,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     const afterCrashObserve = yield* withObject(storage)(
       Effect.gen(function* () {
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const claim = yield* driver.claimExecution({
           commandId: "runtime-executable-manifest-test-ts-claim-6",
           runId: crashAfterObserve.runId,
@@ -150,7 +151,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     const committed = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: "session:tracer:commit",
@@ -208,7 +209,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     yield* withObject(storage)(
       Effect.gen(function* () {
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const runtime = yield* Runtime.Runtime
         const duplicate = yield* runtime.send({
           to: assistantAddress,
@@ -240,7 +241,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const driver = yield* RunStore.RunStore
+        const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: "session:tracer:pure-retry",

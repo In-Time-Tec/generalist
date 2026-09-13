@@ -4,7 +4,10 @@ import { expect, it } from "@effect/vitest"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, RunBudget } from "../../../../src/index.js"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore, type Service as RunStoreService } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { AgentExecutionFailure, RuntimeUnavailable } from "../../../../src/runtime/errors.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
 import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor-internal.js"
@@ -94,7 +97,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
           const first = yield* scopedWith(layer())(
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
-              const store = yield* RunStore.RunStore
+              const store = yield* RunStore
               const receipt = yield* runtime.startExecution({
                 executable,
                 registrations: registrationsFor(executable),
@@ -108,7 +111,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
                 runId: receipt.runId,
                 ownerId: objectWorkerId,
               })
-              const faultyStore: RunStore.Service = {
+              const faultyStore: RunStoreService = {
                 ...store,
                 commitInterruptedModelResponse: (input) =>
                   Effect.gen(function* () {
@@ -124,9 +127,7 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
                     return yield* Effect.never
                   }),
               }
-              yield* scopedWith(
-                Layer.mergeAll(Layer.succeed(RunStore.RunStore, faultyStore), activeExecutionsLayer, resolver),
-              )(
+              yield* scopedWith(Layer.mergeAll(Layer.succeed(RunStore, faultyStore), activeExecutionsLayer, resolver))(
                 Effect.gen(function* () {
                   const host = yield* makeRunExecutor
                   const caller = yield* host.execute(claim).pipe(Effect.forkChild({ startImmediately: true }))
@@ -179,8 +180,8 @@ for (const boundary of ["cancel-settlement", "stream-completion"] as const) {
           yield* scopedWith(layer())(
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
-              const store = yield* RunStore.RunStore
-              const host = yield* RunExecutor.RunExecutor
+              const store = yield* RunStore
+              const host = yield* RunExecutor
               if ((yield* runtime.inspect(first.runId)).status !== "needs-resolution") {
                 yield* host.execute(
                   yield* store.claimExecution({
@@ -315,7 +316,7 @@ it.live("replays a committed tool response across two interruptions and a budget
       yield* scopedWith(layer())(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           if (phase === "write") {
             const receipt = yield* runtime.startExecution({
               executable,
@@ -328,7 +329,7 @@ it.live("replays a committed tool response across two interruptions and a budget
             runId = receipt.runId
           } else {
             // Canonical usage exhausted the budget. Reopening must suspend before dispatching anything.
-            const host = yield* RunExecutor.RunExecutor
+            const host = yield* RunExecutor
             yield* host.execute(
               yield* store.claimExecution({
                 commandId: "runtime-execution-suites-boundaries-ts-claim-4",
@@ -342,7 +343,7 @@ it.live("replays a committed tool response across two interruptions and a budget
             yield* runtime.extendBudget({ commandId: "budget-exhausted:resume", runId, delta: { tokens: 2 } })
           }
           const paused = yield* Deferred.make<void>()
-          const faultyStore: RunStore.Service = {
+          const faultyStore: RunStoreService = {
             ...store,
             commitModelResponse: (input) =>
               store
@@ -365,9 +366,7 @@ it.live("replays a committed tool response across two interruptions and a budget
                   ),
                 ),
           }
-          yield* scopedWith(
-            Layer.mergeAll(Layer.succeed(RunStore.RunStore, faultyStore), activeExecutionsLayer, resolver),
-          )(
+          yield* scopedWith(Layer.mergeAll(Layer.succeed(RunStore, faultyStore), activeExecutionsLayer, resolver))(
             Effect.gen(function* () {
               const host = yield* makeRunExecutor
               const caller = yield* host
@@ -395,8 +394,8 @@ it.live("replays a committed tool response across two interruptions and a budget
     yield* scopedWith(layer())(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         yield* host.execute(
           yield* store.claimExecution({
             commandId: "runtime-execution-suites-boundaries-ts-claim-6",

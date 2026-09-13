@@ -1,6 +1,8 @@
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
-import { Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
   assistantRef,
@@ -37,7 +39,7 @@ it.effect("replays a base larger than the bounded subscriber queue and follows l
   scopedWith(highWaterLayer(2))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:subscriber-high-water",
@@ -89,7 +91,7 @@ it.effect("replays a rewound host Session from retained durable history", () =>
   scopedWith(highWaterLayer(16))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const sessionId = "session:rewound-replay"
       yield* runtime.createSession({ id: sessionId })
       const receipt = yield* runtime.send({
@@ -168,7 +170,7 @@ it.effect("fails a follower whose live queue overflows while the producer stays 
   scopedWith(highWaterLayer(1))(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:subscriber-lag",

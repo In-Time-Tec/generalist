@@ -1,7 +1,7 @@
 import { describe, expect, it, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { explain, verify, type Journal } from "../../../../src/runtime/execution/recovery/operator.js"
-import { Runtime } from "../../../../src/runtime/service.js"
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { assistantAddress, objectLayer } from "../fixtures.js"
 
 const journal = (overrides: Partial<Journal> = {}): Journal => ({

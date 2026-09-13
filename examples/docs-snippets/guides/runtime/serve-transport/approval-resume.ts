@@ -2,9 +2,8 @@ import { BunCrypto } from "@effect/platform-bun"
 import { Config, Console, Effect, Layer, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
-import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
+import { Cursor, Runtime } from "generalist/runtime"
 
 const deployTool = Tool.make("deploy", {
   description: "Deploy a service",
@@ -93,19 +92,19 @@ const runtimeLayer = Layer.unwrap(
         },
       }
     }
-    return layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
-      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-      Layer.provide(layerS3(transport)),
-      Layer.provide(BunCrypto.layer),
-    )
+    return Runtime.layer({
+      agents: { "release-agent": agent },
+      revision: "approval-resume-v1",
+      namespace: { environment, tenant, partition },
+      services: agentServices,
+      storage: Layer.merge(layerS3(transport), BunCrypto.layer),
+    })
   }),
 )
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    yield* activate
     const runtime = yield* Runtime.Runtime
-    yield* runtime.register(agent)
     const handle = yield* runtime.start(agent, "Deploy the api service", {
       sessionId: "release-1",
       idempotencyKey: "deploy-1",
@@ -132,4 +131,4 @@ const program = Effect.scoped(
   }),
 )
 
-await Effect.runPromise(program.pipe(Effect.provide(Layer.merge(runtimeLayer, agentServices))))
+await Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)))

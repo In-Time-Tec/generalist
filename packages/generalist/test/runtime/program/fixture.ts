@@ -9,7 +9,10 @@ import {
   ProgramCapabilities,
   CodeExecutor,
 } from "../../../src/index.js"
-import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { pinnedTestAgent } from "../run/identity.js"
 import { allowAllAuthorization } from "../../authorization.js"
 import { objectWorkerId } from "../execution/object.js"
@@ -236,8 +239,8 @@ export const agentMapProgramFixture = () => {
 
 export const executeProgramFixture = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const store = yield* RunStore.RunStore
-  const host = yield* RunExecutor.RunExecutor
+  const store = yield* RunStore
+  const host = yield* RunExecutor
   const receipt = yield* runtime.send({
     to: programAddress,
     sessionId: "program-session",

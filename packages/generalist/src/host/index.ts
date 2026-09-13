@@ -34,21 +34,24 @@ import { make as makeSessionReads, type SessionReads } from "./session-reads.js"
 import type { ForkOptions, RewindOptions } from "../runtime/fork.js"
 import type { Decision as ApprovalDecision } from "../runtime/operation/approval.js"
 import type { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
-import {
-  Runtime,
-  type CancelError,
-  type ForkError,
-  type InspectError,
-  type OperatorActionError,
-  type OperatorExtendBudgetError,
-  type RewindError,
-  type RespondApprovalError,
-  type RunHandle,
-  type RunSend,
-  type RuntimeInspection,
-  type StartError,
-  type StartOptions,
-} from "../runtime/service.js"
+import type {
+  Service as EngineService,
+  CancelError,
+  ForkError,
+  InspectError,
+  OperatorActionError,
+  OperatorReadError,
+  OperatorExtendBudgetError,
+  RewindError,
+  RespondApprovalError,
+  RunHandle,
+  RunSend,
+  RuntimeInspection,
+  StartError,
+  StartOptions,
+} from "../runtime/engine.js"
+import { Runtime } from "../runtime/service.js"
+import { engineFor } from "../runtime/hosting/application.js"
 import type { ToolServices } from "../runtime/executable/registered-tool.js"
 import { ExecutableRegistrationInvalid, IllegalOperatorAction, RunNotFound } from "../runtime/errors.js"
 import { make as makeTools, type Tools as HostTools } from "./tools.js"
@@ -65,7 +68,7 @@ import { BlobStore } from "../blob-store/index.js"
 import { make as makeHostRun, type HostRun } from "./run.js"
 export type { HostRun, ChildHandle, ChildSpawnOptions, WaitOptions } from "./run.js"
 export { WaitInvalid, WaitResult } from "./run.js"
-import { ArtifactRegistry } from "../core/artifact.js"
+import { Artifacts as ArtifactCapability } from "../unstable/artifact/service.js"
 import { AgentBuildRevision, AgentProfiles, validateProfiles } from "../runtime/executable/registered-agent.js"
 import { fromHostLimits, type HostLimits } from "../runtime/tree/policy.js"
 import {
@@ -162,7 +165,7 @@ export interface Host<Agents extends AgentRegistry> {
     readonly fork: (runId: string, options: ForkOptions) => Effect.Effect<HostRun<unknown>, ForkError>
   }
   readonly runs: {
-    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, import("../runtime/service.js").GetRunError>
+    readonly get: (runId: string) => Effect.Effect<HostRun<unknown>, import("../runtime/engine.js").GetRunError>
     readonly start: <Selected extends AgentValues<Agents>>(
       sessionId: string,
       agent: Selected,
@@ -181,14 +184,14 @@ export interface Host<Agents extends AgentRegistry> {
     readonly messages: (
       runId: string,
       limit?: number,
-    ) => Effect.Effect<ReadonlyArray<MailboxEntry>, import("../runtime/service.js").DirectoryError>
+    ) => Effect.Effect<ReadonlyArray<MailboxEntry>, import("../runtime/engine.js").DirectoryError>
     readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, CancelError>
     readonly admitChild: (
       parentRunId: string,
       selection: string,
       prompt: string,
       options: { readonly commandId: string; readonly label?: string },
-    ) => Effect.Effect<RunReceipt, import("../runtime/service.js").SpawnError>
+    ) => Effect.Effect<RunReceipt, import("../runtime/engine.js").SpawnError>
     readonly children: (parentRunId: string) => Effect.Effect<RuntimeInspection["children"], InspectError>
     readonly inspectChild: (
       parentRunId: string,
@@ -213,7 +216,7 @@ export interface Host<Agents extends AgentRegistry> {
     ) => Effect.Effect<void, InspectError | RespondApprovalError | IllegalOperatorAction>
   }
   readonly operator: {
-    readonly explain: (runId: string) => Effect.Effect<Explanation, InspectError>
+    readonly explain: (runId: string) => Effect.Effect<Explanation, OperatorReadError>
     readonly retry: (runId: string, operator: string, commandId: string) => Effect.Effect<void, OperatorActionError>
     readonly wake: (runId: string, operator: string, commandId: string) => Effect.Effect<void, OperatorActionError>
     readonly resolveUnknown: (
@@ -291,7 +294,7 @@ const configuredAgent = <Value extends AnyAgent>(agent: Value, tools: ReadonlyAr
   return configured as Value
 }
 
-const registerAgent = <Value extends AnyAgent>(runtime: Runtime["Service"], agent: Value) => {
+const registerAgent = <Value extends AnyAgent>(runtime: EngineService, agent: Value) => {
   const hidden: unknown = agent
   // oxlint-disable-next-line anti-slop/no-widen-then-assert, typescript/no-unsafe-type-assertion -- SAFETY: Value is an Agent whose hidden invariant parameters are recovered by this distributive conditional type.
   const definition = hidden as AgentDefinition<Value>
@@ -299,7 +302,7 @@ const registerAgent = <Value extends AnyAgent>(runtime: Runtime["Service"], agen
 }
 
 const startAgent = <Value extends AnyAgent>(
-  runtime: Runtime["Service"],
+  runtime: EngineService,
   agent: Value,
   input: AgentInput<Value>,
   options: StartOptions,
@@ -351,7 +354,7 @@ const make = <
   options: MakeOptions<Agents, Plugins, Tools>,
 ): Effect.Effect<Host<Agents>, MakeError, MakeRequirements<Agents, Plugins, Tools>> =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime
+    const runtime = yield* Effect.flatMap(Runtime, engineFor)
     const environment = yield* Effect.context<MakeRequirements<Agents, Plugins, Tools>>()
     yield* Approvals
     yield* Permissions
@@ -369,7 +372,7 @@ const make = <
     const currentSkills = yield* Effect.serviceOption(SkillCatalog)
     const currentHooks = yield* Effect.serviceOption(Hooks)
     const attachments = makeAttachments(yield* Effect.serviceOption(BlobStore))
-    const artifacts = makeArtifacts(yield* Effect.serviceOption(ArtifactRegistry))
+    const artifacts = makeArtifacts(yield* Effect.serviceOption(ArtifactCapability))
     const contributions = yield* preparePlugins({ plugins, agents })
     const instructions = mergedInstructions(currentInstructions, contributions.instructions)
     const skills = mergedSkills(currentSkills, contributions.skills)

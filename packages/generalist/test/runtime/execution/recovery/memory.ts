@@ -4,7 +4,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Memory } from "../../../../src/index.js"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { JournalFault } from "../../../../src/runtime/operation/journal-fault.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { provideScoped } from "../scoped-provide.js"
@@ -108,8 +111,8 @@ export const memoryRecoverySuite = () => {
             )
           const run = Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const executor = yield* RunExecutor.RunExecutor
-            const store = yield* RunStore.RunStore
+            const executor = yield* RunExecutor
+            const store = yield* RunStore
             yield* runtime.register(agent)
             const handle = yield* runtime.start(agent, "do work", {
               sessionId: "memory-test",

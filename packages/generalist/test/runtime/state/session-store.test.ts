@@ -4,7 +4,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, ToolExecutor } from "../../../src/index.js"
-import { Address, ChildRuns, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, ChildRuns, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import type { RunEvent } from "../../../src/runtime/run/event.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
@@ -216,8 +219,8 @@ it.live("preserves 42 provider-free model calls across four durable children and
         fixture.runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const host = yield* RunExecutor
+          const store = yield* RunStore
           const parent = yield* runtime.send({
             to: fixture.address,
             sessionId: "session:linear-four-child",
@@ -289,8 +292,8 @@ it.live("preserves 42 provider-free model calls across four durable children and
         fixture.runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const host = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const host = yield* RunExecutor
+          const store = yield* RunStore
           expect(
             yield* Effect.forEach(admitted.childRunIds, (runId) =>
               runtime.inspect(runId).pipe(Effect.map((run) => run.status)),

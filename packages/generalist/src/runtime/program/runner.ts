@@ -43,12 +43,15 @@ import { programWait } from "./approval.js"
 import { OperationOutcome } from "./operation-outcome.js"
 import { Authorization } from "./authorization.js"
 import { digest as identityDigest } from "../../core/durable/canonical-json.js"
+import type { Any as AnyAgent } from "../../core/agent/lifecycle/definition.js"
+import type { ChildCapabilities } from "../execution/scope.js"
 export const make = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly store: RunStore
   readonly executor: CodeExecutorService
   readonly handlers: Handlers
+  readonly children?: ChildCapabilities<Readonly<Record<string, AnyAgent>>>
 }): ProgramRunnerService => {
   const tools = new Map(input.handlers.tools.map((handler) => [handler.name, handler] as const))
   const steps = new Map(input.handlers.steps.map((handler) => [handler.name, handler] as const))
@@ -205,6 +208,7 @@ export const make = (input: {
     claimed: input.claimed,
     store: input.store,
     handlers: input.handlers.agents,
+    ...Object.assign({}, input.children === undefined ? undefined : { children: input.children }),
     operationIdentity,
     acceptedOperation,
     settleOperation,
@@ -369,6 +373,9 @@ export const make = (input: {
               outputBytes: budget.outputBytes,
               toolCalls: budget.toolCalls,
               agentRuns: budget.agentRuns,
+              concurrency: budget.concurrency,
+              tokens: budget.tokens,
+              logBytes: budget.logBytes,
               tools: request.program.manifest.capabilities.tools.map((entry) => entry.name),
               steps: request.program.manifest.capabilities.steps.map((entry) => entry.name),
               agents: request.program.manifest.capabilities.agents.map((entry) => entry.selection),

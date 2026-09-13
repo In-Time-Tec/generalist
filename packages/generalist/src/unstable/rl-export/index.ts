@@ -5,7 +5,6 @@ import packageManifest from "../../../package.json" with { type: "json" }
 import { RunId, type RunSnapshot } from "../../runtime/run.js"
 import type { RunEvent } from "../../runtime/run/event.js"
 import { collect as collectHistory } from "../../runtime/run/history/index.js"
-import type { RecordRewardError, Service as RuntimeService } from "../../runtime/service.js"
 import {
   fromJournal,
   type FromJournalError,
@@ -14,9 +13,26 @@ import {
 } from "../../trajectory/index.js"
 import { fromTurn as modelOperation, ModelCall, TokenId } from "./model-call.js"
 import { RewardInvalid, type Service as RewardService } from "./reward.js"
+import type { RewardWriteError, RewardWriter } from "./reward-writer.js"
 
 export * as Reward from "./reward.js"
 export { ModelCall } from "./model-call.js"
+export { runtime } from "./runtime.js"
+export {
+  RewardConflict,
+  RewardRunNotFound,
+  RewardRuntimeUnavailable,
+  RewardStorageFailed,
+  type RewardInput,
+  type RewardWriteError,
+  type RewardWriter,
+} from "./reward-writer.js"
+
+/** Failures while projecting retained Runtime journals. @experimental */
+export type ProjectionError = FromJournalError
+
+/** Failures while evaluating, recording, projecting, or encoding an exported reward. @experimental */
+export type ExportFailure<E> = E | RewardInvalid | RewardWriteError | ProjectionError | Schema.SchemaError
 
 /** @experimental One completed durable tool operation. */
 export const ToolCall = Schema.TaggedStruct("ToolCall", {
@@ -92,7 +108,7 @@ export interface Dag {
 
 /** @experimental Cross-driver Runtime methods required by `dag`. */
 export interface DagRuntime extends JournalReader {
-  readonly recordReward: RuntimeService["recordReward"]
+  readonly rewards: RewardWriter
 }
 
 interface DagState {
@@ -396,14 +412,14 @@ const encodeLeaf = <R, E>(
   leaf: string,
   path: DagPath,
   options: ExportOptions<R, E>,
-): Effect.Effect<Uint8Array, E | RewardInvalid | RecordRewardError | Schema.SchemaError, R> =>
+): Effect.Effect<Uint8Array, ExportFailure<E>, R> =>
   Effect.gen(function* () {
     const node = state.nodes.get(leaf)!
     const trajectory = state.trajectories.get(node.runId)!
     const messages = state.messages.get(leaf)!
     const value = yield* options.reward.evaluate({ leaf, runId: node.runId, messages, trajectory })
     if (!Number.isFinite(value)) return yield* RewardInvalid.make({ leaf, source: options.reward.source, value })
-    yield* state.runtime.recordReward({
+    yield* state.runtime.rewards.record({
       commandId: digest(["rl-export-reward", node.runId, leaf, options.reward.source]),
       runId: node.runId,
       leaf,
@@ -432,13 +448,8 @@ function* includedPaths(
 }
 
 const exportVerifiers: {
-  <R, E>(
-    options: ExportOptions<R, E>,
-  ): (dagValue: Dag) => Stream.Stream<Uint8Array, E | RewardInvalid | RecordRewardError | Schema.SchemaError, R>
-  <R, E>(
-    dagValue: Dag,
-    options: ExportOptions<R, E>,
-  ): Stream.Stream<Uint8Array, E | RewardInvalid | RecordRewardError | Schema.SchemaError, R>
+  <R, E>(options: ExportOptions<R, E>): (dagValue: Dag) => Stream.Stream<Uint8Array, ExportFailure<E>, R>
+  <R, E>(dagValue: Dag, options: ExportOptions<R, E>): Stream.Stream<Uint8Array, ExportFailure<E>, R>
 } = Function.dual(2, <R, E>(dagValue: Dag, options: ExportOptions<R, E>) => {
   if (options.format !== "verifiers-v1") throw new TypeError("Unsupported RL trajectory export format")
   const state = dagStates.get(dagValue)!

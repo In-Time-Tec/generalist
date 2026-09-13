@@ -2,7 +2,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Hooks, Permissions } from "../../../../src/index.js"
-import { Runtime, RunExecutor, RunStore, ExecutableResolver } from "../../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { makeObjectStorage, objectRuntimeLayer } from "../../../runtime/execution/object.js"
 import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../../../../src/core/durable/service.js"
@@ -114,13 +117,13 @@ it.effect("recovers an accepted Session tool mutation without applying it twice,
     const runId = yield* scopedWith(first)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "increment", {
           sessionId: "session-counter",
           idempotencyKey: "first",
         })
-        yield* (yield* RunExecutor.RunExecutor).execute(
+        yield* (yield* RunExecutor).execute(
           yield* store.claimExecution({ runId: handle.runId, ownerId: "first", commandId: "first" }),
         )
         const execution = yield* store.loadExecution(handle.runId)
@@ -166,8 +169,8 @@ it.effect("recovers an accepted Session tool mutation without applying it twice,
     yield* scopedWith(recovered)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const executor = yield* RunExecutor
         yield* runtime.register(agent)
         yield* executor.execute(yield* store.claimExecution({ runId, ownerId: "second", commandId: "recovery" }))
         expect(transitions).toBe(1)

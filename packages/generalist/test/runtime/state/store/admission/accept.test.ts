@@ -1,7 +1,9 @@
 import "../suites/send-attestation-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { DateTime, Effect, Stream } from "effect"
-import { Address, Errors, Runtime, RunStore } from "../../../../../src/runtime/index.js"
+import { Address, Errors } from "../../../../../src/runtime/index.js"
+import * as Runtime from "../../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { DurabilityFailure } from "../../../../../src/durability/errors.js"
 import { assistantAddress, completedResult, objectLayer, textPrompt } from "../../../execution/fixtures.js"
 import { objectWorkerId } from "../../../execution/object.js"
@@ -13,7 +15,7 @@ layer(objectLayer)("Runtime send", (it) => {
   it.effect("admits a message and starts the lane head", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:1",
@@ -70,7 +72,7 @@ layer(objectLayer)("Runtime send", (it) => {
   it.effect("completes through the test driver", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:1",

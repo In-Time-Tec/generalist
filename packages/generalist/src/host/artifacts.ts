@@ -1,7 +1,6 @@
 import { Effect, Option, Stream } from "effect"
 import {
   ArtifactNotFound,
-  ArtifactRegistry,
   type ArtifactError,
   type ArtifactUpdate,
   type EditResult,
@@ -9,6 +8,8 @@ import {
   type ReadResult,
   type Version,
 } from "../core/artifact.js"
+import { get as getArtifact } from "../unstable/artifact/registry.js"
+import type { Service as ArtifactService } from "../unstable/artifact/service.js"
 
 export interface Artifacts {
   readonly read: (name: string) => Effect.Effect<ReadResult, ArtifactError>
@@ -19,11 +20,11 @@ export interface Artifacts {
   ) => Effect.Effect<Stream.Stream<ArtifactUpdate, ArtifactError>, ArtifactError>
 }
 
-const get = (registry: Option.Option<ArtifactRegistry["Service"]>, name: string) =>
-  Option.isNone(registry) ? Effect.fail(ArtifactNotFound.make({ artifact: name })) : registry.value.get(name)
+const get = (artifacts: Option.Option<ArtifactService>, name: string) =>
+  Option.isNone(artifacts) ? Effect.fail(ArtifactNotFound.make({ artifact: name })) : getArtifact(artifacts.value, name)
 
-export const make = (registry: Option.Option<ArtifactRegistry["Service"]>): Artifacts => ({
-  read: (name) => get(registry, name).pipe(Effect.flatMap((artifact) => artifact.read)),
-  edit: (name, input) => get(registry, name).pipe(Effect.flatMap((artifact) => artifact.edit(input))),
-  subscribe: (name, version) => get(registry, name).pipe(Effect.flatMap((artifact) => artifact.subscribe(version))),
+export const make = (artifacts: Option.Option<ArtifactService>): Artifacts => ({
+  read: (name) => get(artifacts, name).pipe(Effect.flatMap((artifact) => artifact.read)),
+  edit: (name, input) => get(artifacts, name).pipe(Effect.flatMap((artifact) => artifact.edit(input))),
+  subscribe: (name, version) => get(artifacts, name).pipe(Effect.flatMap((artifact) => artifact.subscribe(version))),
 })

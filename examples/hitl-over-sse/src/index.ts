@@ -1,5 +1,6 @@
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Schema, Stream, type Types } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, Redacted, Schema, Stream, type Types } from "effect"
+import { HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, AgentManifest, Approvals, ModelMiddleware, Permissions, Pins, ToolExecutor } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
@@ -133,22 +134,42 @@ const runtimeLayer = Layer.unwrap(
   }),
 )
 
-const program = Effect.gen(function* () {
-  const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
-  const session = yield* host.sessions.create({ id: "release-1" })
-  yield* host.runs.start(session.id, agent, "Deploy api", { idempotencyKey: "deploy-api-1" })
-  const events = yield* (yield* host.events.subscribe(session.id)).pipe(
-    Stream.takeUntil((event) => event._tag === "ApprovalRequested" || event._tag === "Completed"),
-    Stream.runCollect,
-  )
-  const collected = Array.from(events)
-  const final = collected.at(-1)
-  if (final === undefined) return yield* Effect.die("expected one Host event")
-  const encoded = yield* Server.eventCodec.encode(final)
-  yield* Console.log(
-    `Server HostEvents: ${collected.map((event) => event._tag).join(" -> ")}; final wire bytes: ${encoded.length}`,
-  )
-})
+const program = Effect.scoped(
+  Effect.gen(function* () {
+    const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
+    const session = yield* host.sessions.create({ id: "release-1" })
+    yield* host.runs.start(session.id, agent, "Deploy api", { idempotencyKey: "deploy-api-1" })
+    const app = HttpRouter.toWebHandler(
+      Server.layer({
+        host,
+        auth: Server.authBearer({
+          token: Config.succeed(Redacted.make("local-token")),
+          principal: { id: "release-reader", tenantId: "local", role: "spectator" },
+        }),
+        authorization: { tenantId: "local", authorize: () => Effect.succeed(true) },
+      }).pipe(Layer.provide(HttpServer.layerServices)),
+      { disableLogger: true },
+    )
+    yield* Effect.addFinalizer(() => Effect.promise(app.dispose).pipe(Effect.orDie))
+    const response = yield* Effect.promise(() =>
+      app.handler(
+        new Request(`http://generalist.test/sessions/${session.id}/events`, {
+          headers: { authorization: "Bearer local-token" },
+        }),
+      ),
+    )
+    if (response.status !== 200 || response.body === null) return yield* Effect.die("expected an SSE response")
+    const reader = response.body.getReader()
+    let encoded = ""
+    while (!encoded.includes("ApprovalRequested")) {
+      const chunk = yield* Effect.promise(() => reader.read())
+      if (chunk.done) return yield* Effect.die("SSE ended before the approval event")
+      encoded += new TextDecoder().decode(chunk.value)
+    }
+    yield* Effect.promise(() => reader.cancel())
+    yield* Console.log(`Server ClientEvent SSE bytes through ApprovalRequested: ${encoded.length}`)
+  }),
+)
 
 const runtime = ManagedRuntime.make(Layer.merge(runtimeLayer, agentServices))
 try {

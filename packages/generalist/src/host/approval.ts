@@ -1,7 +1,7 @@
 import { Effect, Exit } from "effect"
 import type { Decision } from "../runtime/operation/approval.js"
 import { IllegalOperatorAction } from "../runtime/errors.js"
-import type { InspectError, RespondApprovalError, Runtime } from "../runtime/service.js"
+import type { InspectError, RespondApprovalError, Runtime } from "../runtime/engine.js"
 
 /** Resolve one approval only while its exact token remains an open Run obligation. */
 // oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- internal Host composition seam, not a public combinator.

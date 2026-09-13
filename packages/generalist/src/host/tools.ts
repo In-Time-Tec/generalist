@@ -7,7 +7,7 @@ import type {
   StartExecutionError,
   ToolRunHandle,
   ToolStartOptions,
-} from "../runtime/service.js"
+} from "../runtime/engine.js"
 import { ToolNotRegistered } from "./errors.js"
 
 export type HostToolRun<Output, Failure> = Omit<ToolRunHandle<Output, Failure>, "runId"> & {
@@ -20,7 +20,7 @@ export interface Tools {
     runId: string,
   ) => Effect.Effect<
     HostToolRun<T["successSchema"]["Type"], T["failureSchema"]["Type"]>,
-    import("../runtime/service.js").GetRunError | import("../runtime/errors.js").ExecutableRegistrationInvalid
+    import("../runtime/engine.js").GetRunError | import("../runtime/errors.js").ExecutableRegistrationInvalid
   >
   readonly start: <T extends Tool.Any>(
     tool: T,
@@ -35,7 +35,7 @@ export interface Tools {
     runId: string,
   ) => Effect.Effect<
     HostToolRun<unknown, unknown>,
-    | import("../runtime/service.js").GetRunError
+    | import("../runtime/engine.js").GetRunError
     | import("../runtime/errors.js").ExecutableRegistrationInvalid
     | ToolNotRegistered
   >

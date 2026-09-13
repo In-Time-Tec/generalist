@@ -8,7 +8,7 @@ import {
   RuntimeUnavailable,
   WaitNotOpen,
 } from "../../../errors.js"
-import type { RespondInput, SignalInput as SignalCommand } from "../../../service.js"
+import type { RespondInput, SignalInput as SignalCommand } from "../../../engine.js"
 import type { RunWait, WaitResolution } from "../../../run/wait.js"
 import { acceptsResponseKind, classifyResponse } from "../../../run/wait-internal.js"
 import { appendLifecycle, rejectIfTerminal, resumedEvent } from "../../append.js"

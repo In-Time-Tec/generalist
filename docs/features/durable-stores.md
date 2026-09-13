@@ -93,6 +93,36 @@ The command prints a Run ID and the scripted answer. A second invocation uses th
 
 `Durability.layer(options)` provides Runtime, RunStore, executor, and scheduler services. `layerRunStore(options)` provides storage without owning an execution loop. Both require an ObjectStore and Crypto; the full Runtime also requires `ExecutableResolver`. Neither selects a fallback store when configuration is missing.
 
+## Inspect without activating a Runtime
+
+Use `generalist/runtime/inspection` when a support tool needs bounded Run or Session status but must not acquire execution authority. This **configuration fragment** reuses an ObjectStore-and-Crypto Layer; it does not require Agents, an executable resolver, a scheduler, or a hosted Runtime:
+
+```ts
+import { Effect } from "effect"
+import * as Inspection from "generalist/runtime/inspection"
+
+declare const storage: Inspection.Options<never, never>["storage"]
+
+const ReadOnly = Inspection.layer({
+  storage,
+  namespace: {
+    environment: "development",
+    tenant: "example-team",
+    partition: "recovery-demo",
+  },
+})
+
+const read = Effect.gen(function* () {
+  const inspection = yield* Inspection.Inspection
+  const runs = yield* inspection.runs({ limit: 25 })
+  return { partition: yield* inspection.partition, runs }
+}).pipe(Effect.provide(ReadOnly))
+```
+
+Each Layer is fixed to one application-authorized namespace. Page limits are required integers from 1 through 200, and continuations are opaque: store and return them unchanged. Results expose identity, revision, lifecycle, status, remaining budget, usage, wait kind, and bounded child summaries. They omit executable manifests and registrations, claims, owner and fence fields, checkpoints, provider references, credentials, and signed URLs. `Discovery.inspect` returns the same committed or uncommitted partition summary rather than a journal head or reconstructed engine state.
+
+Inspection verifies canonical bytes and reconstructs state in memory under fixed object and byte ceilings, but never creates an object or activates, admits, schedules, heartbeats, dispatches, acknowledges, compacts, or settles work. `InspectionCorrupt`, `InspectionUnavailable`, `InspectionCursorInvalid`, and `InspectionLimitInvalid` distinguish invalid storage, availability, continuation, and caller-bound failures. Recovery explanation and mutation remain separately authorized operator operations; this service provides neither.
+
 ## Transport configuration
 
 `S3.layer` accepts resolved values, not Effect `Config` values. Resolve application configuration with `Layer.unwrap` as above. Its options include `bucket`, `region`, `endpoint?`, `forcePathStyle?`, `credentials?`, and `requestTimeoutMs?`. Credentials may be `{ accessKeyId, secretAccessKey, sessionToken? }` or an AWS SDK refreshing credential provider. Use the latter for a long-lived host with expiring credentials; do not log secrets.

@@ -20,12 +20,12 @@ const services = () => {
       )
     }),
   )
+  const runtime = objectRuntimeLayer(
+    { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
+    storage,
+  ).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
   return Layer.mergeAll(
-    objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
-      Layer.provide(ExecutableResolver.layerStatic([])),
-    ),
-    blobStore,
-    artifactLayer,
+    artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore)),
     TestModel.layer([]),
     Permissions.layerAllowAll,
     Approvals.layerAutoApprove,

@@ -1,5 +1,5 @@
 import { Effect } from "effect"
-import type { Service as Runtime } from "../runtime/service.js"
+import type { Service as Runtime } from "../runtime/engine.js"
 import { projectEntry, type ConversationEntry } from "../runtime/session/conversation.js"
 import { SessionPageInvalid } from "../runtime/session/page.js"
 import type { RuntimeHostSessions, SessionPageError } from "../runtime/session/host.js"

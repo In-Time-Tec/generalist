@@ -1,7 +1,6 @@
 import { Effect, Layer } from "effect"
 import { Approvals } from "./core/policy/approvals.js"
 import type { Level } from "./core/policy/permissions.js"
-import { Runtime } from "./runtime/service.js"
 
 export {
   Approvals,
@@ -34,12 +33,11 @@ export interface DurableOptions<R> {
 }
 
 /** Park approval requests in the Runtime and notify one external operator boundary. */
-export const layerDurable = <R>(options: DurableOptions<R>): Layer.Layer<Approvals, never, Runtime | R> =>
+export const layerDurable = <R>(options: DurableOptions<R>): Layer.Layer<Approvals, never, R> =>
   Layer.effect(
     Approvals,
     Effect.gen(function* () {
-      yield* Runtime
-      const context = yield* Effect.context<Runtime | R>()
+      const context = yield* Effect.context<R>()
       return Approvals.of({
         resolve: (pending) => {
           if (pending.runId === undefined) {

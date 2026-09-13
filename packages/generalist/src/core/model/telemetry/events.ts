@@ -16,14 +16,7 @@ export {
   layerInvocationLifecycleNoop,
   layerSinkNoop,
 } from "./services.js"
-export {
-  CurrentCompactionId,
-  CurrentInstrumentation,
-  CurrentPurpose,
-  CurrentSummaryCall,
-  type Instrumentation,
-  type SummaryCallCell,
-} from "./context.js"
+export { CurrentPurpose, type Instrumentation } from "./context.js"
 export const ProviderUsage = ProviderUsageSchema
 export type ProviderUsage = ProviderUsageValue
 

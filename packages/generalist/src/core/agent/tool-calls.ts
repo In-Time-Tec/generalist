@@ -26,6 +26,7 @@ import { waits, type ToolBatchCheckpoint, type ToolBatchResolution } from "./too
 import { make as makeToolExecution } from "./tools/execution.js"
 import { resumeBatch } from "./tools/resume-batch.js"
 import type { AnyToolCall, PendingToolResult } from "./tools/result.js"
+import type { HostedRunOptions } from "./lifecycle/hosted/options.js"
 
 /** One non-empty externally completed, authored-order framework tool-call batch. */
 export type ToolCallBatch = readonly [Response.ToolCallPartEncoded, ...ReadonlyArray<Response.ToolCallPartEncoded>]
@@ -149,8 +150,8 @@ const decodeCalls = (
     return decoded
   })
 
-const runOptionsForStart = (options: ToolCallBatchStart, messages: ReadonlyArray<Prompt.Message>): RunOptions => {
-  const base: RunOptions = {
+const runOptionsForStart = (options: ToolCallBatchStart, messages: ReadonlyArray<Prompt.Message>): HostedRunOptions => {
+  const base: HostedRunOptions = {
     prompt: messages,
     sessionId: options.sessionId,
     logicalOperationId: options.logicalOperationId,
@@ -166,8 +167,8 @@ const runOptionsForResume = (
   options: ToolCallBatchResume,
   messages: ReadonlyArray<Prompt.Message>,
   state: LoopDriverState,
-): RunOptions => {
-  const base: RunOptions = {
+): HostedRunOptions => {
+  const base: HostedRunOptions = {
     prompt: messages,
     sessionId: state.sessionId,
     logicalOperationId: state.logicalOperationId,
@@ -208,7 +209,7 @@ const validateResume = (
   })
 
 interface PreparedBatch {
-  readonly options: RunOptions
+  readonly options: HostedRunOptions
   readonly messages: ReadonlyArray<Prompt.Message>
   readonly turn: number
   readonly registry: Registry

@@ -14,8 +14,6 @@ import { Chat, Connection } from "generalist/unstable/foldkit"
 import { WorkingMemory } from "generalist/memory"
 import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { FileSystemCatalog } from "generalist/instructions/skills"
-import { HostEvent } from "generalist/host"
-import { ExecutableManifest, RunEvent } from "generalist/runtime"
 
 const researchSkill: SkillCatalog.Skill = {
   name: "research",
@@ -48,43 +46,39 @@ const key: Memory.Key = { agent: "capstone-assistant", subject: "local-user" }
 const filesystemSkillLayer = FileSystemCatalog.layer({ cwd: ".", roots: ["fixtures/.agents/skills"] })
 const compactionLayer = Compaction.layer({ contextWindow: 64_000, reserveTokens: 1_024, keepRecentTokens: 8_000 })
 
-const chatAgent = ExecutableManifest.makeTest("capstone-assistant", "1").ref
-const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunEvent.RunEvent =>
-  Schema.decodeUnknownSync(RunEvent.RunEvent)({
-    specVersion: "1",
-    eventId: `capstone-run:${sequence}`,
-    runId: "capstone-run",
-    sequence,
-    executableRef: chatAgent,
-    rootRunId: "capstone-run",
-    depth: 0,
-    occurredAt: "2026-08-03T00:00:00.000Z",
-    ...fields,
-  })
-
-const hostEvent = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
+const runChanged = (
+  cursor: number,
+  status: "pending" | "running" | "waiting" | "succeeded" | "failed" | "cancelled",
+  turn: number,
+): Connection.Incoming =>
   Connection.HostDelivery({
     epoch: 0,
-    activeRunId: tag === "Completed" ? null : "capstone-run",
-    event: Schema.decodeUnknownSync(HostEvent)({
-      _tag: tag,
+    activeRunId: status === "succeeded" || status === "failed" || status === "cancelled" ? null : "capstone-run",
+    event: {
+      _tag: "RunChanged",
       sessionId: "capstone-session",
-      cursor,
-      runId: "capstone-run",
-      event,
-    }),
+      cursor: String(cursor),
+      run: {
+        runId: "capstone-run",
+        rootRunId: "capstone-run",
+        agent: { name: "capstone-assistant", revision: "1" },
+        status,
+        cursor: String(cursor),
+        turn,
+      },
+    },
   })
 
 const chatFrames: ReadonlyArray<Connection.Incoming> = [
   Connection.ConnectionOpened({ sessionId: "capstone-session", epoch: 0 }),
-  hostEvent(0, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
+  runChanged(0, "running", 0),
   Connection.HostDelivery({
     epoch: 0,
     activeRunId: "capstone-run",
     event: {
-      _tag: "Conversation",
+      _tag: "ConversationChanged",
       sessionId: "capstone-session",
-      cursor: 1,
+      cursor: "1",
       update: {
         previousLeafId: null,
         leafId: "entry-response-0",
@@ -103,20 +97,8 @@ const chatFrames: ReadonlyArray<Connection.Incoming> = [
       },
     },
   }),
-  hostEvent(2, "Turn", runEvent(2, { _tag: "TurnCompleted", turn: 0 })),
-  hostEvent(
-    3,
-    "Completed",
-    runEvent(3, {
-      _tag: "RunCompleted",
-      result: {
-        text: "deterministic response",
-        output: "deterministic response",
-        turns: 1,
-        session: { sessionId: "capstone-session", leafId: "entry-response-0" },
-      },
-    }),
-  ),
+  runChanged(2, "running", 0),
+  runChanged(3, "succeeded", 1),
 ]
 
 const [chatModel] = Chat.update(
@@ -126,8 +108,13 @@ const [chatModel] = Chat.update(
       epoch: 0,
       snapshot: {
         version: 1,
-        session: { id: "capstone-session", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
-        cursor: -1,
+        session: {
+          id: "capstone-session",
+          createdAt: "2026-09-02T00:00:00.000Z",
+          lifecycle: "active",
+          queue: [],
+        },
+        cursor: "-1",
         runs: [],
         conversation: { leafId: null, entries: [] },
       },

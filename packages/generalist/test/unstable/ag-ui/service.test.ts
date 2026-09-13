@@ -1,21 +1,26 @@
 import { describe, expect, layer } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
-import { Effect, Layer, Predicate, Stream } from "effect"
+import { Effect, Layer, Predicate, Schema, Stream } from "effect"
 import type { Prompt } from "effect/unstable/ai"
-import {
-  Address,
-  Approval,
-  ExecutableManifest,
-  Errors as RuntimeErrors,
-  Run,
-  Runtime,
-  TreePolicy,
-} from "generalist/runtime"
+import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Run, TreePolicy } from "generalist/runtime"
 import { AGUI } from "../../../src/unstable/ag-ui/index.js"
+import type { RuntimeInspection } from "../../../src/runtime/engine.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { Runtime as ApplicationRuntime } from "../../../src/runtime/service.js"
+import { make as makeApplication } from "../../../src/runtime/hosting/application.js"
+import type { SteeringReceipt } from "../../../src/runtime/run/steering.js"
 
 const address = Address.make("agent:assistant")
 const executable = ExecutableManifest.makeTest("assistant", "1")
 const agent = executable.ref
+const privateMarker = "AGUI_PRIVATE_RECOVERY_MARKER"
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
+const privateManifest = {
+  ...executable.manifest,
+  entries: executable.manifest.entries.map((entry) =>
+    entry._tag === "Agent" ? { ...entry, manifest: { ...entry.manifest, instructions: privateMarker } } : entry,
+  ),
+}
 
 const input = (overrides: Partial<RunAgentInput> = {}): RunAgentInput => ({
   threadId: "thread-1",
@@ -71,7 +76,46 @@ const runningInspection = (runId: string): Run.RunInspection => ({
   branches: [],
 })
 
-const runtimeLayer = (runtime: Runtime.Service) => Layer.succeed(Runtime.Runtime, runtime)
+const retainedSession = (runId: string) => ({
+  id: "thread-1",
+  rootSessionId: "thread-1",
+  parentSessionId: null,
+  parentRunId: null,
+  initialRunId: runId,
+  depth: 0,
+})
+
+const runtimeInspection = (runId: string, overrides: Partial<RuntimeInspection> = {}): RuntimeInspection => ({
+  ...runningInspection(runId),
+  retainedSession: retainedSession(runId),
+  revision: "1",
+  waitOpenedAtSequence: {},
+  turn: 0,
+  usage: { inputTokens: 0, outputTokens: 0 },
+  usageFacts: [],
+  activeTools: [],
+  elapsed: 0,
+  budget: {},
+  gates: [],
+  children: [],
+  ...overrides,
+})
+
+const runtimeLayer = (runtime: Runtime.Service) =>
+  Layer.succeed(
+    ApplicationRuntime,
+    makeApplication({
+      engine: runtime,
+      lifecycle: { run: (effect) => effect },
+      views: {
+        run: () => unused(),
+        child: () => unused(),
+        list: () => unused(),
+        session: () => unused(),
+        sessions: unused(),
+      },
+    }),
+  )
 
 const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
 
@@ -82,13 +126,13 @@ const rootSend = (
     runId: string,
     prompt: Prompt.Prompt | string,
     options?: Runtime.RunSendOptions,
-  ): Effect.Effect<Runtime.SteeringReceipt, Runtime.RunSendError>
+  ): Effect.Effect<SteeringReceipt, Runtime.RunSendError>
   function send(input: Runtime.SendInput): Effect.Effect<Run.RunReceipt, Runtime.SendError>
   function send(
     sendInput: Runtime.SendInput | string,
     _prompt?: Prompt.Prompt | string,
     _options?: Runtime.RunSendOptions,
-  ): Effect.Effect<Runtime.SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
+  ): Effect.Effect<SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
     return Predicate.isString(sendInput) ? unused() : handler(sendInput)
   }
   return send
@@ -104,6 +148,12 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
     startToolEncoded: () => unused(),
     sessionSelection: () => unused(),
     sessionFamily: () => Effect.die("not used"),
+    hold: () => unused(),
+    sessions: {
+      create: () => unused(),
+      get: () => unused(),
+      list: unused(),
+    },
     getRun: () => unused(),
     configureDelegationPolicy: () => unused(),
     submitSessionInput: () => unused(),
@@ -356,25 +406,41 @@ describe("AGUI", () => {
 
   {
     const lagCursors: Array<number | undefined> = []
-    const snapshot = {
+    let snapshotReads = 0
+    const staleSnapshot = {
       run: {
         runId: "client-run-1",
-        status: "running" as const,
+        status: "waiting" as const,
         executableRef: agent,
-        executableManifest: executable.manifest,
+        executableManifest: privateManifest,
+        retainedSession: retainedSession("client-run-1"),
         depth: 0,
         treePolicy: TreePolicy.defaultTreePolicy,
         waits: [],
-        lastSequence: 8,
+        lastSequence: 3,
         durability: "ephemeral" as const,
         branches: [],
+        attemptFence: 17,
+        privateMarker,
       },
-      cursor: 8,
+      cursor: 3,
       turn: 0,
       usageFacts: [],
       budget: {},
       compactions: [],
       gates: [],
+      claim: { ownerId: privateMarker, epoch: 3, fence: 17 },
+      providerResourceRef: privateMarker,
+    }
+    const inspected = {
+      ...runtimeInspection("client-run-1", {
+        executableManifest: privateManifest,
+        lastSequence: 8,
+      }),
+      attemptFence: 17,
+      privateMarker,
+      claim: { ownerId: privateMarker, epoch: 3, fence: 17 },
+      providerResourceRef: privateMarker,
     }
     const runtime = mockRuntime({
       send: rootSend(() =>
@@ -386,19 +452,59 @@ describe("AGUI", () => {
           ? Stream.fail(RuntimeErrors.SubscriberLagged.make({ runId: "client-run-1", lastDeliveredSequence: 2 }))
           : Stream.empty
       },
-      snapshot: () => Effect.succeed(snapshot),
+      snapshot: () => {
+        snapshotReads += 1
+        return Effect.succeed(staleSnapshot)
+      },
+      inspect: () => Effect.succeed(inspected),
     })
     layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
-      "recovers subscriber lag with a state snapshot and the snapshot cursor",
+      "recovers subscriber lag from one inspection view and its cursor",
       (it) => {
-        it.effect("recovers subscriber lag with a state snapshot and the snapshot cursor", () =>
+        it.effect("recovers subscriber lag from one inspection view and its cursor", () =>
           Effect.gen(function* () {
             const service = yield* AGUI.AGUI
             const current = yield* service.snapshot("client-run-1")
             const events = yield* service.run(input()).pipe(Stream.runCollect)
             expect(lagCursors).toEqual([-1, 8])
-            expect(current).toEqual({ type: "STATE_SNAPSHOT", snapshot })
-            expect([...events]).toEqual([{ type: "STATE_SNAPSHOT", snapshot }])
+            expect(snapshotReads).toBe(0)
+            const expected = {
+              type: "STATE_SNAPSHOT",
+              snapshot: {
+                version: 1,
+                cursor: "8",
+                run: {
+                  runId: "client-run-1",
+                  sessionId: "thread-1",
+                  rootRunId: "client-run-1",
+                  agent: { name: "assistant", revision: "1" },
+                  status: "running",
+                  durability: "ephemeral",
+                  depth: 0,
+                  turn: 0,
+                  lastSequence: 8,
+                  budget: {},
+                  usage: { inputTokens: 0, outputTokens: 0 },
+                  waits: [],
+                },
+              },
+            }
+            expect(current).toEqual(expected)
+            expect([...events]).toEqual([expected])
+            const bytes = encodeJson([current, ...events])
+            for (const forbidden of [
+              privateMarker,
+              "executableManifest",
+              "attemptFence",
+              "privateMarker",
+              "claim",
+              "ownerId",
+              "epoch",
+              "fence",
+              "providerResourceRef",
+            ]) {
+              expect(bytes).not.toContain(forbidden)
+            }
           }),
         )
       },
@@ -412,13 +518,16 @@ describe("AGUI", () => {
         runId: "client-run-1",
         status: "running" as const,
         executableRef: agent,
-        executableManifest: executable.manifest,
+        executableManifest: privateManifest,
+        retainedSession: retainedSession("client-run-1"),
         depth: 0,
         treePolicy: TreePolicy.defaultTreePolicy,
         waits: [],
         lastSequence: 12,
         durability: "durable" as const,
         branches: [],
+        attemptFence: 21,
+        privateMarker,
       },
       cursor: 12,
       turn: 0,
@@ -426,6 +535,19 @@ describe("AGUI", () => {
       budget: {},
       compactions: [],
       gates: [],
+      claim: { ownerId: privateMarker, epoch: 4, fence: 21 },
+      providerResourceRef: privateMarker,
+    }
+    const inspected = {
+      ...runtimeInspection("client-run-1", {
+        executableManifest: privateManifest,
+        lastSequence: 12,
+        durability: "durable",
+      }),
+      attemptFence: 21,
+      privateMarker,
+      claim: { ownerId: privateMarker, epoch: 4, fence: 21 },
+      providerResourceRef: privateMarker,
     }
     const runtime = mockRuntime({
       send: rootSend(() =>
@@ -443,6 +565,7 @@ describe("AGUI", () => {
           : Stream.empty
       },
       snapshot: () => Effect.succeed(snapshot),
+      inspect: () => Effect.succeed(inspected),
     })
     layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
       "recovers an expired cursor from the authoritative snapshot",
@@ -452,7 +575,151 @@ describe("AGUI", () => {
             const service = yield* AGUI.AGUI
             const events = yield* service.run(input()).pipe(Stream.runCollect)
             expect(expiredCursors).toEqual([-1, 12])
-            expect([...events]).toEqual([{ type: "STATE_SNAPSHOT", snapshot }])
+            expect([...events]).toEqual([
+              {
+                type: "STATE_SNAPSHOT",
+                snapshot: {
+                  version: 1,
+                  cursor: "12",
+                  run: {
+                    runId: "client-run-1",
+                    sessionId: "thread-1",
+                    rootRunId: "client-run-1",
+                    agent: { name: "assistant", revision: "1" },
+                    status: "running",
+                    durability: "durable",
+                    depth: 0,
+                    turn: 0,
+                    lastSequence: 12,
+                    budget: {},
+                    usage: { inputTokens: 0, outputTokens: 0 },
+                    waits: [],
+                  },
+                },
+              },
+            ])
+            const bytes = encodeJson(events)
+            for (const forbidden of [
+              privateMarker,
+              "executableManifest",
+              "attemptFence",
+              "privateMarker",
+              "claim",
+              "ownerId",
+              "epoch",
+              "fence",
+              "providerResourceRef",
+            ]) {
+              expect(bytes).not.toContain(forbidden)
+            }
+          }),
+        )
+      },
+    )
+  }
+
+  {
+    const snapshot = {
+      run: {
+        ...runningInspection("client-run-1"),
+        retainedSession: retainedSession("client-run-1"),
+      },
+      cursor: 4,
+      turn: 0,
+      usageFacts: [],
+      budget: {},
+      compactions: [],
+      gates: [],
+    }
+    const missingIdentity = runtimeInspection("client-run-1")
+    Reflect.deleteProperty(missingIdentity, "revision")
+    const runtime = mockRuntime({
+      snapshot: () => Effect.succeed(snapshot),
+      inspect: () => Effect.succeed(missingIdentity),
+      send: rootSend(() =>
+        Effect.succeed({ runId: "client-run-1", messageId: "message-1", acceptedSequence: 0, duplicate: false }),
+      ),
+      events: () =>
+        Stream.fail(RuntimeErrors.SubscriberLagged.make({ runId: "client-run-1", lastDeliveredSequence: 0 })),
+    })
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+      "fails typed when a snapshot has no exact public Agent identity",
+      (it) => {
+        it.effect("fails typed when a snapshot has no exact public Agent identity", () =>
+          Effect.gen(function* () {
+            const service = yield* AGUI.AGUI
+            const failure = yield* service.snapshot("client-run-1").pipe(Effect.flip)
+            expect(failure).toMatchObject({
+              _tag: "generalist/runtime/RuntimeUnavailable",
+              message: "Run has no complete public AG-UI identity",
+            })
+            const replayFailure = yield* service.run(input()).pipe(Stream.runDrain, Effect.flip)
+            expect(replayFailure).toMatchObject({
+              _tag: "generalist/runtime/RuntimeUnavailable",
+              message: "Run has no complete public AG-UI identity",
+            })
+          }),
+        )
+      },
+    )
+  }
+
+  {
+    const snapshot = {
+      run: { ...runningInspection("client-run-1"), parentRunId: "root-run", depth: 1 },
+      cursor: 4,
+      turn: 0,
+      usageFacts: [],
+      budget: {},
+      compactions: [],
+      gates: [],
+    }
+    const child = runtimeInspection("client-run-1", { parentRunId: "root-run", depth: 1 })
+    Reflect.deleteProperty(child, "retainedSession")
+    const root = runtimeInspection("root-run")
+    const runtime = mockRuntime({
+      snapshot: () => Effect.succeed(snapshot),
+      inspect: (runId) => Effect.succeed(runId === "root-run" ? root : child),
+    })
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+      "does not substitute a root Session for a child snapshot",
+      (it) => {
+        it.effect("does not substitute a root Session for a child snapshot", () =>
+          Effect.gen(function* () {
+            const service = yield* AGUI.AGUI
+            const failure = yield* service.snapshot("client-run-1").pipe(Effect.flip)
+            expect(failure).toMatchObject({
+              _tag: "generalist/runtime/RuntimeUnavailable",
+              message: "Run has no retained Session identity",
+            })
+          }),
+        )
+      },
+    )
+  }
+
+  {
+    const child = runtimeInspection("client-run-1", { parentRunId: "root-run", depth: 1 })
+    const invalidParent = runtimeInspection("root-run", { depth: 1 })
+    const inspectedRunIds: Array<string> = []
+    const runtime = mockRuntime({
+      inspect: (runId) => {
+        inspectedRunIds.push(runId)
+        return Effect.succeed(runId === "root-run" ? invalidParent : child)
+      },
+    })
+    layer(AGUI.layer({ address }).pipe(Layer.provide(runtimeLayer(runtime))))(
+      "rejects non-decreasing Run ancestry before projecting a snapshot",
+      (it) => {
+        it.effect("rejects non-decreasing Run ancestry before projecting a snapshot", () =>
+          Effect.gen(function* () {
+            const service = yield* AGUI.AGUI
+            const failure = yield* service.snapshot("client-run-1").pipe(Effect.flip)
+            expect(failure).toMatchObject({
+              _tag: "generalist/runtime/RuntimeUnavailable",
+              message: "Run ancestry has a non-decreasing depth",
+            })
+            expect(inspectedRunIds).toEqual(["client-run-1", "root-run"])
           }),
         )
       },

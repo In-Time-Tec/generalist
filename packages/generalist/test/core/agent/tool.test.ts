@@ -16,7 +16,10 @@ import {
   ToolExecutor,
   ToolPlacement,
 } from "../../../src/index"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
+import { ExecutableResolver } from "../../../src/runtime/index"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { withProviderFinish } from "../provider-finish"
@@ -1223,8 +1226,8 @@ layer(unusedToolHandlerLayer)("AgentTool", (it) => {
 
     const execute = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const host = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const host = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "delegate", startOptions)
       runId = handle.runId

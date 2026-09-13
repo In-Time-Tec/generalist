@@ -2,7 +2,7 @@
 export const packageSmokeTypecheck = (
   exports: ReadonlyArray<string>,
 ): string => `${exports.map((specifier) => `import ${JSON.stringify(specifier)}`).join("\n")}
-import { Agent, DurableDriver, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, Session, Tasks, ToolOutput } from "generalist"
+import { ActiveModelResponse, Agent, DurableDriver, Handoff, Memory, ModelMiddleware, ModelRegistry, ModelResilience, ModelTelemetry, Session, Tasks, ToolOutput } from "generalist"
 import { LanguageModel } from "effect/unstable/ai"
 import { A2A } from "generalist/unstable/a2a"
 import { AGUI } from "generalist/unstable/ag-ui"
@@ -18,9 +18,11 @@ import { layer as deterministicLayer } from "generalist/providers/deterministic"
 import { make as makeModelRoute } from "generalist/unstable/providers/model-route"
 import { TestModel, Testing } from "generalist/testing"
 import { Cursor, Runtime, RunEvent } from "generalist/runtime"
+import * as Inspection from "generalist/runtime/inspection"
 import type { ClosedNativeError, NativeLayerEnvironment } from "generalist/runtime/native-layer-environment"
 import * as Durability from "generalist/durability"
-import { ObjectStoreFailure } from "generalist/durability/object-store"
+import * as Discovery from "generalist/durability/discovery"
+import { ObjectStore, ObjectStoreFailure } from "generalist/durability/object-store"
 import * as S3 from "generalist/durability/s3"
 import * as R2 from "generalist/durability/r2"
 import * as DurableObjects from "generalist/unstable/cloudflare/durable-objects"
@@ -28,7 +30,49 @@ import * as Rivet from "generalist/unstable/rivet"
 import * as TestDurability from "generalist/testing/durability"
 import * as Components from "generalist/components"
 import * as AccountAuth from "generalist/unstable/providers/openai-account-auth"
-import { Server } from "generalist/server"
+import {
+  ClientAgentIdentity,
+  ClientApprovalSummary,
+  ClientBudget,
+  ClientConversation,
+  ClientConversationEntry,
+  ClientConversationUpdate,
+  ClientCursor,
+  ClientEvent,
+  ClientMessage,
+  ClientPreview,
+  ClientQueueEntry,
+  ClientRun,
+  ClientRunSummary,
+  ClientServerEvent,
+  ClientSession,
+  ClientSessionHistoryPage,
+  ClientSessionRunsPage,
+  ClientSessionSnapshot,
+  ClientUsage,
+  ClientWait,
+  Server,
+  type ClientAgentIdentity as ClientAgentIdentityType,
+  type ClientApprovalSummary as ClientApprovalSummaryType,
+  type ClientBudget as ClientBudgetType,
+  type ClientConversation as ClientConversationType,
+  type ClientConversationEntry as ClientConversationEntryType,
+  type ClientConversationUpdate as ClientConversationUpdateType,
+  type ClientCursor as ClientCursorType,
+  type ClientEvent as ClientEventType,
+  type ClientMessage as ClientMessageType,
+  type ClientPreview as ClientPreviewType,
+  type ClientQueueEntry as ClientQueueEntryType,
+  type ClientRun as ClientRunType,
+  type ClientRunSummary as ClientRunSummaryType,
+  type ClientServerEvent as ClientServerEventType,
+  type ClientSession as ClientSessionType,
+  type ClientSessionHistoryPage as ClientSessionHistoryPageType,
+  type ClientSessionRunsPage as ClientSessionRunsPageType,
+  type ClientSessionSnapshot as ClientSessionSnapshotType,
+  type ClientUsage as ClientUsageType,
+  type ClientWait as ClientWaitType,
+} from "generalist/server"
 import { Host, ToolIdentity, type HostToolRun } from "generalist/host"
 import { Config, Context, Crypto, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
@@ -491,6 +535,68 @@ const memoryRun = Agent.stream(memoryAgent, "hello")
 type MemoryRunRequirements = Assert<
   Equal<StreamServices<typeof memoryRun>, LanguageModel.LanguageModel | Memory.Memory>
 >
+const publicOptionAgent = Agent.make({ name: "public-options", output: Schema.Struct({ summary: Schema.String }) })
+const publicMemoryOptions = { memory: { key: { agent: "public-options", subject: "consumer" } } }
+const publicAllocationOptions = { prompt: "hello", ...publicMemoryOptions }
+const publicAllocation = Agent.allocateRun(publicOptionAgent, publicAllocationOptions)
+const curriedPublicAllocation = Agent.allocateRun(publicAllocationOptions)(publicOptionAgent)
+type ExpectedPublicAllocation = Effect.Effect<
+  Agent.RunHandle<
+    import("generalist").AgentEvent.Event<{ readonly summary: string }>,
+    Agent.RunError,
+    LanguageModel.LanguageModel | Memory.Memory
+  >,
+  import("generalist").Steering.PolicyInvalid,
+  Scope.Scope
+>
+type PublicAllocationExact = Assert<Equal<typeof publicAllocation, ExpectedPublicAllocation>>
+type CurriedPublicAllocationExact = Assert<Equal<typeof curriedPublicAllocation, ExpectedPublicAllocation>>
+const publicMemoryStream = Agent.stream(publicOptionAgent, "hello", publicMemoryOptions)
+const curriedPublicMemoryStream = Agent.stream("hello", publicMemoryOptions)(publicOptionAgent)
+type ExpectedPublicStream = Stream.Stream<
+  import("generalist").AgentEvent.Event<{ readonly summary: string }>,
+  Agent.RunError,
+  LanguageModel.LanguageModel | Memory.Memory
+>
+type PublicStreamExact = Assert<Equal<typeof publicMemoryStream, ExpectedPublicStream>>
+type CurriedPublicStreamExact = Assert<Equal<typeof curriedPublicMemoryStream, ExpectedPublicStream>>
+const publicMemoryRun = Agent.run(publicOptionAgent, "hello", publicMemoryOptions)
+const curriedPublicMemoryRun = Agent.run("hello", publicMemoryOptions)(publicOptionAgent)
+type ExpectedPublicRun = Effect.Effect<
+  { readonly summary: string },
+  Agent.RunError,
+  LanguageModel.LanguageModel | Memory.Memory
+>
+type PublicRunExact = Assert<Equal<typeof publicMemoryRun, ExpectedPublicRun>>
+type CurriedPublicRunExact = Assert<Equal<typeof curriedPublicMemoryRun, ExpectedPublicRun>>
+type HostedOptionsAbsent = Assert<Equal<
+  Extract<keyof Agent.RunOptions, "initialSteering" | "driverCheckpoint" | "executableRef" | "executableManifest">,
+  never
+>>
+type CapabilityBindingsAbsent = Assert<Equal<Extract<keyof Agent.Any, "capabilities">, never>>
+type HandleControlAbsent = Assert<Equal<Extract<keyof Agent.RunHandle, "busy" | "interruptTools" | "reject">, never>>
+type InspectorWritesAbsent = Assert<Equal<Extract<keyof Agent.InspectorService, "start" | "publish" | "observe">, never>>
+type ParentStateAbsent = Assert<Equal<
+  Extract<keyof import("generalist").ToolContext.Service, "history" | "agent" | "inheritedSandboxSnapshot">,
+  never
+>>
+const rejectHostedOptionUnion = (
+  options: { readonly sessionId: string } | { readonly sessionId: string; readonly driverCheckpoint: {} },
+) => {
+  // @ts-expect-error A union containing hosted state cannot enter direct allocation.
+  Agent.allocateRun(publicOptionAgent, { prompt: "hello", ...options })
+  // @ts-expect-error A union containing hosted state cannot enter curried allocation.
+  Agent.allocateRun({ prompt: "hello", ...options })(publicOptionAgent)
+  // @ts-expect-error A union containing hosted state cannot enter direct streaming.
+  Agent.stream(publicOptionAgent, "hello", options)
+  // @ts-expect-error A union containing hosted state cannot enter curried streaming.
+  Agent.stream("hello", options)(publicOptionAgent)
+  // @ts-expect-error A union containing hosted state cannot enter direct runs.
+  Agent.run(publicOptionAgent, "hello", options)
+  // @ts-expect-error A union containing hosted state cannot enter curried runs.
+  Agent.run("hello", options)(publicOptionAgent)
+}
+void rejectHostedOptionUnion
 void Handoff
 type ServerRoot = typeof import("generalist/server")
 type RuntimeRoot = typeof import("generalist/runtime")
@@ -499,14 +605,292 @@ type AGUIRoot = typeof import("generalist/unstable/ag-ui")
 type A2ACanonical = Assert<Equal<A2ARoot["A2A"], typeof A2A>>
 type AGUICanonical = Assert<Equal<AGUIRoot["AGUI"], typeof AGUI>>
 type ServerCanonical = Assert<Equal<ServerRoot["Server"], typeof Server>>
+type ClientSessionCanonical = Assert<Equal<ServerRoot["ClientSession"], typeof ClientSession>>
+type ClientRunCanonical = Assert<Equal<ServerRoot["ClientRun"], typeof ClientRun>>
+type ClientEventCanonical = Assert<Equal<ServerRoot["ClientEvent"], typeof ClientEvent>>
+type ClientServerEventCanonical = Assert<Equal<ServerRoot["ClientServerEvent"], typeof ClientServerEvent>>
+type ClientSnapshotCanonical = Assert<Equal<ServerRoot["ClientSessionSnapshot"], typeof ClientSessionSnapshot>>
+type ClientContractTypes = readonly [
+  ClientAgentIdentityType,
+  ClientApprovalSummaryType,
+  ClientBudgetType,
+  ClientConversationType,
+  ClientConversationEntryType,
+  ClientConversationUpdateType,
+  ClientCursorType,
+  ClientEventType,
+  ClientMessageType,
+  ClientPreviewType,
+  ClientQueueEntryType,
+  ClientRunType,
+  ClientRunSummaryType,
+  ClientServerEventType,
+  ClientSessionType,
+  ClientSessionHistoryPageType,
+  ClientSessionRunsPageType,
+  ClientSessionSnapshotType,
+  ClientUsageType,
+  ClientWaitType,
+]
+type ClientSessionInternalFieldsAbsent = Assert<
+  Equal<
+    Extract<
+      keyof ClientSessionType,
+      "selection" | "executableRef" | "executableManifest" | "registrations" | "retainedSession"
+    >,
+    never
+  >
+>
+type ClientRunInternalFieldsAbsent = Assert<
+  Equal<
+    Extract<
+      keyof ClientRunType,
+      "executableRef" | "executableManifest" | "registrations" | "ownerId" | "attemptFence" | "checkpoint"
+    >,
+    never
+  >
+>
+type ClientSnapshotInternalFieldsAbsent = Assert<
+  Equal<Extract<keyof ClientSessionSnapshotType["session"], "selection" | "checkpointPath" | "providerResourceRef">, never>
+>
+type InternalServerContractsAbsent = Assert<
+  Equal<Extract<keyof ServerRoot, "HostSessionSnapshot" | "ServerEvent">, never>
+>
+type InternalServerNamespaceContractsAbsent = Assert<
+  Equal<
+    Extract<
+      keyof typeof Server,
+      | "SessionSnapshot"
+      | "SessionHistoryPage"
+      | "SessionRunsPage"
+      | "HostEvent"
+      | "PreviewDelivery"
+      | "ServerEvent"
+      | "CursorFromString"
+    >,
+    never
+  >
+>
+void [
+  ClientAgentIdentity,
+  ClientApprovalSummary,
+  ClientBudget,
+  ClientConversation,
+  ClientConversationEntry,
+  ClientConversationUpdate,
+  ClientCursor,
+  ClientMessage,
+  ClientPreview,
+  ClientQueueEntry,
+  ClientRunSummary,
+  ClientSessionHistoryPage,
+  ClientSessionRunsPage,
+  ClientUsage,
+  ClientWait,
+]
 type RuntimeCanonical = Assert<Equal<RuntimeRoot["Runtime"], typeof Runtime>>
+type RuntimeInspectionCanonical = Assert<Equal<RuntimeRoot["Inspection"], typeof Inspection>>
 type RunEventCanonical = Assert<Equal<RuntimeRoot["RunEvent"], typeof RunEvent>>
-type RuntimeAdmitInputCanonical = Assert<
-  Equal<Parameters<Runtime.Service["admit"]>[0], Runtime.AdmitInput>
+type DiscoveryInspection = Effect.Success<ReturnType<typeof Discovery.inspect>>
+type DiscoveryInternalsAbsent = Assert<Equal<Extract<keyof DiscoveryInspection, "head" | "state">, never>>
+type InspectionContracts = readonly [
+  Inspection.Cursor,
+  Inspection.RunStatus,
+  Inspection.Run,
+  Inspection.Child,
+  Inspection.Wait,
+  Inspection.Session,
+  Inspection.Usage,
+  Inspection.Budget,
+  Inspection.PartitionInspection,
+  Inspection.Page<Inspection.Run>,
+  Inspection.PageInput,
+  Inspection.Service,
+  Inspection.Options<ObjectStoreFailure, never>,
+  Inspection.RunNotFound,
+  Inspection.SessionNotFound,
+  Inspection.InspectionUnavailable,
+  Inspection.InspectionCorrupt,
+  Inspection.InspectionCursorInvalid,
+  Inspection.InspectionLimitInvalid,
+  Inspection.InspectionFailure,
+]
+type InspectionInternalsAbsent = Assert<
+  Equal<Extract<keyof typeof Inspection, "RuntimeInspectionResponse" | "ChildInspectionResponse">, never>
 >
-type RuntimeActivateInputCanonical = Assert<
-  Equal<Parameters<Runtime.Service["activate"]>[0], Runtime.ActivateInput>
+declare const inspectionStorage: Layer.Layer<ObjectStore | Crypto.Crypto, ObjectStoreFailure>
+const inspectionLayer = Inspection.layer({
+  storage: inspectionStorage,
+  namespace: { environment: "package", tenant: "smoke", partition: "inspection" },
+})
+type InspectionLayerShape = Assert<
+  Equal<
+    LayerShape<typeof inspectionLayer>,
+    readonly [Inspection.Inspection, ObjectStoreFailure | Inspection.InspectionFailure, never]
+  >
 >
+void inspectionLayer
+void [
+  Inspection.Cursor,
+  Inspection.RunStatus,
+  Inspection.Run,
+  Inspection.Child,
+  Inspection.Wait,
+  Inspection.Session,
+  Inspection.Usage,
+  Inspection.Budget,
+  Inspection.PartitionInspection,
+  Inspection.Page,
+  Inspection.PageInput,
+  Inspection.Inspection,
+  Inspection.RunNotFound,
+  Inspection.SessionNotFound,
+  Inspection.InspectionUnavailable,
+  Inspection.InspectionCorrupt,
+  Inspection.InspectionCursorInvalid,
+  Inspection.InspectionLimitInvalid,
+]
+type RuntimeSemanticSurface = Assert<
+  Equal<keyof Runtime.Service,
+    "start" | "hold" | "schedule" | "inspect" | "list" | "events" | "history" | "previews" |
+    "signal" | "respond" | "cancel" | "sessions" | "children" | "messaging" | "operator">
+>
+type RuntimeHoldInputCanonical = Assert<
+  Equal<Parameters<Runtime.Service["hold"]>[2], Runtime.HoldOptions>
+>
+type RuntimeHeldActivationCanonical = Assert<
+  Equal<Parameters<Runtime.HeldRunHandle<string>["activate"]>, [commandId: string]>
+>
+type RuntimeAuthorityExportsAbsent = Assert<
+  Equal<Extract<keyof typeof import("generalist/runtime"), "RunStore" | "RunExecutor" | "LocalScheduler">, never>
+>
+type RuntimePreviewFenceAbsent = Assert<
+  Equal<Extract<keyof Runtime.ModelPreviewFrame, "attemptFence">, never>
+>
+type RuntimeExecutionScopeSubpath = Assert<
+  Equal<import("generalist/runtime/execution-scope").ExecutionScope<Runtime.AgentRegistry>, Runtime.ExecutionScope<Runtime.AgentRegistry>>
+>
+type RuntimeScopeConstructorsAbsent = Assert<
+  Equal<Extract<keyof typeof import("generalist/runtime/execution-scope"), "issue" | "copyRuntimeBinding" | "markRuntimeReady">, never>
+>
+type ActiveModelResponseReadOnlyService = ActiveModelResponse.Service
+const packageActiveModelResponseSnapshot = Effect.flatMap(
+  ActiveModelResponse.ActiveModelResponse,
+  (service) => service.snapshot,
+)
+type ActiveModelResponseReadOnlySnapshot = Effect.Success<typeof packageActiveModelResponseSnapshot>
+type ActiveModelResponseReadOnlyRequirement = Assert<
+  Equal<EffectServices<typeof packageActiveModelResponseSnapshot>, ActiveModelResponse.ActiveModelResponse>
+>
+type ModelTelemetryRetainedTypes = readonly [
+  ModelTelemetry.ProviderUsage,
+  ModelTelemetry.CallPurpose,
+  ModelTelemetry.FailureCategory,
+  ModelTelemetry.FailureClassification,
+  ModelTelemetry.FailureDisposition,
+  ModelTelemetry.RetryReason,
+  ModelTelemetry.FirstOutputKind,
+  ModelTelemetry.CompactionTrigger,
+  ModelTelemetry.CompactionKind,
+  ModelTelemetry.ModelInvocationMethod,
+  ModelTelemetry.ModelInvocationStarted,
+  ModelTelemetry.ModelInvocationCompleted,
+  ModelTelemetry.ModelInvocationFailed,
+  ModelTelemetry.CallStarted,
+  ModelTelemetry.AttemptStarted,
+  ModelTelemetry.AttemptFirstOutput,
+  ModelTelemetry.AttemptCompleted,
+  ModelTelemetry.AttemptFailed,
+  ModelTelemetry.FallbackScheduled,
+  ModelTelemetry.CompactionCommit,
+  ModelTelemetry.RetryScheduled,
+  ModelTelemetry.CallCompleted,
+  ModelTelemetry.CallFailed,
+  ModelTelemetry.CompactionStarted,
+  ModelTelemetry.CompactionSkipped,
+  ModelTelemetry.CompactionApplied,
+  ModelTelemetry.CompactionFailed,
+  ModelTelemetry.Event,
+  ModelTelemetry.DeliveryBatch,
+  ModelTelemetry.EventPayload,
+  ModelTelemetry.Sink,
+  ModelTelemetry.SinkFailed,
+  ModelTelemetry.InvocationLifecycle,
+  ModelTelemetry.InvocationLifecycleFailed,
+]
+const modelTelemetryRetainedValues = [
+  ModelTelemetry.ProviderUsage,
+  ModelTelemetry.CallPurpose,
+  ModelTelemetry.FailureCategory,
+  ModelTelemetry.FailureClassification,
+  ModelTelemetry.FailureDisposition,
+  ModelTelemetry.RetryReason,
+  ModelTelemetry.FirstOutputKind,
+  ModelTelemetry.CompactionTrigger,
+  ModelTelemetry.CompactionKind,
+  ModelTelemetry.ModelInvocationMethod,
+  ModelTelemetry.ModelInvocationStarted,
+  ModelTelemetry.ModelInvocationCompleted,
+  ModelTelemetry.ModelInvocationFailed,
+  ModelTelemetry.CallStarted,
+  ModelTelemetry.AttemptStarted,
+  ModelTelemetry.AttemptFirstOutput,
+  ModelTelemetry.AttemptCompleted,
+  ModelTelemetry.AttemptFailed,
+  ModelTelemetry.FallbackScheduled,
+  ModelTelemetry.CompactionCommit,
+  ModelTelemetry.RetryScheduled,
+  ModelTelemetry.CallCompleted,
+  ModelTelemetry.CallFailed,
+  ModelTelemetry.CompactionStarted,
+  ModelTelemetry.CompactionSkipped,
+  ModelTelemetry.CompactionApplied,
+  ModelTelemetry.CompactionFailed,
+  ModelTelemetry.Event,
+  ModelTelemetry.DeliveryBatch,
+  ModelTelemetry.Sink,
+  ModelTelemetry.SinkFailed,
+  ModelTelemetry.layerSinkNoop,
+  ModelTelemetry.InvocationLifecycle,
+  ModelTelemetry.InvocationLifecycleFailed,
+  ModelTelemetry.layerInvocationLifecycleNoop,
+  ModelTelemetry.isInvocationLifecycleFailed,
+  ModelTelemetry.classifyFailureCategory,
+] as const
+const packageTelemetrySink: Layer.Layer<ModelTelemetry.Sink> = Layer.succeed(ModelTelemetry.Sink, {
+  deliver: (_batch) => Effect.void,
+})
+const packageInvocationLifecycle: Layer.Layer<ModelTelemetry.InvocationLifecycle> = Layer.succeed(
+  ModelTelemetry.InvocationLifecycle,
+  {
+    beforeAttempt: (_input) => Effect.void,
+    completeAttempt: (_input) => Effect.void,
+    failAttempt: (_input) => Effect.void,
+  },
+)
+const packageSinkFailed = ModelTelemetry.SinkFailed.make({ message: "telemetry sink unavailable" })
+const packageInvocationLifecycleFailed = ModelTelemetry.InvocationLifecycleFailed.make({
+  message: "telemetry lifecycle unavailable",
+})
+declare const packagePreviewRuntime: Pick<Runtime.Service, "previews">
+const packagePreviewStream: Stream.Stream<Runtime.ModelPreviewEvent> = packagePreviewRuntime.previews({ runId: "run-42" })
+// @ts-expect-error Telemetry instrumentation belongs to the model loop.
+void ModelTelemetry.CurrentInstrumentation
+// @ts-expect-error Compaction correlation belongs to the model loop.
+void ModelTelemetry.CurrentCompactionId
+// @ts-expect-error Summary-call correlation belongs to the model loop.
+void ModelTelemetry.CurrentSummaryCall
+// @ts-expect-error Summary-call state is not part of the public telemetry contract.
+type PackageSummaryCallCell = ModelTelemetry.SummaryCallCell
+// @ts-expect-error Active response construction belongs to the hosted model loop.
+void ActiveModelResponse.make
+void modelTelemetryRetainedValues
+void packageTelemetrySink
+void packageInvocationLifecycle
+void packageSinkFailed
+void packageInvocationLifecycleFailed
+void packagePreviewStream
+void Option.none<ModelTelemetryRetainedTypes | ActiveModelResponseReadOnlyRequirement | ActiveModelResponseReadOnlySnapshot>()
 const s3Options: S3.Options = {
   bucket: "generalist-package-smoke",
   region: "us-east-1",

@@ -3,7 +3,9 @@ import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
 import { ToolContext, ToolExecutor } from "../../../../src/index.js"
-import { ChildRuns, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { ChildRuns, Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
   completedResult,
@@ -82,7 +84,7 @@ const groupMembers = [
 
 const startGroup = (parentRunId: string, toolCallId = "start-group") =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const outcome = yield* ChildRuns.make(store).startGroup({
       parentRunId,
       toolCallId,
@@ -164,7 +166,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
   suite.effect("starts without blocking and resumes one durable join with ordered results", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const children = ChildRuns.make(store)
       const parent = yield* runtime.send({
         to: assistantAddress,
@@ -256,7 +258,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
   suite.effect("runs one blocking replay-safe group call and resumes the same parent exactly once", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const children = ChildRuns.make(store)
       const parent = yield* runtime.send({
         to: assistantAddress,
@@ -371,7 +373,7 @@ layer(memoryGroupLayer)("model-facing durable child groups", (suite) => {
   suite.effect("cancels a suspended group with its parent without resuming the join", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const children = ChildRuns.make(store)
       const parent = yield* runtime.send({
         to: assistantAddress,
@@ -423,7 +425,7 @@ it.live("persists one ordered child-group suspension and result across object st
       Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const children = ChildRuns.make(store)
           const parent = yield* runtime.send({
             to: assistantAddress,
@@ -481,7 +483,7 @@ it.live("persists one ordered child-group suspension and result across object st
       Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(yield* runtime.inspect(admitted.parentRunId)).toMatchObject({
             status: "waiting",
             waits: [{ waitId: "object-run-group", status: "open" }],
@@ -533,7 +535,7 @@ it.live("persists one ordered child-group suspension and result across object st
       Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const children = ChildRuns.make(store)
           const parent = yield* runtime.inspect(admitted.parentRunId)
           expect(parent.waits).toEqual([])
@@ -615,7 +617,7 @@ it.live("resumes one labelled singleton from canonical child settlement across o
       Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const parent = yield* runtime.send({
             to: assistantAddress,
             sessionId: "child-singleton:object",
@@ -658,7 +660,7 @@ it.live("resumes one labelled singleton from canonical child settlement across o
       Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(yield* runtime.inspect(admitted.input.parentRunId)).toMatchObject({
             status: "waiting",
             waits: [{ waitId: admitted.input.toolCallId, status: "open" }],
@@ -696,7 +698,7 @@ it.live("resumes one labelled singleton from canonical child settlement across o
       Effect.flatMap(Layer.build(objectGroupLayer(storage)), (context) =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(yield* ChildRuns.make(store).invoke(admitted.input)).toMatchObject({
             _tag: "Success",
             result: {

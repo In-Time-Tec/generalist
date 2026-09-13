@@ -7,8 +7,12 @@ import { HttpServerRequest } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host } from "generalist/host"
-import { ExecutableResolver, Runtime as RuntimeService, RunExecutor, RunStore } from "generalist/runtime"
-import { Server, type ServerEvent } from "generalist/server"
+import { ExecutableResolver, Runtime as RuntimeService } from "generalist/runtime"
+import { engineFor, make as makeApplication } from "../../src/runtime/hosting/application.js"
+import { RuntimeLifecycle } from "../../src/runtime/state/layer.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
+import { Server, type ClientServerEvent } from "generalist/server"
 import { handle } from "../../src/server/websocket.js"
 
 interface FakeSocket {
@@ -72,7 +76,8 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
   (it) => {
     it.effect("streams the route Session and cancels only an explicitly named member Run", () =>
       Effect.gen(function* () {
-        const agent = Agent.make({ name: "websocket-test" })
+        const privateMarker = "A10_WEBSOCKET_PRIVATE_INSTRUCTION_MARKER"
+        const agent = Agent.make({ name: "websocket-test", instructions: privateMarker })
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: "session-1" })
         const run = yield* host.runs.start(session.id, agent, "wait")
@@ -90,8 +95,11 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         )
 
         const output = yield* Queue.take(fake.outbound)
-        if (Socket.isCloseEvent(output) || output instanceof Uint8Array) return yield* Effect.die("expected HostEvent")
-        expect(yield* Server.eventCodec.decode(output)).toMatchObject({ _tag: "RunStarted", runId: run.id })
+        if (Socket.isCloseEvent(output) || output instanceof Uint8Array)
+          return yield* Effect.die("expected ClientEvent")
+        expect(output).not.toContain(privateMarker)
+        expect(output).not.toContain("executableRef")
+        expect(yield* Server.eventCodec.decode(output)).toMatchObject({ _tag: "RunChanged", run: { runId: run.id } })
 
         const command = yield* Schema.encodeEffect(Schema.fromJsonString(Server.ClientCommand))({
           _tag: "Cancel",
@@ -111,17 +119,23 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
     it.effect("rejects an empty cancel command identity as malformed before the Host is invoked", () =>
       Effect.gen(function* () {
         const agent = Agent.make({ name: "websocket-empty-command" })
-        const runtimeService = yield* RuntimeService.Runtime
+        const runtimeService = yield* Effect.flatMap(RuntimeService.Runtime, engineFor)
+        const store = yield* RunStore
+        const lifecycle = yield* RuntimeLifecycle
         const cancelInputs: Array<string> = []
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
           Effect.provideService(
             RuntimeService.Runtime,
-            RuntimeService.Runtime.of({
-              ...runtimeService,
-              cancel: (input) => {
-                cancelInputs.push(input.commandId)
-                return runtimeService.cancel(input)
+            makeApplication({
+              engine: {
+                ...runtimeService,
+                cancel: (input) => {
+                  cancelInputs.push(input.commandId)
+                  return runtimeService.cancel(input)
+                },
               },
+              views: store.views,
+              lifecycle,
             }),
           ),
         )
@@ -142,8 +156,8 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
 
         const started = yield* Queue.take(fake.outbound)
         if (Socket.isCloseEvent(started) || started instanceof Uint8Array)
-          return yield* Effect.die("expected RunStarted")
-        expect(yield* Server.eventCodec.decode(started)).toMatchObject({ _tag: "RunStarted", runId: run.id })
+          return yield* Effect.die("expected RunChanged")
+        expect(yield* Server.eventCodec.decode(started)).toMatchObject({ _tag: "RunChanged", run: { runId: run.id } })
 
         const malformed = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))({
           _tag: "Cancel",
@@ -182,11 +196,11 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
 
         const started = yield* Queue.take(fake.outbound)
         if (Socket.isCloseEvent(started) || started instanceof Uint8Array)
-          return yield* Effect.die("expected RunStarted")
-        expect(yield* Server.eventCodec.decode(started)).toMatchObject({ _tag: "RunStarted", runId: run.id })
+          return yield* Effect.die("expected RunChanged")
+        expect(yield* Server.eventCodec.decode(started)).toMatchObject({ _tag: "RunChanged", run: { runId: run.id } })
 
-        const store = yield* RunStore.RunStore
-        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const executor = yield* RunExecutor
         const claim = yield* store.claimExecution({
           commandId: "websocket-preview:claim",
           runId: run.id,
@@ -194,19 +208,20 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         })
         yield* executor.execute(claim)
 
-        let preview: ServerEvent | undefined
+        let preview: ClientServerEvent | undefined
         for (let index = 0; index < 10 && preview === undefined; index += 1) {
           const output = yield* Queue.take(fake.outbound)
           if (Socket.isCloseEvent(output) || output instanceof Uint8Array) continue
           const decoded = yield* Server.eventCodec.decode(output)
-          if (decoded._tag === "PreviewDelivery") preview = decoded
+          if (decoded._tag === "Preview") preview = decoded
         }
         expect(preview).toMatchObject({
-          _tag: "PreviewDelivery",
+          _tag: "Preview",
           sessionId: session.id,
           runId: run.id,
-          authorityAttemptFence: claim.attemptFence,
-          event: { _tag: "ModelPreview", attemptFence: claim.attemptFence },
+          attempt: 0,
+          channel: "final",
+          append: "live preview",
         })
 
         yield* Queue.offer(fake.inbound, new Socket.CloseEvent(1000))
@@ -257,17 +272,23 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
             Stream.concat(Stream.never),
           )
         const agent = Agent.make({ name: "websocket-preview-revoked" })
-        const runtimeService = yield* RuntimeService.Runtime
+        const runtimeService = yield* Effect.flatMap(RuntimeService.Runtime, engineFor)
+        const store = yield* RunStore
+        const lifecycle = yield* RuntimeLifecycle
         let authorityReads = 0
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } }).pipe(
           Effect.provideService(
             RuntimeService.Runtime,
-            RuntimeService.Runtime.of({
-              ...runtimeService,
-              previewAuthority: (runId) =>
-                Effect.sync(() => {
-                  authorityReads += 1
-                }).pipe(Effect.andThen(runtimeService.previewAuthority(runId))),
+            makeApplication({
+              engine: {
+                ...runtimeService,
+                previewAuthority: (runId) =>
+                  Effect.sync(() => {
+                    authorityReads += 1
+                  }).pipe(Effect.andThen(runtimeService.previewAuthority(runId))),
+              },
+              views: store.views,
+              lifecycle,
             }),
           ),
         )
@@ -287,23 +308,19 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         )
         yield* Queue.take(fake.outbound)
 
-        const store = yield* RunStore.RunStore
         const staleClaim = yield* store.claimExecution({
           commandId: "websocket-preview-revoked:stale-claim",
           runId: run.id,
           ownerId: objectWorkerId,
         })
-        const executor = yield* RunExecutor.RunExecutor
+        const executor = yield* RunExecutor
         const execution = yield* executor.execute(staleClaim).pipe(Effect.forkChild)
         let authorized = false
         while (!authorized) {
           const output = yield* Queue.take(fake.outbound)
           if (Socket.isCloseEvent(output) || output instanceof Uint8Array) continue
           const decoded = yield* Server.eventCodec.decode(output)
-          authorized =
-            decoded._tag === "PreviewDelivery" &&
-            decoded.event._tag === "ModelPreview" &&
-            decoded.event.changes.some((change) => change.delta.startsWith("authorized"))
+          authorized = decoded._tag === "Preview" && decoded.append.startsWith("authorized")
         }
         yield* Effect.yieldNow
         let pending = yield* Queue.poll(fake.outbound)
@@ -324,11 +341,7 @@ layer(Layer.mergeAll(runtime, model, Permissions.layerAllowAll, Approvals.layerA
         const queued = yield* Queue.poll(fake.outbound)
         if (Option.isSome(queued) && !Socket.isCloseEvent(queued.value) && !(queued.value instanceof Uint8Array)) {
           const decoded = yield* Server.eventCodec.decode(queued.value)
-          expect(
-            decoded._tag === "PreviewDelivery" &&
-              decoded.event._tag === "ModelPreview" &&
-              decoded.event.changes.some((change) => change.delta.startsWith("obsolete")),
-          ).toBe(false)
+          expect(decoded._tag === "Preview" && decoded.append.startsWith("obsolete")).toBe(false)
         }
         expect(authorityReads).toBe(3)
 

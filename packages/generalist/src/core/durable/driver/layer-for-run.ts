@@ -1,6 +1,6 @@
 import { Effect, Function, Layer, Option, Schema } from "effect"
 import { Prompt, Tool } from "effect/unstable/ai"
-import type { Agent, RunOptions } from "../../agent/service.js"
+import type { Agent } from "../../agent/service.js"
 import { make as makeLoopDriver, type LoopDriverOptions } from "../loop-driver.js"
 import { make, type RunBudget } from "../run-budget.js"
 import { DriverError, DriverStateInvalid, type DurableAgentDriver } from "../service.js"
@@ -9,6 +9,8 @@ import { DriverInterpreter, DriverJournal, journalNoop, make as makeInterpreter,
 import { Registry, SessionState } from "../component/services.js"
 import { initialize as initializeCapabilities } from "../../capability/state.js"
 import { LoopDriverState } from "../loop-driver-state.js"
+import { capabilitiesFor } from "../../agent/lifecycle/hosted/capability-binding.js"
+import type { HostedRunOptions } from "../../agent/lifecycle/hosted/options.js"
 
 const AgentInput = Schema.Struct({ toolkit: Schema.Unknown })
 
@@ -38,7 +40,7 @@ export const layerTest = layerInline
 /** Construct the inline driver Layer for one Agent run. */
 export const layerForRun: {
   <Tools extends Record<string, Tool.Any>, R, P, A>(
-    options: RunOptions,
+    options: HostedRunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
   ): (
@@ -46,7 +48,7 @@ export const layerForRun: {
   ) => Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
   <Tools extends Record<string, Tool.Any>, R, P, A>(
     agent: Agent<Tools, R, P, A, Schema.Top, Schema.Top>,
-    options: RunOptions,
+    options: HostedRunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
   ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid>
@@ -54,7 +56,7 @@ export const layerForRun: {
   (args) => args.length >= 1 && Schema.is(AgentInput)(args[0]),
   <Tools extends Record<string, Tool.Any>, R, P, A>(
     agent: Agent<Tools, R, P, A, Schema.Top, Schema.Top>,
-    options: RunOptions,
+    options: HostedRunOptions,
     prompt: Prompt.Prompt,
     budget?: RunBudget,
   ): Layer.Layer<DriverInterpreter, DriverError | DriverStateInvalid> => {
@@ -73,13 +75,14 @@ export const layerForRun: {
         }
         if (options.executableRef !== undefined) driverInput = { ...driverInput, executable: options.executableRef }
         const checkpoint = yield* driver.initial(driverInput)
-        if (agent.capabilities === undefined) return checkpoint
+        const capabilities = capabilitiesFor(agent)
+        if (capabilities === undefined) return checkpoint
         const state = yield* Schema.decodeUnknownEffect(LoopDriverState)(checkpoint.state).pipe(
           Effect.mapError((error) => DriverStateInvalid.make({ message: String(error) })),
         )
         return {
           ...checkpoint,
-          state: { ...state, capabilities: initializeCapabilities(state.capabilities, agent.capabilities) },
+          state: { ...state, capabilities: initializeCapabilities(state.capabilities, capabilities) },
         }
       }
       const checkpoint = options.driverCheckpoint

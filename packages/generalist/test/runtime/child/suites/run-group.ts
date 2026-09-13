@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer, Schema } from "effect"
-import { ChildRuns, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { ChildRuns, Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
   completedResult,
@@ -13,8 +15,8 @@ import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface ChildRunsRunGroupSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
+  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -28,7 +30,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
   options: ChildRunsRunGroupSuiteOptions<StoreError, Extra>,
 ) => {
   const suite = options.skip === true ? describe.skip : describe
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
   const activate = options.activate ?? (() => Effect.void)
   let sequence = 0
@@ -43,7 +45,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
   ) =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const id = `${options.name}:run-group:${label}:${sequence++}`
       const base = {
         to: assistantAddress,
@@ -746,7 +748,7 @@ export const childRunsRunGroupSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const id = `${options.name}:run-group:policy:${sequence++}`
           const parentRun = yield* runtime.send({
             to: assistantAddress,

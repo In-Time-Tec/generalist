@@ -53,6 +53,15 @@ const request = (source: string, input: Request["input"] = { value: 1 }, overrid
     signal: new AbortController().signal,
     deadlineMillis: 60_000,
     limits: { cpuMillis: 1_000, subrequests: 8, outputBytes: 4_096 },
+    budget: {
+      agentRuns: 0,
+      concurrency: 1,
+      toolCalls: 8,
+      tokens: 0,
+      wallClockMillis: 60_000,
+      logBytes: 4_096,
+      outputBytes: 4_096,
+    },
     capabilities: [{ operation: "callTool", names: ["echo"] }],
     ...overrides,
   }

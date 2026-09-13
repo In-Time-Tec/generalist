@@ -4,7 +4,8 @@ import { Prompt, Response as AiResponse, Tool, Toolkit } from "effect/unstable/a
 import { Agent, AgentEvent, Approvals, Permissions } from "generalist"
 import { decodeConfig as decodeOpenRouterConfig } from "generalist/providers/openrouter"
 import { TestModel } from "generalist/testing"
-import { Address, Errors, ExecutableManifest, Message, RunStore as RunStoreFacade } from "generalist/runtime"
+import { Address, Errors, ExecutableManifest, Message } from "generalist/runtime"
+import { RunStore as RunStoreFacade } from "../../../../src/runtime/run/store.js"
 import { layerRunStore } from "generalist/unstable/cloudflare/durable-objects"
 import type { Bucket } from "generalist/durability/r2"
 
@@ -28,7 +29,7 @@ const cryptoLayer = Layer.succeed(
       }).pipe(Effect.map((buffer) => new Uint8Array(buffer))),
   }),
 )
-const RunStore = RunStoreFacade.RunStore
+const RunStore = RunStoreFacade
 
 interface ObjectId {
   readonly name: string

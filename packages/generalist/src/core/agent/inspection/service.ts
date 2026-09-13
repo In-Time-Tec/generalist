@@ -28,11 +28,14 @@ export class RunNotFound extends ActionableTaggedError<RunNotFound>()("generalis
 /** Process-local Agent Run inspection seam. */
 export interface Service {
   readonly snapshot: (runId: RunId) => Effect.Effect<Snapshot, RunNotFound>
-  /** @internal */
+}
+
+interface Publishing {
   readonly start: (runId: RunId) => Effect.Effect<void>
-  /** @internal */
   readonly publish: (runId: RunId, event: Event) => Effect.Effect<void>
 }
+
+const publishers = new WeakMap<Service, Publishing>()
 
 export class Inspector extends Context.Service<Inspector, Service>()(
   "generalist/core/agent/inspection/service/Inspector",
@@ -95,31 +98,29 @@ export const layerMemory: Layer.Layer<Inspector> = Layer.effect(
   Inspector,
   Effect.gen(function* () {
     const states = yield* Ref.make<ReadonlyMap<RunId, State>>(new Map())
-    return Inspector.of({
-      start: (runId) =>
-        Effect.gen(function* () {
-          const startedAt = yield* Clock.currentTimeMillis
-          yield* Ref.update(states, (current) => {
-            if (current.has(runId)) return current
-            const updated = new Map(current)
-            updated.set(runId, emptyState(startedAt))
-            return updated
-          })
-        }),
-      publish: (runId, event) =>
-        Ref.update(states, (current) => {
-          const state = current.get(runId)
-          if (state === undefined) return current
+    const start: Publishing["start"] = (runId) =>
+      Effect.gen(function* () {
+        const startedAt = yield* Clock.currentTimeMillis
+        yield* Ref.update(states, (current) => {
+          if (current.has(runId)) return current
           const updated = new Map(current)
-          updated.set(runId, nextState(state, event))
+          updated.set(runId, emptyState(startedAt))
           return updated
-        }),
+        })
+      })
+    const publish: Publishing["publish"] = (runId, event) =>
+      Ref.update(states, (current) => {
+        const state = current.get(runId)
+        if (state === undefined) return current
+        const updated = new Map(current)
+        updated.set(runId, nextState(state, event))
+        return updated
+      })
+    const inspector = Inspector.of({
       snapshot: (runId) =>
         Effect.gen(function* () {
           const state = (yield* Ref.get(states)).get(runId)
-          if (state === undefined) {
-            return yield* RunNotFound.make({ runId })
-          }
+          if (state === undefined) return yield* RunNotFound.make({ runId })
           const now = yield* Clock.currentTimeMillis
           const snapshot: Snapshot = {
             runId,
@@ -131,6 +132,8 @@ export const layerMemory: Layer.Layer<Inspector> = Layer.effect(
           return state.lastEvent === undefined ? snapshot : { ...snapshot, lastEvent: state.lastEvent }
         }),
     })
+    publishers.set(inspector, { start, publish })
+    return inspector
   }),
 )
 
@@ -146,11 +149,15 @@ export const observe = <A extends Event, E, R>(runId: RunId, events: Stream.Stre
       Effect.map(
         Option.match({
           onNone: () => events,
-          onSome: (inspector) =>
-            Stream.concat(
-              Stream.fromEffect(inspector.start(runId)).pipe(Stream.drain),
-              events.pipe(Stream.tap((event) => inspector.publish(runId, event))),
-            ),
+          onSome: (inspector) => {
+            const publisher = publishers.get(inspector)
+            return publisher === undefined
+              ? events
+              : Stream.concat(
+                  Stream.fromEffect(publisher.start(runId)).pipe(Stream.drain),
+                  events.pipe(Stream.tap((event) => publisher.publish(runId, event))),
+                )
+          },
         }),
       ),
     ),

@@ -1,13 +1,21 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- These regressions reopen fresh object-backed host scopes. */
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, it, layer } from "@effect/vitest"
-import { Deferred, Effect, Fiber, Layer } from "effect"
+import { Context, Deferred, Effect, Fiber, Layer } from "effect"
 import { Approvals, BlobStore, Permissions } from "generalist"
 import { Host } from "generalist/host"
-import { ExecutableResolver, RunStore } from "generalist/runtime"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
-import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer, type CrdtService } from "generalist/unstable/artifact"
+import {
+  Artifact,
+  ArtifactCrdt,
+  Artifacts,
+  Yjs,
+  layer as artifactLayer,
+  type CrdtService,
+} from "generalist/unstable/artifact"
 import { ObjectStore } from "../../src/durability/object-store.js"
+import { RunStore } from "../../src/runtime/run/store.js"
 import { makeObjectStorage, objectRuntimeLayer } from "../runtime/execution/object.js"
 import type { Client } from "../../src/testing/durability/index.js"
 
@@ -20,12 +28,12 @@ const runtime = objectRuntimeLayer(
   },
   memoryStorage,
 ).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, memoryStorage.store))),
+)
+const artifacts = artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore))
 const services = Layer.mergeAll(
-  runtime,
-  BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
-    Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, memoryStorage.store))),
-  ),
-  artifactLayer,
+  artifacts,
   Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
   TestModel.layer([]),
@@ -33,20 +41,21 @@ const services = Layer.mergeAll(
 )
 
 const objectServices = (client: Client) =>
-  Layer.mergeAll(
-    objectRuntimeLayer(
+  (() => {
+    const runtimeLayer = objectRuntimeLayer(
       { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
       client,
-      false,
-    ).pipe(Layer.provide(ExecutableResolver.layerStatic([]))),
-    BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+    ).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+    const blobStoreLayer = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
       Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, client.store))),
-    ),
-    artifactLayer,
-    Permissions.layerAllowAll,
-    Approvals.layerAutoApprove,
-    TestModel.layer([]),
-  )
+    )
+    return Layer.mergeAll(
+      artifactLayer.pipe(Layer.provideMerge(runtimeLayer), Layer.provideMerge(blobStoreLayer)),
+      Permissions.layerAllowAll,
+      Approvals.layerAutoApprove,
+      TestModel.layer([]),
+    )
+  })()
 
 const provideObject = <A, E, R>(client: Client, effect: Effect.Effect<A, E, R>) =>
   Effect.scoped(
@@ -152,7 +161,7 @@ layer(services)("Artifact public retries", (suite) => {
   suite.effect("does not mutate Artifact state during read-only inspection", () =>
     Effect.gen(function* () {
       const document = yield* Artifact.open("retry-read.md", { crdt: Yjs.layer(), initial: "draft" })
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const before = yield* store.artifactHead({ artifact: document.name })
       expect(yield* Artifact.read(document)).toMatchObject({ version: 0, content: "draft" })
       const after = yield* store.artifactHead({ artifact: document.name })
@@ -164,8 +173,8 @@ layer(services)("Artifact public retries", (suite) => {
 const reopenStorage = makeObjectStorage()
 const concurrentOpenStorage = makeObjectStorage()
 const lostAckStorage = makeObjectStorage()
-const genesisKey = "environments/test/v1/tenants/runtime/partitions/conformance/commits/00000000000000000000.json"
-const commitKey = "environments/test/v1/tenants/runtime/partitions/conformance/commits/00000000000000000001.json"
+const commitPrefix = "environments/test/v1/tenants/runtime/partitions/conformance/commits/"
+const commitKey = (sequence: number): string => `${commitPrefix}${sequence.toString().padStart(20, "0")}.json`
 
 it.effect("reconciles a successful HumanEdit after fresh Layer reopen", () =>
   Effect.gen(function* () {
@@ -193,37 +202,66 @@ it.effect("reconciles a successful HumanEdit after fresh Layer reopen", () =>
   }),
 )
 it.effect("reconciles concurrent public opens with nondeterministic initial snapshots", () =>
-  Effect.gen(function* () {
-    const firstClient = yield* concurrentOpenStorage.connect
-    const secondClient = yield* concurrentOpenStorage.connect
-    const firstPause = yield* firstClient.faults.pauseNextCreate(genesisKey)
-    const secondPause = yield* secondClient.faults.pauseNextCreate(genesisKey)
-    const first = yield* Effect.forkChild(
-      provideObject(
-        firstClient,
-        Effect.gen(function* () {
-          const document = yield* Artifact.open("retry-open-race.md", { crdt: Yjs.layer(), initial: "draft" })
-          return yield* Artifact.read(document)
-        }),
-      ),
-    )
-    yield* firstPause.entered
-    const second = yield* Effect.forkChild(
-      provideObject(
-        secondClient,
-        Effect.gen(function* () {
-          const document = yield* Artifact.open("retry-open-race.md", { crdt: Yjs.layer(), initial: "draft" })
-          return yield* Artifact.read(document)
-        }),
-      ),
-    )
-    yield* secondPause.entered
-    yield* firstPause.release
-    yield* secondPause.release
-    const reads = [yield* Fiber.join(first), yield* Fiber.join(second)]
-    expect(reads[0]).toEqual(reads[1])
-    expect(reads[0]).toMatchObject({ artifact: "retry-open-race.md", version: 0, content: "draft" })
-  }),
+  Effect.scoped(
+    Effect.gen(function* () {
+      const client = yield* concurrentOpenStorage.connect
+      const runtimeLayer = objectRuntimeLayer(
+        { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
+        client,
+      ).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+      const blobStoreLayer = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+        Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, client.store))),
+      )
+      const runtimeContext = yield* Layer.build(Layer.merge(runtimeLayer, blobStoreLayer))
+      const runtimeService = Context.get(runtimeContext, Runtime.Runtime)
+      const blobs = Context.get(runtimeContext, BlobStore.BlobStore)
+      const crdtContext = yield* Layer.build(Yjs.layer())
+      const crdt = Context.get(crdtContext, ArtifactCrdt)
+      const bothObservedMissing = yield* Deferred.make<void>()
+      const bothCreatedSnapshots = yield* Deferred.make<void>()
+      let emptyCalls = 0
+      let snapshots = 0
+      const gated: CrdtService = {
+        ...crdt,
+        empty: (initial) =>
+          Effect.gen(function* () {
+            emptyCalls += 1
+            if (emptyCalls === 2) yield* Deferred.succeed(bothObservedMissing, undefined)
+            yield* Deferred.await(bothObservedMissing)
+            const snapshot = yield* crdt.empty(initial)
+            snapshots += 1
+            if (snapshots === 2) yield* Deferred.succeed(bothCreatedSnapshots, undefined)
+            yield* Deferred.await(bothCreatedSnapshots)
+            return snapshot
+          }),
+      }
+      const runtimeDependencies = Layer.mergeAll(
+        Layer.succeed(Runtime.Runtime, runtimeService),
+        Layer.succeed(BlobStore.BlobStore, blobs),
+      )
+      const firstContext = yield* Layer.build(Layer.fresh(artifactLayer).pipe(Layer.provide(runtimeDependencies)))
+      const secondContext = yield* Layer.build(Layer.fresh(artifactLayer).pipe(Layer.provide(runtimeDependencies)))
+      const firstArtifacts = Context.get(firstContext, Artifacts)
+      const secondArtifacts = Context.get(secondContext, Artifacts)
+      const first = yield* Effect.forkChild(
+        firstArtifacts
+          .open("retry-open-race.md", { crdt: Layer.succeed(ArtifactCrdt, gated), initial: "draft" })
+          .pipe(Effect.flatMap(Artifact.read)),
+      )
+      const second = yield* Effect.forkChild(
+        secondArtifacts
+          .open("retry-open-race.md", { crdt: Layer.succeed(ArtifactCrdt, gated), initial: "draft" })
+          .pipe(Effect.flatMap(Artifact.read)),
+      )
+      yield* Deferred.await(bothObservedMissing)
+      expect(emptyCalls).toBe(2)
+      yield* Deferred.await(bothCreatedSnapshots)
+      expect(snapshots).toBe(2)
+      const reads = [yield* Fiber.join(first), yield* Fiber.join(second)]
+      expect(reads[0]).toEqual(reads[1])
+      expect(reads[0]).toMatchObject({ artifact: "retry-open-race.md", version: 0, content: "draft" })
+    }),
+  ),
 )
 
 it.effect("reconciles a successful HumanEdit after lost acknowledgement", () =>
@@ -234,8 +272,12 @@ it.effect("reconciles a successful HumanEdit after lost acknowledgement", () =>
       Effect.gen(function* () {
         const document = yield* Artifact.open("retry-lost-ack.md", { crdt: Yjs.layer(), initial: "draft" })
         const host = yield* Host.make({ revision: "local", agents: {} })
-        yield* firstClient.faults.failNextCreate({ key: commitKey, phase: "after" })
-        yield* firstClient.faults.failNextRead({ key: commitKey })
+        const commits = yield* firstClient.store.list(commitPrefix)
+        expect(commits.cursor).toBeUndefined()
+        expect(commits.keys).toEqual(Array.from({ length: commits.keys.length }, (_, sequence) => commitKey(sequence)))
+        const nextCommit = commitKey(commits.keys.length)
+        yield* firstClient.faults.failNextCreate({ key: nextCommit, phase: "after" })
+        yield* firstClient.faults.failNextRead({ key: nextCommit })
         return yield* host.artifacts.edit(document.name, edit("human:retry-lost-ack", 0, "!")).pipe(Effect.flip)
       }),
     )

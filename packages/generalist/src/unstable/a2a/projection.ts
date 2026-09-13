@@ -2,7 +2,7 @@ import { Role, TaskState, type Artifact, type Message, type Part, type Task, typ
 import type { RunInspection } from "../../runtime/run.js"
 import type { RunCompleted, RunEvent } from "../../runtime/run/event.js"
 import { collect as collectHistory } from "../../runtime/run/history/index.js"
-import type { Service as RuntimeService } from "../../runtime/service.js"
+import type { Service as RuntimeService } from "../../runtime/engine.js"
 import { Effect, Function, Predicate, Schema } from "effect"
 import { TaskProjectionFailed } from "./errors.js"
 

@@ -21,11 +21,8 @@ import { Socket } from "effect/unstable/socket"
 import type { BudgetLimits } from "../core/durable/run-budget.js"
 import type { Put as BlobPut } from "../blob-store/index.js"
 import type { EncodedAgentInput } from "../host/index.js"
-import { HostEvent } from "../host/event.js"
 import type { Decision } from "../runtime/operation/approval.js"
 import type { UnknownResolution } from "../runtime/execution/recovery/operator.js"
-import type { Cursor } from "../runtime/cursor.js"
-import type { HostSessionSnapshot } from "../runtime/session/host.js"
 import { make as makeSessionClient, type SessionClient } from "./session-client.js"
 import {
   api,
@@ -36,7 +33,8 @@ import {
   type ToolStartPayload,
 } from "./api.js"
 import { ApiError, InvalidConnectOptions, ReconnectExhausted, TransportError, Unauthorized } from "./errors.js"
-import { encodeCommand, eventCodec, type ClientCommand, type ServerEvent } from "./wire.js"
+import { encodeCommand, eventCodec, type ClientCommand } from "./wire.js"
+import type { ClientCursor, ClientEvent, ClientServerEvent, ClientSessionSnapshot } from "./projection/index.js"
 
 type RawClient = HttpApiClient.ForApi<typeof api>
 type SnapshotError = Effect.Error<ReturnType<RawClient["sessions"]["snapshot"]>>
@@ -58,9 +56,9 @@ export interface ConnectionSnapshot {
   readonly _tag: "ConnectionSnapshot"
   /** The originating WebSocket attempt epoch, including attempts whose snapshot load failed. */
   readonly epoch: number
-  readonly snapshot: HostSessionSnapshot
+  readonly snapshot: ClientSessionSnapshot
 }
-export type ConnectionEvent = ServerEvent | ConnectionSnapshot
+export type ConnectionEvent = ClientServerEvent | ConnectionSnapshot
 
 export interface ConnectOptions {
   readonly sessionId: string
@@ -69,7 +67,7 @@ export interface ConnectOptions {
 }
 
 export interface Connection {
-  readonly snapshot: HostSessionSnapshot
+  readonly snapshot: ClientSessionSnapshot
   readonly events: Stream.Stream<ConnectionEvent, TransportError>
   readonly cancel: (runId: string, commandId: string, reason?: string) => Effect.Effect<void, TransportError>
   readonly status: Stream.Stream<ConnectionStatus>
@@ -140,9 +138,9 @@ export interface Client {
   readonly events: {
     readonly subscribe: (options: {
       readonly sessionId: string
-      readonly cursor?: Cursor
+      readonly cursor?: ClientCursor
       readonly reconnect?: ReconnectSchedule
-    }) => Stream.Stream<HostEvent, ClientStreamError>
+    }) => Stream.Stream<ClientEvent, ClientStreamError>
     readonly connect: (
       options: ConnectOptions,
     ) => Effect.Effect<Connection, InvalidConnectOptions | HttpError, Scope.Scope | Socket.WebSocketConstructor>
@@ -220,8 +218,8 @@ const reconnectError = (error: SocketClientError): TransportError =>
 
 const subscribe = (
   raw: RawClient,
-  options: { readonly sessionId: string; readonly cursor?: Cursor; readonly reconnect?: ReconnectSchedule },
-): Stream.Stream<HostEvent, ClientStreamError> =>
+  options: { readonly sessionId: string; readonly cursor?: ClientCursor; readonly reconnect?: ReconnectSchedule },
+): Stream.Stream<ClientEvent, ClientStreamError> =>
   Stream.unwrap(
     Ref.make(options.cursor).pipe(
       Effect.map((cursorRef) => {
@@ -238,17 +236,17 @@ const subscribe = (
               events.pipe(
                 Stream.mapEffect((item) => {
                   if (item.data.sessionId !== options.sessionId) {
-                    return Effect.fail(transportError("HostEvent belongs to another Session", "protocol"))
+                    return Effect.fail(transportError("ClientEvent belongs to another Session", "protocol"))
                   }
-                  if (item.id !== String(item.data.cursor)) {
-                    return Effect.fail(transportError("SSE event ID does not match HostEvent cursor", "protocol"))
+                  if (item.id !== item.data.cursor) {
+                    return Effect.fail(transportError("SSE event ID does not match ClientEvent cursor", "protocol"))
                   }
                   return Ref.get(cursorRef).pipe(
-                    Effect.flatMap((cursor) => {
-                      if (cursor !== undefined && item.data.cursor <= cursor)
-                        return Effect.succeed(Option.none<HostEvent>())
-                      return Ref.set(cursorRef, item.data.cursor).pipe(Effect.as(Option.some(item.data)))
-                    }),
+                    Effect.flatMap((cursor) =>
+                      cursor === item.data.cursor
+                        ? Effect.succeed(Option.none<ClientEvent>())
+                        : Ref.set(cursorRef, item.data.cursor).pipe(Effect.as(Option.some(item.data))),
+                    ),
                   )
                 }),
                 Stream.filterMap((event) =>
@@ -279,8 +277,8 @@ const writeSocket = (
   )
 
 const connect = (
-  loadSnapshot: Effect.Effect<HostSessionSnapshot, HttpError>,
-  urlFor: (cursor: Cursor | undefined) => string,
+  loadSnapshot: Effect.Effect<ClientSessionSnapshot, HttpError>,
+  urlFor: (cursor: ClientCursor | undefined) => string,
   options: ConnectOptions,
 ): Effect.Effect<Connection, InvalidConnectOptions | HttpError, Scope.Scope | Socket.WebSocketConstructor> =>
   Effect.gen(function* () {
@@ -336,7 +334,7 @@ const connect = (
             const handleRaw = (data: string | Uint8Array): void => {
               if (!active) return
               if (data instanceof Uint8Array) {
-                Deferred.doneUnsafe(overflow, Effect.fail(transportError("binary HostEvent", "protocol")))
+                Deferred.doneUnsafe(overflow, Effect.fail(transportError("binary ClientEvent", "protocol")))
               } else if (!Queue.offerUnsafe(ingress, data)) {
                 Deferred.doneUnsafe(overflow, Effect.fail(transportError("event buffer capacity exceeded", "socket")))
               }
@@ -349,19 +347,13 @@ const connect = (
                     Effect.gen(function* () {
                       if (!active) return
                       if (event.sessionId !== options.sessionId)
-                        return yield* transportError("HostEvent belongs to another Session", "protocol")
-                      if (event._tag === "PreviewDelivery") {
-                        if (
-                          event.runId !== event.event.runId ||
-                          event.authorityAttemptFence !== event.event.attemptFence
-                        ) {
-                          return yield* transportError("preview delivery does not match Host authority", "protocol")
-                        }
+                        return yield* transportError("Client event belongs to another Session", "protocol")
+                      if (event._tag === "Preview") {
                         yield* Queue.offer(eventQueue, event)
                         return
                       }
                       const admittedCursor = yield* Ref.get(cursorRef)
-                      if (event.cursor <= admittedCursor) return
+                      if (event.cursor === admittedCursor) return
                       yield* Queue.offer(eventQueue, event)
                       yield* Ref.set(cursorRef, event.cursor)
                     }),
@@ -437,7 +429,7 @@ export const client = (options: {
     const raw = yield* HttpApiClient.make(api, { baseUrl: options.baseUrl })
     const urls = HttpApiClient.urlBuilder(api, { baseUrl: options.baseUrl })
     const basePath = new URL(options.baseUrl).pathname.replace(/\/$/, "")
-    const websocketUrl = (sessionId: string, cursor: Cursor | undefined): string => {
+    const websocketUrl = (sessionId: string, cursor: ClientCursor | undefined): string => {
       const url = new URL(
         urls.events.connect({
           params: { id: sessionId },

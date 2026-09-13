@@ -3,7 +3,10 @@ import { DateTime, Effect, Layer, Option, Redacted, Schema, Scope, Stream } from
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, Session } from "../../../../src/index.js"
 import type { Simulator } from "../../../../src/testing/durability/index.js"
-import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { assistantAddress, assistantRef, registrationsFor, resolverLayer } from "../../../runtime/execution/fixtures.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
 import type { RuntimeServices } from "../../../../src/runtime/state/layer.js"
@@ -71,7 +74,7 @@ it.effect("reopens a Session entry with redacted provider headers and authored e
       storage,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const runStore = yield* RunStore.RunStore
+        const runStore = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId,
@@ -91,7 +94,7 @@ it.effect("reopens a Session entry with redacted provider headers and authored e
     yield* withObject(
       storage,
       Effect.gen(function* () {
-        const reader = Option.getOrThrow(yield* (yield* RunStore.RunStore).sessionReader(sessionId))
+        const reader = Option.getOrThrow(yield* (yield* RunStore).sessionReader(sessionId))
         const [entry] = yield* reader.path()
         expect(entry?._tag).toBe("ModelResponse")
         if (entry?._tag !== "ModelResponse") return
@@ -207,7 +210,7 @@ it.effect("reuses equivalent durable payloads and rejects changed Session identi
       storage,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const runStore = yield* RunStore.RunStore
+        const runStore = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId,
@@ -234,7 +237,7 @@ it.effect("reuses equivalent durable payloads and rejects changed Session identi
       storage,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const runStore = yield* RunStore.RunStore
+        const runStore = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId,
@@ -353,8 +356,8 @@ it.effect("reopens and hydrates a model response without persisting provider tra
     const runId = yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:model-response-redaction",
@@ -376,7 +379,7 @@ it.effect("reopens and hydrates a model response without persisting provider tra
     yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const event = (yield* runtime.history({ runId, cursor: -1, limit: 100 })).find(
           (candidate) => candidate._tag === "ModelResponseCommitted",
         )

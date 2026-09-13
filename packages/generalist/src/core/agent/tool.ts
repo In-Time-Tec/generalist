@@ -66,10 +66,10 @@ export const register: {
     )
     return {
       name: agent.name,
-      run: (input, options) =>
+      run: (input, options, ...guard) =>
         Effect.scoped(
           Effect.flatMap(Layer.build(registrationLayer), (services) =>
-            run(agent, input, options).pipe(Effect.provideContext(services)),
+            run(agent, input, options, ...guard).pipe(Effect.provideContext(services)),
           ),
         ),
       requirements: (value) => value,

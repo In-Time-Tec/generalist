@@ -1,7 +1,7 @@
 import { Crypto, Deferred, Effect, Layer, PlatformError, Scope } from "effect"
 import type { Bucket } from "../../../../src/durability/r2.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
-import { Runtime } from "../../../../src/runtime/service.js"
+import { Runtime } from "../../../../src/runtime/engine.js"
 import {
   layerRunStore,
   make,

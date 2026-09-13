@@ -11,10 +11,8 @@ import { adapt, invokeGenerateObject, invokeGenerateText, type StreamTextOptions
 import { type InvalidToolCallParameters, isInvalidToolCallParameters } from "./tool-call-validation.js"
 import { type Classification, type Misconfigured, apply, validate } from "./resilience.js"
 import type { TerminationFailure } from "./stream-termination.js"
+import { CurrentCompactionId, CurrentPurpose, CurrentSummaryCall } from "./telemetry/context.js"
 import {
-  CurrentCompactionId,
-  CurrentPurpose,
-  CurrentSummaryCall,
   InvocationLifecycleFailed,
   type FailureCategory,
   classifyFailureCategory,

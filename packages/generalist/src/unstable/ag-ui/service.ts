@@ -3,21 +3,23 @@ import { RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { origin, type Cursor } from "../../runtime/cursor.js"
 import type { Address } from "../../runtime/address.js"
-import {
-  Runtime,
-  type ActivateError,
-  type EventsError,
-  type InspectError,
-  type Service as RuntimeService,
-  type RespondApprovalError,
-  type RespondError,
-  type SendError,
-  type SessionEntryError,
-} from "../../runtime/service.js"
-import { CursorExpired, SubscriberLagged } from "../../runtime/errors.js"
+import type {
+  ActivateError,
+  EventsError,
+  InspectError,
+  Service as RuntimeService,
+  RespondApprovalError,
+  RespondError,
+  SendError,
+  SessionEntryError,
+  RuntimeInspection,
+} from "../../runtime/engine.js"
+import { Runtime } from "../../runtime/service.js"
+import { engineFor } from "../../runtime/hosting/application.js"
+import { CursorExpired, RuntimeUnavailable, SubscriberLagged } from "../../runtime/errors.js"
 import type { RunEvent } from "../../runtime/run/event.js"
 import { EventInvalid, InputMalformed, InputRejected, ResumeMismatch, type ValueNotSerializable } from "./errors.js"
-import { project, projectModelResponse, stateSnapshot } from "./projection.js"
+import { project, projectModelResponse, projectStateSnapshot, stateSnapshot } from "./projection.js"
 
 /** @experimental */
 export interface LayerOptions {
@@ -84,6 +86,34 @@ const isBoundary = (event: RunEvent): boolean =>
   event._tag === "RunCancelled" ||
   event._tag === "OperationUnknown"
 
+const rootRunIdFor = (runtime: RuntimeService, inspection: RuntimeInspection) =>
+  Effect.gen(function* () {
+    if (inspection.depth > inspection.treePolicy.maxDepth)
+      return yield* RuntimeUnavailable.make({ message: "Run ancestry has an invalid depth" })
+    let current = inspection
+    let remaining = inspection.treePolicy.maxDepth
+    const seen = new Set<string>()
+    while (current.parentRunId !== undefined) {
+      if (remaining <= 0 || current.depth <= 0 || seen.has(current.runId))
+        return yield* RuntimeUnavailable.make({ message: "Run ancestry has an invalid depth" })
+      seen.add(current.runId)
+      const parent = yield* runtime.inspect(current.parentRunId)
+      if (parent.depth >= current.depth)
+        return yield* RuntimeUnavailable.make({ message: "Run ancestry has a non-decreasing depth" })
+      current = parent
+      remaining -= 1
+    }
+    return current.runId
+  })
+
+const clientStateSnapshot = (runtime: RuntimeService, runId: string) =>
+  Effect.gen(function* () {
+    const inspection = yield* runtime.inspect(runId)
+    const rootRunId = yield* rootRunIdFor(runtime, inspection)
+    const projected = yield* projectStateSnapshot(inspection, rootRunId)
+    return { event: yield* stateSnapshot(projected), cursor: inspection.lastSequence }
+  })
+
 const recover = (
   runtime: RuntimeService,
   runId: string,
@@ -105,11 +135,11 @@ const recover = (
         Schema.is(SubscriberLagged)(error) || Schema.is(CursorExpired)(error),
       () =>
         Stream.unwrap(
-          runtime.snapshot(runId).pipe(
-            Effect.map((snapshot) =>
+          clientStateSnapshot(runtime, runId).pipe(
+            Effect.map(({ event, cursor: recoveredCursor }) =>
               Stream.concat(
-                Stream.fromEffect(stateSnapshot(snapshot)),
-                Stream.suspend(() => recover(runtime, runId, threadId, snapshot.cursor)),
+                Stream.fromEffect(Effect.succeed(event)),
+                Stream.suspend(() => recover(runtime, runId, threadId, recoveredCursor)),
               ),
             ),
           ),
@@ -118,12 +148,12 @@ const recover = (
   )
 
 /** @experimental */
-export const layer = (options: LayerOptions): Layer.Layer<AGUI, never, Runtime> =>
+export const layer = (options: LayerOptions): Layer.Layer<AGUI, RuntimeUnavailable, Runtime> =>
   Layer.effect(
     AGUI,
     Effect.gen(function* () {
-      const runtime = yield* Runtime
-      const snapshot = (runId: string) => runtime.snapshot(runId).pipe(Effect.flatMap(stateSnapshot))
+      const runtime = yield* Effect.flatMap(Runtime, engineFor)
+      const snapshot = (runId: string) => clientStateSnapshot(runtime, runId).pipe(Effect.map(({ event }) => event))
       const run = (untrusted: RunAgentInput): Stream.Stream<AGUIEvent, RunError> =>
         Stream.unwrap(
           Effect.gen(function* () {

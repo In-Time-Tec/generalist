@@ -61,7 +61,7 @@ import type { CommitModelResponseInput } from "../execution/model-response/commi
 import type { CommitInterruptedModelResponseInput } from "../execution/model-response/interrupted.js"
 import { ExecutionResult, type ExecutionCheckpoint, type ExecutionSuspension } from "../execution/state.js"
 import { RunFailure, type RewardInput, type RunEvent } from "./event.js"
-import type { CancelInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "../service.js"
+import type { CancelInput, RespondInput, SignalInput, SpawnInput, StartReceipt } from "../engine.js"
 import type { ResolveOperationInput } from "../operation/resolution.js"
 import type { RespondInput as RespondApprovalInput } from "../operation/approval.js"
 import type { OperationRecord, OperationStatus, RetryReason } from "../operation/record.js"
@@ -165,6 +165,7 @@ export const PendingRunOutcome = Schema.Union([
 export type PendingRunOutcome = typeof PendingRunOutcome.Type
 
 export interface Service {
+  readonly views: import("../state/inspection/views.js").Service
   readonly info: Effect.Effect<StoreInfo, DurabilityFailure>
   /** Read-only durable conversation history for one Session identity. */
   readonly sessionReader: (sessionId: string) => Effect.Effect<Option.Option<SessionReader>, DurabilityFailure>
@@ -335,6 +336,9 @@ export interface Service {
   readonly cancel: (
     input: CommandIdentity & CancelInput,
   ) => Effect.Effect<void, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly cancelScopedChild: (
+    input: ExecutionClaim & CommandIdentity & { readonly childRunId: string; readonly reason?: string },
+  ) => Effect.Effect<void, WorkerMutationError | import("../child/admission.js").ChildParentageInvalid>
   readonly cancelSession: (
     input: CommandIdentity & {
       readonly sessionId: string
@@ -455,9 +459,11 @@ export interface Service {
   }) => Effect.Effect<HostSession, SessionConflict | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure>
   readonly submitSessionInput: (
     input: import("../session/queue.js").SubmitInput,
+    resolveSelection?: import("../session/queue.js").SelectionResolver,
   ) => Effect.Effect<
     import("../session/queue.js").QueueReceipt,
     | import("../session/queue.js").SessionQueueConflict
+    | import("../errors.js").UnknownAgent
     | SessionNotFound
     | PayloadTooLarge
     | RuntimeUnavailable
@@ -600,6 +606,10 @@ export interface Service {
   readonly recordReward: (
     input: CommandIdentity & RewardInput,
   ) => Effect.Effect<void, RunNotFound | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure>
+  /** Read canonical reward-command provenance for private failure translation. @internal */
+  readonly lookupRewardCommand: (
+    commandId: string,
+  ) => Effect.Effect<RewardInput | undefined, RuntimeUnavailable | DurabilityFailure>
   readonly treeReplay: (input: {
     readonly rootRunId: string
     readonly position: number
@@ -754,6 +764,15 @@ export interface Service {
   readonly loadExecution: (
     runId: string,
   ) => Effect.Effect<ExecutionRecord, RunNotFound | RuntimeUnavailable | DurabilityFailure>
+  readonly assertExecutionClaim: (
+    input: ExecutionClaim,
+  ) => Effect.Effect<
+    void,
+    | RuntimeUnavailable
+    | DurabilityFailure
+    | import("./ownership-errors.js").StaleClaim
+    | import("./ownership-errors.js").StaleSessionClaim
+  >
   readonly releaseExecution: (input: ExecutionClaim) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
   readonly saveExecution: (
     input: CommandIdentity &

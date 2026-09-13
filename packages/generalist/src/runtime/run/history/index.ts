@@ -1,6 +1,6 @@
 import { Effect } from "effect"
 import { RuntimeUnavailable } from "../../errors.js"
-import type { EventsError, Service } from "../../service.js"
+import type { EventsError, Service } from "../../engine.js"
 import type { RunEvent } from "../event.js"
 
 /** Collect a fixed snapshot journal in bounded requests; the resulting projection remains lossless. */

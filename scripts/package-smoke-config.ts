@@ -118,6 +118,16 @@ export const minimumConsumerProfiles = [
       { specifier: "generalist/repl", runtimes: nodeAndBun },
       { specifier: "generalist/repl/bun", runtimes: bunOnly },
       { specifier: "generalist/runtime", runtimes: nodeAndBun, exports: ["Runtime"] },
+      {
+        specifier: "generalist/runtime/execution-scope",
+        runtimes: nodeAndBun,
+        exports: ["ExecutionScopeRetired", "ChildCommandConflict", "ChildPlacementDenied"],
+      },
+      {
+        specifier: "generalist/runtime/inspection",
+        runtimes: nodeAndBun,
+        exports: ["Inspection", "PartitionInspection", "layer"],
+      },
       { specifier: "generalist/runtime/native-layer-environment", runtimes: nodeAndBun },
       { specifier: "generalist/tasks", runtimes: nodeAndBun, exports: ["layer", "update"] },
       {
@@ -415,6 +425,8 @@ export const exactPackageExports = [
   "./repl",
   "./repl/bun",
   "./runtime",
+  "./runtime/execution-scope",
+  "./runtime/inspection",
   "./runtime/native-layer-environment",
   "./sandbox",
   "./server",

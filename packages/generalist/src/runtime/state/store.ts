@@ -36,6 +36,8 @@ import { commands as admissionCommands } from "../../durability/internal/runtime
 import { commands as operationCommands } from "../../durability/internal/runtime-command-operation.js"
 import { commands as controlCommands, externalCommands } from "../../durability/internal/runtime-command-control.js"
 import { idempotencyKey, waitMapKey, type RuntimeState } from "./projection.js"
+import { make as makeInspectionViews } from "./inspection/views.js"
+import { ChildParentageInvalid } from "../child/admission.js"
 import { admitSend, admitSpawn, admitStart } from "./store/admission/accept.js"
 import { normalize as normalizeTreePolicy, TreePolicy } from "../tree/policy.js"
 import { activateRoot } from "./store/admission/activation.js"
@@ -200,6 +202,7 @@ const makeStoreServices = (options: Options) =>
             return yield* ForkSequenceInvalid.make({ runId, sequence, lastSequence: run.lastSequence })
           })
     const runStore = RunStore.of({
+      views: makeInspectionViews(readState),
       configureDelegationPolicy: (policy) =>
         modifyState(commands.configureDelegationPolicy, [policy], (state, [prepared]) =>
           Effect.gen(function* () {
@@ -354,6 +357,31 @@ const makeStoreServices = (options: Options) =>
       advanceSchedule: (input) =>
         update(commands.advanceSchedule, [input], (state, [preparedInput]) => advanceSchedule(state, preparedInput)),
       cancel: (input) => update(commands.cancel, [input], (state, [preparedInput]) => cancel(state, preparedInput)),
+      assertExecutionClaim: (input) => readState.pipe(Effect.flatMap((state) => requireExecutionClaim(state, input))),
+      cancelScopedChild: (input) =>
+        readState.pipe(
+          Effect.flatMap((state) => requireExecutionClaim(state, input)),
+          Effect.andThen(
+            fencedUpdate(commands.cancelScopedChild, [input], (state, [preparedInput]) =>
+              Effect.gen(function* () {
+                const child = state.runs.get(preparedInput.childRunId)
+                if (child === undefined) return yield* RunNotFound.make({ runId: preparedInput.childRunId })
+                if (child.parentRunId !== preparedInput.runId) {
+                  return yield* ChildParentageInvalid.make({
+                    parentRunId: preparedInput.runId,
+                    childRunId: preparedInput.childRunId,
+                  })
+                }
+                return yield* cancel(
+                  state,
+                  preparedInput.reason === undefined
+                    ? { runId: child.runId }
+                    : { runId: child.runId, reason: preparedInput.reason },
+                )
+              }),
+            ),
+          ),
+        ),
       cancelSession: (input) =>
         modifyState(commands.cancelSession, [input], (state, [preparedInput]) => cancelSession(state, preparedInput)),
       admitSteering: (input) =>
@@ -522,6 +550,33 @@ const makeStoreServices = (options: Options) =>
       recordReward: (input) =>
         modifyState(commands.recordReward, [input], (state, [preparedInput]) =>
           Effect.gen(function* () {
+            if (state.rewardCommands === undefined) {
+              return yield* RuntimeUnavailable.make({
+                message: "Canonical reward-command provenance is missing for this namespace",
+              })
+            }
+            const received = Object.freeze({
+              runId: preparedInput.runId,
+              leaf: preparedInput.leaf,
+              value: preparedInput.value,
+              source: preparedInput.source,
+            })
+            const existing = state.rewardCommands.get(preparedInput.commandId)
+            if (existing !== undefined) {
+              if (
+                existing.runId !== received.runId ||
+                existing.leaf !== received.leaf ||
+                existing.value !== received.value ||
+                existing.source !== received.source
+              ) {
+                return yield* DurabilityFailure.make({
+                  reason: "input-conflict",
+                  message: "The reward command identity already committed with different input",
+                  commandId: preparedInput.commandId,
+                })
+              }
+              return [undefined, state] as const
+            }
             if (!state.runs.has(preparedInput.runId)) return yield* RunNotFound.make({ runId: preparedInput.runId })
             const [, next] = yield* appendLifecycle(state, preparedInput.runId, {
               _tag: "Rewarded",
@@ -529,9 +584,18 @@ const makeStoreServices = (options: Options) =>
               value: preparedInput.value,
               source: preparedInput.source,
             })
-            return [undefined, next] as const
+            const rewardCommands = new Map(state.rewardCommands)
+            rewardCommands.set(preparedInput.commandId, received)
+            return [undefined, { ...next, rewardCommands }] as const
           }),
         ).pipe(Effect.asVoid),
+      lookupRewardCommand: (commandId) =>
+        readState.pipe(
+          Effect.map((state) => {
+            const command = state.rewardCommands?.get(commandId)
+            return command === undefined ? undefined : Object.freeze({ ...command })
+          }),
+        ),
       treeReplay: (input) =>
         readState.pipe(
           Effect.flatMap((state) =>
@@ -855,12 +919,25 @@ const makeStoreServices = (options: Options) =>
         readState.pipe(Effect.flatMap((state) => externalChildOperations.outstandingPlacements(state, input))),
       outstandingRoots: (input) =>
         readState.pipe(Effect.flatMap((state) => externalChildOperations.outstandingRoots(state, input))),
+      placementsByParent: (input) =>
+        readState.pipe(Effect.flatMap((state) => externalChildOperations.placementsByParent(state, input))),
       reserve: (input) =>
         validatePayload({ value: input, boundary: "external child reservation" }).pipe(
           Effect.andThen(
             modifyState(externalCommands.reserve, [input], (state, [prepared]) =>
               prepared.request.parent.partition === options.partition
                 ? externalChildOperations.reserve(state, prepared)
+                : RuntimeUnavailable.make({ message: "External child parent belongs to another partition" }),
+            ),
+          ),
+          withDomainConflict(ExternalChildPlacementConflict.make({ placementId: input.placementId })),
+        ),
+      reserveScoped: (input) =>
+        validatePayload({ value: input, boundary: "external scoped child reservation" }).pipe(
+          Effect.andThen(
+            fencedModify(externalCommands.reserveScoped, [input], (state, [prepared]) =>
+              prepared.request.parent.partition === options.partition
+                ? externalChildOperations.reserveScoped(state, prepared)
                 : RuntimeUnavailable.make({ message: "External child parent belongs to another partition" }),
             ),
           ),
@@ -882,6 +959,10 @@ const makeStoreServices = (options: Options) =>
         modifyState(externalCommands.cancel, [placementId], (state, [preparedPlacementId]) =>
           externalChildOperations.cancel(state, preparedPlacementId),
         ),
+      cancelScoped: (input) =>
+        fencedModify(externalCommands.cancelScoped, [input], (state, [preparedInput]) =>
+          externalChildOperations.cancelScoped(state, preparedInput),
+        ).pipe(withDomainConflict(ExternalChildPlacementConflict.make({ placementId: input.placementId }))),
       admitRoot: (input) =>
         validatePayload({ value: input, boundary: "external root admission" }).pipe(
           Effect.andThen(
@@ -899,6 +980,8 @@ const makeStoreServices = (options: Options) =>
         ),
       inspectRoot: (placementId) =>
         readState.pipe(Effect.flatMap((state) => externalChildOperations.inspectRoot(state, placementId))),
+      inspectRootRun: (placementId) =>
+        readState.pipe(Effect.flatMap((state) => externalChildOperations.inspectRootRun(state, placementId))),
       cancelRoot: (placementId, reason) =>
         modifyState(
           externalCommands.cancelRoot,

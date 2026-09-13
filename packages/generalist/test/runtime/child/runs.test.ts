@@ -1,7 +1,9 @@
 import { objectWorkerId } from "../execution/object.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Stream } from "effect"
-import { ChildRuns, Cursor, Errors, Runtime, RunStore, RunTree } from "../../../src/runtime/index.js"
+import { ChildRuns, Cursor, Errors, RunTree } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import {
   alternateAssistantAddress,
   alternateResearcherRef,
@@ -17,7 +19,7 @@ layer(objectLayer)("Runtime children", (it) => {
   it.effect("isolates each spawned child's Session from its parent and its siblings", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "thread:isolation",
@@ -64,7 +66,7 @@ layer(objectLayer)("Runtime children", (it) => {
   it.effect("links a child on the parent and keeps child detail on the child stream", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:child",
@@ -145,7 +147,7 @@ layer(objectLayer)("Runtime children", (it) => {
   it.effect("projects a noncanonical tree view over parent and child streams", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:tree",
@@ -181,7 +183,7 @@ layer(objectLayer)("Runtime children", (it) => {
   it.effect("attributes root cancellation to every owned child before the root reports terminal", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:cancel-tree",
@@ -229,7 +231,7 @@ layer(objectLayer)("Runtime children", (it) => {
   it.effect("rejects child admission after the parent is terminal and leaves the tree stable", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:terminal-parent",
@@ -265,7 +267,7 @@ layer(parentRelativeLayer)("parent-relative child selection", (it) => {
   it.effect("replays model-facing child admission and joins the persisted result", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "relative:tool-child",

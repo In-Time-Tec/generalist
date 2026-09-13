@@ -25,7 +25,7 @@ export const layer = (options: { readonly baseUrl: string }) =>
             return
           }
           const snapshot = yield* client.sessions.snapshot({ sessionId: command.sessionId })
-          const pending = snapshot.runs.find((item) => item.approval?.approvalId === command.token)
+          const pending = snapshot.runs.find((item) => item.approval?.id === command.token)
           if (pending === undefined)
             return yield* Connection.SendFailed.make({ reason: "This approval is not pending in the Session" })
           yield* client.approvals.resolve({

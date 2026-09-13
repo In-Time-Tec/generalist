@@ -1,7 +1,9 @@
 import "../suites/subscriber-high-water-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Option, Stream } from "effect"
-import { Cursor, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Cursor, Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import { assistantAddress, completedResult, lagLayer, objectLayer, textPrompt } from "../../execution/fixtures.js"
 import { objectWorkerId } from "../../execution/object.js"
 
@@ -9,7 +11,7 @@ layer(objectLayer)("Runtime events", (it) => {
   it.effect("replays sequence greater than cursor then follows live", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:events",
@@ -62,7 +64,7 @@ layer(objectLayer)("Runtime events", (it) => {
   it.effect("preserves wrapped AgentEvent payloads", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:agent-event",
@@ -99,7 +101,7 @@ layer(lagLayer)("Runtime subscriber lag", (it) => {
   it.effect("fails a lagging follower without blocking the producer", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:lag",

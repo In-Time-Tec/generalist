@@ -2,7 +2,29 @@
 export { Runtime } from "../service.js"
 export type {
   Service,
+  RunHandle,
+  HeldRunHandle,
+  HoldOptions,
+  SessionService,
+  SessionHandle,
+  SessionTaskReceipt,
+  SessionSubmitOptions,
+  SessionQueueEntry,
+  SessionReadError,
+  SessionCreateError,
+  SessionAdmissionError,
+  SessionControlError,
+  SessionEventsError,
+  ChildObservationService,
+  ChildSettlement,
+  ChildReadError,
+  MessagingService,
+  RuntimeReadError,
+  RuntimeCommandError,
+  HeldRunError,
   OperatorService,
+} from "../application.js"
+export type {
   LayerOptions,
   AddressBinding,
   SendInput,
@@ -11,7 +33,6 @@ export type {
   ScheduleOptions,
   ScheduleError,
   StartEvent,
-  RunHandle,
   ToolRunHandle,
   ToolRunEvent,
   ToolStartOptions,
@@ -64,11 +85,12 @@ export type {
   InspectError,
   ExtendBudgetError,
   OperatorActionError,
+  OperatorReadError,
   OperatorApprovalError,
   OperatorExtendBudgetError,
   FanOutError,
   InspectFanOutError,
-} from "../service.js"
+} from "../engine.js"
 export type {
   HostSession,
   HostSessionEvent,
@@ -76,9 +98,9 @@ export type {
   SessionEventsInput,
   CreateSessionError,
   SessionError,
-  SessionEventsError,
 } from "../session/host.js"
 export { SessionNotFound, SessionConflict, SessionCursorExpired, SessionSubscriberLagged } from "../session/host.js"
+export { SessionIdempotencyConflict, SessionQueueConflict } from "../session/queue.js"
 export type {
   RecoveryDecision,
   Explanation as RecoveryExplanation,
@@ -94,7 +116,7 @@ export type {
   Frame as ModelPreviewFrame,
   Cleared as ModelPreviewCleared,
   Event as ModelPreviewEvent,
-} from "../execution/model-response/preview.js"
+} from "../model-preview.js"
 export type { SteeringReceipt } from "../run/steering.js"
 export { ScheduleInvalid, ScheduleReceipt } from "../execution/trigger/schedule.js"
 export { WakeDisposition, WakeEventInvalid } from "../execution/trigger/wake.js"
@@ -111,6 +133,12 @@ export {
   type AcquisitionError,
   type AgentRegistry,
   type AgentServices,
+  type AgentBoundaryServices,
+  type ExecutionServicesOptions,
+  type ExecutionRevisionDefinition,
+  type ExecutionRevisionLoadResult,
+  type ExecutionRevisionLoader,
+  type VersionedExecutionServicesOptions,
   type LayerFactory,
   type Namespace,
   type Options,
@@ -121,3 +149,17 @@ export {
   type RevisionRequest,
   type VersionedOptions,
 } from "../composition.js"
+export {
+  ExecutionScopeRetired,
+  ChildCommandConflict,
+  ChildPlacementDenied,
+  type ExecutionScope,
+  type ExecutionServicesFactory,
+  type ChildPlacement,
+  type ChildReceipt,
+  type ChildOutcome,
+  type ChildFailure,
+  type ChildInspection,
+  type ChildCapabilities,
+  type ChildCapabilityFailure,
+} from "../execution/scope.js"

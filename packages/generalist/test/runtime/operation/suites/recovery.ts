@@ -4,7 +4,10 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { layer } from "../../../../src/ai/provider/openrouter.js"
-import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
 import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor-internal.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
@@ -18,15 +21,11 @@ export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
     options: Runtime.LayerOptions,
-  ) => Layer.Layer<
-    Runtime.Runtime | RunStore.RunStore | RunExecutor.RunExecutor | Extra,
-    StoreError,
-    ExecutableResolver.ExecutableResolver
-  >
+  ) => Layer.Layer<Runtime.Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
   readonly claim?: (
     runId: string,
     ownerId: string,
-  ) => Effect.Effect<ExecutionClaim, WorkerMutationError, RunStore.RunStore | Extra>
+  ) => Effect.Effect<ExecutionClaim, WorkerMutationError, RunStore | Extra>
   readonly expireClaim?: (runId: string) => Effect.Effect<void, WorkerMutationError, Extra>
   readonly skip?: boolean
 }
@@ -70,7 +69,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claim = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) =>
+      ? Effect.flatMap(RunStore, (store) =>
           store.claimExecution({
             commandId: `runtime-operation-suites-recovery-ts-claim-${ownerId}`,
             runId,
@@ -111,8 +110,8 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
         options.makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
-          const host = yield* RunExecutor.RunExecutor
+          const store = yield* RunStore
+          const host = yield* RunExecutor
           const receipt = yield* runtime.startExecution({
             executable,
             registrations: registrationsFor(executable),
@@ -213,8 +212,8 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           .pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
-          const host = yield* RunExecutor.RunExecutor
+          const store = yield* RunStore
+          const host = yield* RunExecutor
           const receipt = yield* runtime.send({
             to: address,
             sessionId,
@@ -299,7 +298,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           ),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const receipt = yield* runtime.startExecution({
             executable: assistantRef,
             registrations: registrationsFor(assistantRef),
@@ -451,8 +450,8 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const host = yield* RunExecutor.RunExecutor
+            const store = yield* RunStore
+            const host = yield* RunExecutor
             const receipt = yield* runtime.send({
               to: address,
               sessionId: `session:operation-recovery:${options.name}:crash`,
@@ -479,7 +478,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             yield* provideScoped(
               Layer.mergeAll(
                 allowAllAuthorization,
-                Layer.succeed(RunStore.RunStore, store),
+                Layer.succeed(RunStore, store),
                 Layer.fresh(activeExecutionsLayer),
                 resolverLayer,
               ),
@@ -585,8 +584,8 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const host = yield* RunExecutor.RunExecutor
+            const store = yield* RunStore
+            const host = yield* RunExecutor
             const receipt = yield* runtime.send({
               to: address,
               sessionId: `session:idempotent-recovery:${options.name}`,
@@ -617,7 +616,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             yield* provideScoped(
               Layer.mergeAll(
                 allowAllAuthorization,
-                Layer.succeed(RunStore.RunStore, store),
+                Layer.succeed(RunStore, store),
                 Layer.fresh(activeExecutionsLayer),
                 resolverLayer,
               ),

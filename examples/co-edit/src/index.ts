@@ -159,10 +159,9 @@ const services = Layer.unwrap(
       Layer.provide(objectStore),
       Layer.provide(BunCrypto.layer),
     )
+    const runtime = Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed))
     return Layer.mergeAll(
-      Layer.effectDiscard(activate).pipe(Layer.provideMerge(reconstructed)),
-      blobs,
-      artifactLayer,
+      artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobs)),
       TestModel.layer([
         TestModel.toolCall("artifact_read_cGxhbi5tZA", {}, { id: "read-plan" }),
         TestModel.toolCall(

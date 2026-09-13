@@ -3,7 +3,7 @@ import { DurabilityFailure } from "../../durability/errors.js"
 import type { Entry } from "../../core/context/session.js"
 import { RuntimeUnavailable, SessionEntryCorrupt, SessionEntryNotFound } from "../errors.js"
 import type { Service as RunStoreService } from "../run/store.js"
-import type { ModelResponseEvent, SessionEntryInput } from "../service.js"
+import type { ModelResponseEvent, SessionEntryInput } from "../engine.js"
 import {
   completedSessionEntryId,
   referenceFromEvent,

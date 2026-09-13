@@ -286,7 +286,7 @@ export const makeRuntime = (overrides: Partial<Record<string, CompletedModelResp
     sessionEntry: (input: { readonly entryId: string }) => Effect.succeed(entries.get(input.entryId)!),
     resolveModelResponse: (event: { readonly modelCallId: string }) =>
       Effect.succeed(responses.get(event.modelCallId)!),
-    recordReward: (input: RewardInput) => Effect.sync(() => void rewards.push(input)),
+    rewards: { record: (input: RewardInput) => Effect.sync(() => void rewards.push(input)) },
   } satisfies DagRuntime
   return { runtime, rewards }
 }

@@ -5,8 +5,12 @@ import { Context, Deferred, Effect, Fiber, Layer, Ref, Schema, Stream } from "ef
 import { ToolContext, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent } from "../../src/index.js"
+import { bindInheritance } from "../../src/core/tools/tool-context/internal.js"
 import { Cell, CellTool, KernelPool, KernelProfile, KernelSnapshotStore, TestKernel } from "../../src/repl/index"
-import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
 import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor-internal.js"
 import {
@@ -285,14 +289,16 @@ standalone.effect("rejects an unavailable inherited workspace instead of startin
           )
         },
       })
-      const unavailableContext = ToolContext.ToolContext.of({
-        signal: yield* Effect.abortSignal,
-        emit: () => Effect.succeed(true),
-        sessionId,
-        toolCallId: "call-1",
-        operationKey: "operation-1",
-        inheritedSandboxSnapshot,
-      })
+      const unavailableContext = bindInheritance(
+        ToolContext.ToolContext.of({
+          signal: yield* Effect.abortSignal,
+          emit: () => Effect.succeed(true),
+          sessionId,
+          toolCallId: "call-1",
+          operationKey: "operation-1",
+        }),
+        { inheritedSandboxSnapshot },
+      )
       const unavailableExecutor = CellTool.layer.pipe(
         Layer.provide(Layer.succeed(SandboxProvider, unavailableProvider)),
       )
@@ -470,8 +476,8 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
         ),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
-          const host = yield* RunExecutor.RunExecutor
+          const store = yield* RunStore
+          const host = yield* RunExecutor
           const recoverySessionId = "session:sandbox-snapshot-recovery"
           const first = yield* runtime.startExecution({
             executable,
@@ -544,7 +550,7 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
           yield* provideScoped(
             Layer.mergeAll(
               allowAllAuthorization,
-              Layer.succeed(RunStore.RunStore, store),
+              Layer.succeed(RunStore, store),
               Layer.fresh(activeExecutionsLayer),
               recoveredResolver,
             ),

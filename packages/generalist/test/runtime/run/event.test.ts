@@ -3,7 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { ProgramCapabilities, ProgramRunner, CodeExecutor, Gate } from "../../../src/index.js"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { provideScoped } from "../execution/scoped-provide.js"
-import { Errors, ExecutableResolver, LocalScheduler, RunEvent, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Errors, ExecutableResolver, RunEvent } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
 import type { RunFailure as RunFailureType } from "../../../src/runtime/run/event.js"
 import {
   alternateAssistant,
@@ -68,7 +71,7 @@ it.live("round-trips every RunFailure variant through object-backed history", ()
     objectLayer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       for (const [index, failure] of failures.entries()) {
         const runId = `run:event-codec:${index}`
         const receipt = yield* runtime.send({
@@ -103,7 +106,7 @@ it.live("keeps object failure history and inspection typed", () =>
     objectLayer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "codec:object",
@@ -153,7 +156,7 @@ it.live("reopens object failure history, stream, snapshot, and inspection with t
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       runId = (yield* runtime.send({
         runId: failure.runId,
         to: assistantAddress,
@@ -235,7 +238,7 @@ it.live("makes a changed object resolver identity terminal once without schedule
     ),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const scheduler = yield* LocalScheduler.LocalScheduler
+      const scheduler = yield* LocalScheduler
       yield* scheduler.tick
       yield* scheduler.idle
       yield* scheduler.tick

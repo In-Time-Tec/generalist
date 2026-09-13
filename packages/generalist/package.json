@@ -124,6 +124,14 @@
       "types": "./dist/runtime/index.d.ts",
       "import": "./dist/runtime/index.js"
     },
+    "./runtime/execution-scope": {
+      "types": "./dist/runtime/execution-scope.d.ts",
+      "import": "./dist/runtime/execution-scope.js"
+    },
+    "./runtime/inspection": {
+      "types": "./dist/runtime/inspection.d.ts",
+      "import": "./dist/runtime/inspection.js"
+    },
     "./runtime/native-layer-environment": {
       "types": "./dist/runtime/hosting/native-layer-environment.d.ts",
       "import": "./dist/runtime/hosting/native-layer-environment.js"

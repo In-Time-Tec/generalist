@@ -2,9 +2,8 @@ import { BunCrypto } from "@effect/platform-bun"
 import { Console, Config, Effect, Layer, Option, Stream } from "effect"
 import { Agent, Approvals, ModelMiddleware, Permissions, ToolExecutor } from "generalist"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { activate, layer as layerDurability } from "generalist/durability"
 import { type Options, layer as layerS3 } from "generalist/durability/s3"
-import { Cursor, ExecutableResolver, Runtime } from "generalist/runtime"
+import { Cursor, Runtime } from "generalist/runtime"
 const agent = Agent.make({ name: "chat-agent" })
 const usage = Response.Usage.make({
   inputTokens: { uncached: 0, total: 0, cacheRead: 0, cacheWrite: 0 },
@@ -58,11 +57,13 @@ const runtimeLayer = Layer.unwrap(
         },
       }
     }
-    return layerDurability({ environment, tenant, partition, addresses: [] }).pipe(
-      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-      Layer.provide(layerS3(transport)),
-      Layer.provide(BunCrypto.layer),
-    )
+    return Runtime.layer({
+      agents: { "chat-agent": agent },
+      revision: "session-frames-v1",
+      namespace: { environment, tenant, partition },
+      services: agentServices,
+      storage: Layer.merge(layerS3(transport), BunCrypto.layer),
+    })
   }),
 )
 
@@ -84,9 +85,7 @@ const tags = (events: Iterable<{ readonly sequence: number; readonly _tag: strin
 
 const program = Effect.scoped(
   Effect.gen(function* () {
-    yield* activate
     const runtime = yield* Runtime.Runtime
-    yield* runtime.register(agent)
     const handle = yield* runtime.start(agent, "Say hello", {
       sessionId: "docs-1",
       idempotencyKey: "hello-1",
@@ -98,4 +97,4 @@ const program = Effect.scoped(
   }),
 )
 
-await Effect.runPromise(program.pipe(Effect.provide(Layer.merge(runtimeLayer, agentServices))))
+await Effect.runPromise(program.pipe(Effect.provide(runtimeLayer)))

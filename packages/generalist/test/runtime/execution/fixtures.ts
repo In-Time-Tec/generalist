@@ -7,8 +7,8 @@ import {
   ExecutableRegistration,
   ExecutableResolver,
   RunWait,
-  Runtime,
 } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
 import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
 import { objectRuntimeLayer } from "./object.js"
 

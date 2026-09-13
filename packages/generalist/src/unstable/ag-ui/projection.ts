@@ -1,9 +1,21 @@
 import { EventSchemas, EventType, type AGUIEvent } from "@ag-ui/core"
 import { Effect, Function, Schema } from "effect"
+import { ClientCursor, ClientRun, clientProjection } from "../../server/projection/index.js"
+import { RuntimeUnavailable } from "../../runtime/errors.js"
 import { RunEvent, type CompletedModelResponse } from "../../runtime/run/event.js"
+import type { RuntimeInspection } from "../../runtime/engine.js"
 import { EventInvalid, ValueNotSerializable } from "./errors.js"
 
 type BoundaryValue = typeof Schema.Unknown.Type
+
+const { projectClientRun } = clientProjection
+
+const ClientStateSnapshot = Schema.Struct({
+  version: Schema.Literal(1),
+  cursor: ClientCursor,
+  run: ClientRun,
+})
+type ClientStateSnapshot = typeof ClientStateSnapshot.Type
 
 const encodeJsonValue = (value: BoundaryValue): string =>
   Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(Schema.decodeUnknownSync(Schema.Unknown)(value))
@@ -31,11 +43,40 @@ type ModelResponseEvent = Extract<RunEvent, { readonly _tag: "ModelResponseCommi
 type SemanticPart = CompletedModelResponse["content"][number]
 type RunErrorEvent = Extract<RunEvent, { readonly _tag: "RunFailed" | "RunCancelled" | "OperationUnknown" }>
 type WaitingEvent = Extract<RunEvent, { readonly _tag: "RunWaiting" }>
+type CompletedEvent = Extract<RunEvent, { readonly _tag: "RunCompleted" }>
 
-const waitMetadata = (event: WaitingEvent) =>
-  event.wait.reason._tag === "Approval"
-    ? { status: event.wait.status, approval: event.wait.reason.request }
-    : { status: event.wait.status }
+const waitMetadata = (event: WaitingEvent) => {
+  if (event.wait.reason._tag !== "Approval") return { status: event.wait.status }
+  return {
+    status: event.wait.status,
+    approval: {
+      approvalId: event.wait.reason.request.approvalId,
+      tool: event.wait.reason.request.capability,
+      summary: event.wait.reason.request.operation,
+    },
+  }
+}
+
+const projectCompletionResult = (source: CompletedEvent["result"]) => {
+  if ("text" in source) {
+    return {
+      text: source.text,
+      output: source.output,
+      turns: source.turns,
+      session: {
+        sessionId: source.session.sessionId,
+        leafId: source.session.leafId,
+      },
+    }
+  }
+  if (source._tag === "Program") return { _tag: "Program" as const, value: source.value }
+  return { _tag: "Tool" as const, isFailure: source.isFailure, value: source.value }
+}
+
+const projectToolProgress = (event: Extract<RunEvent, { readonly _tag: "ToolProgress" }>) =>
+  event.message === undefined
+    ? { toolCallId: event.toolCallId }
+    : { toolCallId: event.toolCallId, message: event.message }
 
 const projectRunError = (event: RunErrorEvent): Effect.Effect<ReadonlyArray<AGUIEvent>, EventInvalid> => {
   if (event._tag === "RunFailed") {
@@ -175,11 +216,7 @@ export const project: {
             {
               type: EventType.CUSTOM,
               name: "generalist.tool.progress",
-              value: {
-                toolCallId: event.toolCallId,
-                message: event.message,
-                data: event.data,
-              },
+              value: projectToolProgress(event),
             },
           ])
         case "RunWaiting": {
@@ -209,7 +246,7 @@ export const project: {
               type: EventType.RUN_FINISHED,
               threadId,
               runId: event.runId,
-              result: event.result,
+              result: projectCompletionResult(event.result),
               outcome: { type: "success" },
             },
           ])
@@ -225,5 +262,28 @@ export const project: {
 )
 
 /** @experimental */
-export const stateSnapshot = (snapshot: BoundaryValue): Effect.Effect<AGUIEvent, EventInvalid> =>
-  emit({ type: EventType.STATE_SNAPSHOT, snapshot: Schema.decodeUnknownSync(Schema.Unknown)(snapshot) })
+export const projectStateSnapshot: {
+  (inspection: RuntimeInspection, rootRunId: string): Effect.Effect<ClientStateSnapshot, RuntimeUnavailable>
+  (rootRunId: string): (inspection: RuntimeInspection) => Effect.Effect<ClientStateSnapshot, RuntimeUnavailable>
+} = Function.dual(2, (inspection: RuntimeInspection, rootRunId: string) => {
+  const sessionId = inspection.retainedSession?.id
+  if (sessionId === undefined)
+    return Effect.fail(RuntimeUnavailable.make({ message: "Run has no retained Session identity" }))
+  return Effect.try({
+    try: (): ClientStateSnapshot => ({
+      version: 1,
+      cursor: String(inspection.lastSequence),
+      run: projectClientRun(inspection, { sessionId, rootRunId }),
+    }),
+    catch: () => RuntimeUnavailable.make({ message: "Run has no complete public AG-UI identity" }),
+  })
+})
+
+/** @experimental */
+export const stateSnapshot = (snapshot: ClientStateSnapshot): Effect.Effect<AGUIEvent, EventInvalid> =>
+  Schema.decodeEffect(ClientStateSnapshot, { onExcessProperty: "error" })(snapshot).pipe(
+    Effect.mapError(() =>
+      EventInvalid.make({ source: "runtime", detail: "Client state snapshot schema rejected the value" }),
+    ),
+    Effect.flatMap((projected) => emit({ type: EventType.STATE_SNAPSHOT, snapshot: projected })),
+  )

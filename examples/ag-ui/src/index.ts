@@ -4,7 +4,7 @@ import { layer as bunHttpServer } from "@effect/platform-bun/BunHttpServer"
 import { EventSchemas, EventType, RunAgentInputSchema, type AGUIEvent, type RunAgentInput } from "@ag-ui/core"
 import { Config, Console, Effect, Layer, ManagedRuntime, Option, Redacted, Schema, Stream, type Types } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { HttpRouter, HttpServer, HttpServerResponse } from "effect/unstable/http"
+import { HttpRouter, HttpServer, HttpServerResponse, type HttpServerRequest } from "effect/unstable/http"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
@@ -132,27 +132,46 @@ const runtimeLayer = Layer.unwrap(
 const agentServices = Layer.mergeAll(runtimeLayer, scriptedModel, handlers, authorization)
 
 const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
-const aguiRoute = HttpRouter.add("POST", "/ag-ui", (request) =>
+const inspection = Schema.Struct({ status: Schema.String })
+const decodeStatusSnapshot = Schema.decodeUnknownEffect(Schema.Struct({ snapshot: Schema.Struct({ run: inspection }) }))
+const statusRequest = Schema.Struct({ runId: Schema.String })
+const authenticateAgui = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const expected = Redacted.value(yield* Config.redacted("GENERALIST_SERVER_TOKEN"))
-    if (expected.length === 0 || request.headers.authorization !== `Bearer ${expected}`) {
-      return HttpServerResponse.empty({ status: 401 })
-    }
-    const parsed = RunAgentInputSchema.safeParse(yield* request.json)
-    if (!parsed.success) {
-      return yield* HttpServerResponse.json({ error: parsed.error.message }, { status: 400 })
-    }
-    const agui = yield* AGUI.AGUI
-    const body = agui.run(parsed.data).pipe(
-      Stream.map((event) => `data: ${encodeJson(event)}\n\n`),
-      Stream.encodeText,
-      Stream.orDie,
-    )
-    return HttpServerResponse.stream(body, {
-      contentType: "text/event-stream",
-      headers: { "cache-control": "no-cache" },
-    })
-  }),
+    return expected.length > 0 && request.headers.authorization === `Bearer ${expected}`
+  })
+const aguiRoute = Layer.merge(
+  HttpRouter.add("POST", "/ag-ui", (request) =>
+    Effect.gen(function* () {
+      if (!(yield* authenticateAgui(request))) {
+        return HttpServerResponse.empty({ status: 401 })
+      }
+      const parsed = RunAgentInputSchema.safeParse(yield* request.json)
+      if (!parsed.success) {
+        return yield* HttpServerResponse.json({ error: parsed.error.message }, { status: 400 })
+      }
+      const agui = yield* AGUI.AGUI
+      const body = agui.run(parsed.data).pipe(
+        Stream.map((event) => `data: ${encodeJson(event)}\n\n`),
+        Stream.encodeText,
+        Stream.orDie,
+      )
+      return HttpServerResponse.stream(body, {
+        contentType: "text/event-stream",
+        headers: { "cache-control": "no-cache" },
+      })
+    }),
+  ),
+  HttpRouter.add("POST", "/ag-ui/status", (request) =>
+    Effect.gen(function* () {
+      if (!(yield* authenticateAgui(request))) return HttpServerResponse.empty({ status: 401 })
+      const input = Schema.decodeUnknownOption(statusRequest)(yield* request.json)
+      if (Option.isNone(input)) return HttpServerResponse.empty({ status: 400 })
+      const agui = yield* AGUI.AGUI
+      const current = yield* agui.snapshot(input.value.runId).pipe(Effect.flatMap(decodeStatusSnapshot))
+      return yield* HttpServerResponse.json({ status: current.snapshot.run.status })
+    }),
+  ),
 )
 const aguiLayer = AGUI.layer({ address })
 const aguiRoutes = aguiRoute.pipe(HttpRouter.provideRequest(aguiLayer))
@@ -245,7 +264,6 @@ const readAguiEvents = Effect.fn("readAguiEvents")(function* (baseUrl: string, c
 const approvalMetadata = Schema.Struct({
   approval: Schema.Struct({ approvalId: Schema.String }),
 })
-const inspection = Schema.Struct({ status: Schema.String })
 const decodeInspection = Schema.decodeUnknownEffect(Schema.fromJsonString(inspection))
 
 const awaitSucceeded = (baseUrl: string, credential: Redacted.Redacted): Effect.Effect<string> =>
@@ -253,10 +271,13 @@ const awaitSucceeded = (baseUrl: string, credential: Redacted.Redacted): Effect.
     for (let attempt = 0; attempt < 100; attempt += 1) {
       const response = yield* Effect.tryPromise(() =>
         // oxlint-disable-next-line effecttsgo/global-fetch-in-effect -- This example intentionally demonstrates a plain-fetch client.
-        fetch(`${baseUrl}/runs/${encodeURIComponent(runInput.runId)}`, {
-          headers: { authorization: `Bearer ${Redacted.value(credential)}` },
+        fetch(`${baseUrl}/ag-ui/status`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${Redacted.value(credential)}` },
+          body: encodeJson({ runId: runInput.runId }),
         }),
       ).pipe(Effect.orDie)
+      if (!response.ok) return yield* Effect.die(`AG-UI status request failed with ${response.status}`)
       const current = yield* Effect.tryPromise(() => response.text()).pipe(
         Effect.flatMap(decodeInspection),
         Effect.orDie,

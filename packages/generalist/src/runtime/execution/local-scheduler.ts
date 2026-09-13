@@ -2,7 +2,7 @@ import { Context, Effect } from "effect"
 import type { DurabilityFailure } from "../../durability/errors.js"
 import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable } from "../errors.js"
 import { RunStore } from "../run/store.js"
-import type { StartExecutionError } from "../service.js"
+import type { StartExecutionError } from "../engine.js"
 import type { ScheduleInvalid } from "./trigger/schedule.js"
 
 /** Typed scheduler failures: run admission plus an unrepresentable stored recurrence. */

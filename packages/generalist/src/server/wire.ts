@@ -1,8 +1,7 @@
 import { Effect, Schema, SchemaTransformation } from "effect"
-import { HostEvent } from "../host/event.js"
-import { PreviewDelivery } from "../host/preview.js"
 import { Cursor } from "../runtime/cursor.js"
 import { WireCodecFailed } from "./errors.js"
+import { ClientServerEvent } from "./projection/index.js"
 
 /** String representation of an exclusive Host Session cursor. */
 export const CursorFromString = Schema.String.check(Schema.isPattern(/^-?\d+$/)).pipe(
@@ -28,17 +27,14 @@ const mapCodecError = (error: Schema.SchemaError): WireCodecFailed => WireCodecF
 const makeCodec = <Type, Encoded>(schema: Schema.Codec<Type, Encoded, never, never>): EventCodec<Type, Type> => {
   const json = Schema.fromJsonString(schema)
   return {
-    encode: (event) => Schema.encodeEffect(json)(event).pipe(Effect.mapError(mapCodecError)),
-    decode: (data) => Schema.decodeEffect(json)(data).pipe(Effect.mapError(mapCodecError)),
+    encode: (event) =>
+      Schema.encodeEffect(json, { onExcessProperty: "error" })(event).pipe(Effect.mapError(mapCodecError)),
+    decode: (data) =>
+      Schema.decodeEffect(json, { onExcessProperty: "error" })(data).pipe(Effect.mapError(mapCodecError)),
   }
 }
 
-/** Events carried by the Session WebSocket. Previews are memory-only and have no committed cursor. */
-export const ServerEvent = Schema.Union([HostEvent, PreviewDelivery])
-export type ServerEvent = typeof ServerEvent.Type
-
-/** The Session WebSocket codec. SSE remains the committed HostEvent schema from the HTTP API. */
-export const eventCodec: EventCodec<ServerEvent> = makeCodec(ServerEvent)
+export const eventCodec: EventCodec<ClientServerEvent> = makeCodec(ClientServerEvent)
 
 const ClientCommandJson = Schema.fromJsonString(ClientCommand)
 

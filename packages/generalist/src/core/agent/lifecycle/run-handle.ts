@@ -12,19 +12,17 @@ import {
   type PolicyInvalid,
   type Receipt as SteeringReceipt,
   type RunBusy,
-  type RunClosed,
+  RunClosed,
 } from "../../turn/steering.js"
 import { streamInternal } from "../run.js"
 import type { Agent, RunError, RunOptions, RunRequirements } from "../service.js"
 import { AgentError, type Event, InvalidOutput } from "../event.js"
 import { observe } from "../inspection/service.js"
 import { requiredField, type StructuredRunConfig } from "../loop/context.js"
+import { projectPublicRunOptions, type HostedRunOptions, type PublicRunOptionGuard } from "./hosted/options.js"
 
 /** Default prompt for the terminal structured-output turn. */
 export const defaultObjectPrompt = "Return the final structured output for the task above."
-
-/** @internal Process-local admission state carried without widening the public producer methods. */
-export const RunControlTypeId: unique symbol = Symbol.for("generalist/core/agent/RunControl")
 
 /** Producer capability and event stream owned by one scoped Agent Run. */
 export interface RunHandle<
@@ -38,16 +36,22 @@ export interface RunHandle<
   readonly events: Stream.Stream<EventValue, EventError, EventServices>
   readonly steer: (input: SteeringInput) => Effect.Effect<ControlReceipt, ControlError>
   readonly followUp: (input: SteeringInput) => Effect.Effect<ControlReceipt, ControlError>
-  readonly [RunControlTypeId]: {
-    readonly busy: Effect.Effect<boolean>
-    readonly interruptTools: Effect.Effect<void>
-    readonly reject: (
-      input: SteeringInput,
-    ) => Effect.Effect<ControlReceipt, ControlError | import("../../turn/steering.js").RunBusy>
-  }
 }
 
 export type SendError = InboxFull | RunClosed | RollbackRequiresRuntime | RunBusy
+
+interface RunControl {
+  readonly interruptTools: Effect.Effect<void>
+  readonly reject: (input: SteeringInput) => Effect.Effect<SteeringReceipt, InboxFull | RunClosed | RunBusy>
+}
+
+interface RunControlOwner {
+  readonly runId: RunId
+}
+
+const runControls = new WeakMap<RunControlOwner, RunControl>()
+
+const controlFor = (handle: RunControlOwner): RunControl | undefined => runControls.get(handle)
 
 const sendEffect = <EventValue, EventError, EventServices>(
   handle: RunHandle<EventValue, EventError, EventServices>,
@@ -58,10 +62,13 @@ const sendEffect = <EventValue, EventError, EventServices>(
   const input = { prompt: message }
   if (policy === "enqueue") return handle.followUp(input)
   if (policy === "interrupt") {
-    return handle.steer(input).pipe(Effect.tap(() => handle[RunControlTypeId].interruptTools))
+    const control = controlFor(handle)
+    if (control === undefined) return Effect.fail(RunClosed.make({ runId: handle.runId }))
+    return handle.steer(input).pipe(Effect.tap(() => control.interruptTools))
   }
   if (policy === "steer") return handle.steer(input)
-  return handle[RunControlTypeId].reject(input)
+  const control = controlFor(handle)
+  return control === undefined ? Effect.fail(RunClosed.make({ runId: handle.runId })) : control.reject(input)
 }
 
 /** Admit one message to a process-local Run under an explicit policy. */
@@ -118,10 +125,11 @@ const typedEvents = <OutputCodec extends Schema.Top, E, R>(
 ): Stream.Stream<Event<OutputCodec["Type"]>, E | InvalidOutput, R> =>
   events.pipe(Stream.mapEffect((event) => decodeEvent(schema, event)))
 
-/** @internal Allocate one scoped Run and its producer handle before consuming its event stream. */
+/** Allocate one scoped Run and its steering handle before consuming its event stream. @experimental */
 export const allocateRun: {
   <O extends RunOptions>(
     options: O,
+    ...guard: PublicRunOptionGuard<O>
   ): <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -151,6 +159,7 @@ export const allocateRun: {
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     options: O,
+    ...guard: PublicRunOptionGuard<O>
   ): Effect.Effect<
     RunHandle<
       Event<OutputSchema["Type"]>,
@@ -175,8 +184,10 @@ export const allocateRun: {
     options: O,
   ) =>
     Effect.gen(function* () {
-      const runId: RunId = options.invocation === undefined ? `run_${yield* generateId}` : options.invocation.runId
-      const { inbox, producer, reject } = yield* allocateRunInbox(runId, options.steering ?? {})
+      const publicOptions = projectPublicRunOptions(options)
+      const runId: RunId =
+        publicOptions.invocation === undefined ? `run_${yield* generateId}` : publicOptions.invocation.runId
+      const { inbox, producer, reject } = yield* allocateRunInbox(runId, publicOptions.steering ?? {})
       const structured = structuredOutput(agent)
       const start = inbox.start.pipe(
         Effect.flatMap((started) =>
@@ -192,18 +203,25 @@ export const allocateRun: {
           Stream.unwrap(
             start.pipe(
               Effect.as(
-                streamInternal(agent, options, structured, inbox).pipe(Stream.ensuring(inbox.close("execution-exit"))),
+                streamInternal(agent, publicOptions, structured, inbox).pipe(
+                  Stream.ensuring(inbox.close("execution-exit")),
+                ),
               ),
             ),
           ),
         ),
       )
-      return {
+      const handle: RunHandle<
+        Event<OutputSchema["Type"]>,
+        RunError,
+        RunRequirements<Tools, R, O, typeof Schema.String, OutputSchema, PolicyServices, AuthorizationServices>
+      > = {
         runId,
         events,
         ...producer,
-        [RunControlTypeId]: { busy: inbox.busy, interruptTools: inbox.interruptTools, reject },
       }
+      runControls.set(handle, { interruptTools: inbox.interruptTools, reject })
+      return handle
     }),
 )
 
@@ -216,7 +234,7 @@ export const HostedRun = {
     AuthorizationServices extends R,
     InputSchema extends Schema.Top,
     OutputSchema extends Schema.Top,
-    O extends Omit<RunOptions, "steering">,
+    O extends HostedRunOptions,
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     options: O,

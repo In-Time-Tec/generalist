@@ -6,7 +6,9 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host, ToolIdentity } from "generalist/host"
-import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { Server, type Client } from "generalist/server"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
@@ -51,8 +53,8 @@ const makeClient = (transport: HttpClient.HttpClient, token: string): Effect.Eff
 
 const runScheduler = (runId: string, commandId: string) =>
   Effect.gen(function* () {
-    const executor = yield* RunExecutor.RunExecutor
-    const store = yield* RunStore.RunStore
+    const executor = yield* RunExecutor
+    const store = yield* RunStore
     yield* executor.execute(yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId }))
   })
 
@@ -299,10 +301,16 @@ layer(services)("Server", (it) => {
           }),
         ).toEqual(admitted)
         expect(yield* client.runs.listChildren({ runId: parentRun.id })).toEqual([
-          expect.objectContaining({ childRunId: admitted.runId, readiness: "ready" }),
+          expect.objectContaining({
+            runId: admitted.runId,
+            parentRunId: parentRun.id,
+            agent: { name: child.name, revision: "local" },
+          }),
         ])
         expect(yield* client.runs.inspectChild({ runId: parentRun.id, childRunId: admitted.runId })).toMatchObject({
-          childRunId: admitted.runId,
+          runId: admitted.runId,
+          parentRunId: parentRun.id,
+          agent: { name: child.name, revision: "local" },
         })
         const toolRun = yield* client.tools.start({
           runId: parentRun.id,
@@ -436,21 +444,25 @@ layer(services)("Server", (it) => {
         })
         const events = Array.from(
           yield* client.events.subscribe({ sessionId: session.id }).pipe(
-            Stream.takeUntil((event) => event._tag === "Completed"),
+            Stream.takeUntil(
+              (event) =>
+                event._tag === "RunChanged" &&
+                (event.run.status === "succeeded" || event.run.status === "failed" || event.run.status === "cancelled"),
+            ),
             Stream.runCollect,
           ),
         )
         expect(events.map((event) => event._tag)).toEqual([
-          "RunStarted",
-          "Turn",
-          "Conversation",
-          "Conversation",
-          "Turn",
-          "Completed",
+          "RunChanged",
+          "RunChanged",
+          "ConversationChanged",
+          "ConversationChanged",
+          "RunChanged",
+          "RunChanged",
         ])
-        expect(events.map((event) => event.cursor)).toEqual([0, 2, 3, 7, 11, 12])
+        expect(events.map((event) => event.cursor)).toEqual(["0", "2", "3", "7", "11", "12"])
         const conversation = events
-          .filter((event) => event._tag === "Conversation")
+          .filter((event) => event._tag === "ConversationChanged")
           .flatMap((event) => event.update.entries)
         expect(
           conversation
@@ -469,7 +481,11 @@ layer(services)("Server", (it) => {
         expect((yield* client.sessions.snapshot({ sessionId: session.id })).conversation.entries).toEqual(conversation)
         const resumed = Array.from(
           yield* client.events.subscribe({ sessionId: session.id, cursor: events[0]!.cursor }).pipe(
-            Stream.takeUntil((event) => event._tag === "Completed"),
+            Stream.takeUntil(
+              (event) =>
+                event._tag === "RunChanged" &&
+                (event.run.status === "succeeded" || event.run.status === "failed" || event.run.status === "cancelled"),
+            ),
             Stream.runCollect,
           ),
         )
@@ -716,13 +732,13 @@ layer(services)("Server", (it) => {
           "last-event-id": "-1",
         })
         expect(overridden.status).toBe(200)
-        expect(yield* readSse(overridden, "event: RunStarted")).toContain("event: RunStarted")
+        expect(yield* readSse(overridden, "event: RunChanged")).toContain("event: RunChanged")
 
         const validOverride = yield* request(`/sessions/${session.id}/events?cursor=999`, {
           "last-event-id": "-1",
         })
         expect(validOverride.status).toBe(200)
-        expect(yield* readSse(validOverride, "event: RunStarted")).toContain("event: RunStarted")
+        expect(yield* readSse(validOverride, "event: RunChanged")).toContain("event: RunChanged")
 
         const queryOnly = yield* request(`/sessions/${session.id}/events?cursor=-1`)
         expect(queryOnly.status).toBe(200)
@@ -739,7 +755,10 @@ layer(services)("Server", (it) => {
           "last-event-id": "not-a-cursor",
         })
         expect(malformedHeader.status).toBe(400)
-        expect(yield* Effect.promise(() => malformedHeader.text())).toBe("")
+        expect(yield* Effect.promise(() => malformedHeader.json())).toMatchObject({
+          _tag: "generalist/server/InvalidCursor",
+          cursor: "not-a-cursor",
+        })
       }),
     ),
   )
@@ -798,7 +817,7 @@ layer(services)("Server", (it) => {
         expect(response.status).toBe(200)
         const reader = response.body!.getReader()
         const first = yield* Effect.promise(() => reader.read())
-        expect(new TextDecoder().decode(first.value)).toContain("RunStarted")
+        expect(new TextDecoder().decode(first.value)).toContain("RunChanged")
         yield* Effect.promise(() => reader.cancel())
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "running" })
 
@@ -807,11 +826,17 @@ layer(services)("Server", (it) => {
         expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
         expect(calls).toBe(1)
         const events = yield* client.events.subscribe({ sessionId: session.id }).pipe(
-          Stream.takeUntil((event) => event._tag === "Completed"),
+          Stream.takeUntil(
+            (event) =>
+              event._tag === "RunChanged" &&
+              (event.run.status === "succeeded" || event.run.status === "failed" || event.run.status === "cancelled"),
+          ),
           Stream.runCollect,
         )
-        expect(events.filter((event) => event._tag === "RunStarted")).toHaveLength(1)
-        expect(events.filter((event) => event._tag === "Completed")).toHaveLength(1)
+        expect(events.filter((event) => event._tag === "RunChanged" && event.run.status === "pending")).toHaveLength(1)
+        expect(events.filter((event) => event._tag === "RunChanged" && event.run.status === "succeeded")).toHaveLength(
+          1,
+        )
       }),
     ),
   )
@@ -843,7 +868,7 @@ layer(services)("Server", (it) => {
           input: "answer",
           commandId: "server:unknown:start",
         })
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const claim = yield* store.claimExecution({
           runId: run.id,
           ownerId: objectWorkerId,
@@ -878,7 +903,7 @@ layer(services)("Server", (it) => {
         expect(yield* unauthorized.operator.resolveUnknown(resolution).pipe(Effect.flip)).toMatchObject({
           _tag: "generalist/server/Unauthorized",
         })
-        expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "needs-resolution" })
+        expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "waiting" })
         yield* client.operator.resolveUnknown(resolution)
         expect(yield* store.getOperation({ runId: run.id, operationId: operation.operationId })).toMatchObject({
           status: "succeeded",

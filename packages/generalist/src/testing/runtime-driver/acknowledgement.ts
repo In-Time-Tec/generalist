@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema } from "effect"
 import { AckBeyondCommitted, AckInvalid, RunNotFound } from "../../runtime/errors.js"
 import { RunStore } from "../../runtime/run/store.js"
-import { Runtime } from "../../runtime/service.js"
+import { Runtime } from "../../runtime/engine.js"
 import type { Options, RuntimeCapability, Services } from "./contract.js"
 
 const servicesFrom = (context: Context.Context<Runtime | RunStore>): Services => {

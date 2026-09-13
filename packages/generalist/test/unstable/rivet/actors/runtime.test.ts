@@ -18,7 +18,9 @@ import { LanguageModel, Response } from "effect/unstable/ai"
 import { HttpBody, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { Host, type MakeError } from "generalist/host"
-import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver, Runtime } from "generalist/runtime"
+import { Address, ExecutableManifest, ExecutableRegistration, ExecutableResolver } from "generalist/runtime"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { Runtime as ApplicationRuntime } from "../../../../src/runtime/service.js"
 import { Authentication, CurrentPrincipal } from "../../../../src/server/auth.js"
 import { Unauthorized } from "../../../../src/server/errors.js"
 import { eventCodec } from "../../../../src/server/wire.js"
@@ -41,7 +43,7 @@ import {
 } from "../../../../src/durability/internal/runtime-state.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
 import { ObjectStore, ObjectStoreFailure } from "../../../../src/durability/object-store.js"
-import { RuntimeInspectionResponse } from "../../../../src/runtime/inspection.js"
+import { RuntimeInspectionResponse } from "../../../../src/runtime/execution/inspection/response.js"
 import { emptyState } from "../../../../src/runtime/state/projection.js"
 import { make as makeBucket, type Client } from "../../../../src/testing/durability/index.js"
 import { Engine, layer as engineLayer } from "./engine.js"
@@ -1211,7 +1213,7 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
       ),
   }
   const options = makeOptions(model, bucket, "server-bridge", 60_000)
-  const definition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, Runtime.Runtime>({
+  const definition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, ApplicationRuntime>({
     ...options,
     server,
   })
@@ -1366,7 +1368,7 @@ test("bridges authenticated HTTP and raw WebSocket traffic through one actor hos
   expect(serverBuilds).toBe(1)
   expect(serverFinalized).toBe(1)
 
-  const replacementDefinition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, Runtime.Runtime>({
+  const replacementDefinition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, ApplicationRuntime>({
     ...makeOptions(model, await Effect.runPromise(bucket.connect), "server-bridge", 60_000),
     server,
   })
@@ -1395,7 +1397,7 @@ test("owns scoped server factory resources until the actor host retires", async 
   let acquired = 0
   let released = 0
   const principal = { id: "factory-controller", tenantId: "rivet", role: "controller" as const }
-  const definition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, Runtime.Runtime>({
+  const definition = makeRuntimeActor<typeof serverAgents, MakeError, never, never, ApplicationRuntime>({
     ...makeOptions(model, bucket, "server-factory-scope", 60_000),
     server: {
       make: () =>

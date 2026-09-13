@@ -108,7 +108,7 @@ export class ReconnectExhausted extends ActionableTaggedError<ReconnectExhausted
 /** A client or server frame could not be Schema-encoded or decoded. */
 export class WireCodecFailed extends ActionableTaggedError<WireCodecFailed>()("generalist/server/WireCodecFailed", {
   message: Schema.String,
-  hint: errorHint("Correct the frame to match Server.HostEvent or Server.ClientCommand."),
+  hint: errorHint("Correct the frame to match Server.ClientServerEvent or Server.ClientCommand."),
 }) {}
 
 const badRequest = HttpApiSchema.status(400)

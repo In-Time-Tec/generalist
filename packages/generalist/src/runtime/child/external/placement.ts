@@ -7,10 +7,12 @@ import { ExecutableRegistration } from "../../executable/registration.js"
 import { Message } from "../../messaging/message.js"
 import { TreePolicy } from "../../tree/policy.js"
 import { BudgetLimits } from "../../../core/durable/run-budget.js"
+import { Spend } from "../../../core/durable/run-budget.js"
 import { encode } from "../../execution/payload/index.js"
 import { RunOutcome } from "../../run.js"
 import { RunWait } from "../../run/wait.js"
 import { ExecutionContinuation } from "../../run/steering.js"
+import { ChildReadiness } from "../readiness.js"
 
 /** A Run address owned by an external partition. */
 export const ExternalRunRef = Schema.Struct({ partition: Schema.String, runId: Schema.String })
@@ -31,6 +33,19 @@ export const AdmissionRequest = Schema.Struct({
   }),
 })
 export type AdmissionRequest = typeof AdmissionRequest.Type
+
+/** Child intent whose policy and budget are granted atomically by the owning parent partition. */
+export const ScopedAdmissionRequest = Schema.Struct({
+  parent: ExternalRunRef,
+  ref: ExternalRunRef,
+  root: Schema.Struct({
+    message: Message,
+    executableRef: ExecutableRef,
+    executableManifest: ExecutableManifest,
+    registrations: Schema.Array(ExecutableRegistration),
+  }),
+})
+export type ScopedAdmissionRequest = typeof ScopedAdmissionRequest.Type
 
 /** Bounded canonical request identity shared by reservation and receiver admission. @experimental */
 export const identifyRequest = (request: AdmissionRequest) =>
@@ -63,6 +78,13 @@ export const PageInput = Schema.Struct({
   limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 1000 })),
 })
 export type PageInput = typeof PageInput.Type
+
+/** Bounded placement page owned by one exact parent Run. */
+export const ParentPlacementPageInput = Schema.Struct({
+  ...PageInput.fields,
+  parentRunId: Schema.String,
+})
+export type ParentPlacementPageInput = typeof ParentPlacementPageInput.Type
 
 /** Stable digest of the exact executable admitted on the child partition. */
 export const executableDigest = (executable: PinnedExecutable): string =>
@@ -98,6 +120,30 @@ export const ReserveInput = Schema.Struct({
 })
 export type ReserveInput = typeof ReserveInput.Type
 
+/** Fenced native reservation; the store derives the child policy, budget, and immutable digests. */
+export const ScopedReserveInput = Schema.Struct({
+  placementId: PlacementId,
+  runId: Schema.String,
+  ownerId: Schema.String,
+  attemptFence: Schema.Int,
+  session: ReserveInput.fields.session,
+  request: ScopedAdmissionRequest,
+  invocationId: Schema.String,
+})
+export type ScopedReserveInput = typeof ScopedReserveInput.Type
+
+/** Fenced cancellation of one placement owned by the issuing parent execution. */
+export const ScopedCancelInput = Schema.Struct({
+  runId: Schema.String,
+  ownerId: Schema.String,
+  attemptFence: Schema.Int,
+  session: ReserveInput.fields.session,
+  commandId: Schema.String.check(Schema.isNonEmpty()),
+  placementId: PlacementId,
+  reason: Schema.optionalKey(Schema.String),
+})
+export type ScopedCancelInput = typeof ScopedCancelInput.Type
+
 /** Stored placement state returned by every placement operation. */
 export const Placement = Schema.Struct({
   placementId: PlacementId,
@@ -106,13 +152,16 @@ export const Placement = Schema.Struct({
   invocationId: Schema.String,
   requestDigest: Schema.String,
   executableDigest: Schema.String,
+  readiness: ChildReadiness,
   waitId: Schema.optionalKey(Schema.String),
   suspensionIdentity: Schema.optionalKey(Schema.String),
   acknowledged: Schema.Boolean,
   cancelRequested: Schema.Boolean,
+  cancelReason: Schema.optionalKey(Schema.String),
   settled: Schema.Boolean,
   settlementId: Schema.optionalKey(Schema.String),
   outcome: Schema.optionalKey(RunOutcome),
+  spend: Schema.optionalKey(Spend),
 })
 export type Placement = typeof Placement.Type
 
@@ -138,6 +187,7 @@ export const ExternalRootSettlement = Schema.Struct({
   ref: ExternalRunRef,
   settlementId: Schema.String,
   outcome: RunOutcome,
+  spend: Schema.optionalKey(Spend),
   acknowledged: Schema.Boolean,
 })
 export type ExternalRootSettlement = typeof ExternalRootSettlement.Type

@@ -7,14 +7,10 @@ import {
   TaskState,
 } from "@a2a-js/sdk"
 import { ServerCallContext } from "@a2a-js/sdk/server"
-import {
-  Address,
-  ExecutableManifest,
-  TreePolicy,
-  type Run,
-  type RunEvent,
-  type Runtime,
-} from "../../../src/runtime/index.js"
+import { Address, ExecutableManifest, TreePolicy, type Run, type RunEvent } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { make as makeApplication } from "../../../src/runtime/hosting/application.js"
+import type { SteeringReceipt } from "../../../src/runtime/run/steering.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
 import type { Prompt as AiPrompt } from "effect/unstable/ai"
@@ -102,6 +98,8 @@ interface StoredRun {
   waits: Run.RunInspection["waits"]
 }
 
+const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
+
 const makeRuntime = (acceptedSequence = 0) => {
   const runs = new Map<string, StoredRun>()
   const sentRunIds: Array<string> = []
@@ -128,13 +126,13 @@ const makeRuntime = (acceptedSequence = 0) => {
     runId: string,
     prompt: AiPrompt.Prompt | string,
     options?: Runtime.RunSendOptions,
-  ): Effect.Effect<Runtime.SteeringReceipt, Runtime.RunSendError>
+  ): Effect.Effect<SteeringReceipt, Runtime.RunSendError>
   function send(input: Runtime.SendInput): Effect.Effect<Run.RunReceipt, Runtime.SendError>
   function send(
     input: Runtime.SendInput | string,
     _prompt?: AiPrompt.Prompt | string,
     _options?: Runtime.RunSendOptions,
-  ): Effect.Effect<Runtime.SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
+  ): Effect.Effect<SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
     if (Predicate.isString(input)) return Effect.die("existing-run send is not used")
     sentRunIds.push(input.runId!)
     const runId = input.runId!
@@ -152,6 +150,12 @@ const makeRuntime = (acceptedSequence = 0) => {
   }
 
   const runtime: Runtime.Service = {
+    hold: () => Effect.die("not used"),
+    sessions: {
+      create: () => Effect.die("not used"),
+      get: () => Effect.die("not used"),
+      list: Effect.die("not used"),
+    },
     messageSessionInput: () => Effect.die("not used"),
     controlSession: () => Effect.die("not used"),
     getTool: () => Effect.die("not used"),
@@ -302,6 +306,8 @@ const makeRuntime = (acceptedSequence = 0) => {
     inspect: (runId) =>
       Effect.succeed({
         ...inspection(runId, runs.get(runId)!),
+        revision: "test",
+        waitOpenedAtSequence: {},
         turn: 0,
         usage: { inputTokens: 0, outputTokens: 0 },
         usageFacts: [],
@@ -313,7 +319,18 @@ const makeRuntime = (acceptedSequence = 0) => {
       }),
     extendBudget: () => Effect.die("not used"),
   }
-  return { runtime, runs, sentRunIds, activatedRunIds, observedCursors }
+  const application = makeApplication({
+    engine: runtime,
+    lifecycle: { run: (effect) => effect },
+    views: {
+      run: () => unused(),
+      child: () => unused(),
+      list: () => unused(),
+      session: () => unused(),
+      sessions: unused(),
+    },
+  })
+  return { runtime, application, runs, sentRunIds, activatedRunIds, observedCursors }
 }
 
 const message = (messageId: string, taskId = ""): Message => ({
@@ -349,7 +366,7 @@ describe("DefaultRequestHandler projection", () => {
   it.effect("streams a full Task first and keeps Task.id equal to Runtime runId", () =>
     Effect.gen(function* () {
       const fixture = makeRuntime()
-      const handler = makeHandler(fixture.runtime, { address, card })
+      const handler = yield* makeHandler(fixture.application, { address, card })
       const responses = yield* collectResponses(
         handler.sendMessageStream(request(message("complete")), new ServerCallContext()),
       )
@@ -388,7 +405,7 @@ describe("DefaultRequestHandler projection", () => {
   it.effect("projects Program completion values as structured artifacts", () =>
     Effect.gen(function* () {
       const fixture = makeRuntime()
-      const handler = makeHandler(fixture.runtime, { address, card })
+      const handler = yield* makeHandler(fixture.application, { address, card })
       const responses = yield* collectResponses(
         handler.sendMessageStream(request(message("program")), new ServerCallContext()),
       )
@@ -402,7 +419,7 @@ describe("DefaultRequestHandler projection", () => {
   it.effect("starts a newly admitted run at the run-event origin, not its lane sequence", () =>
     Effect.gen(function* () {
       const fixture = makeRuntime(7)
-      const handler = makeHandler(fixture.runtime, { address, card })
+      const handler = yield* makeHandler(fixture.application, { address, card })
       const responses = yield* collectResponses(
         handler.sendMessageStream(request(message("later-lane")), new ServerCallContext()),
       )
@@ -420,7 +437,7 @@ describe("DefaultRequestHandler projection", () => {
   it.effect("resubscribes, responds to the authoritative wait, and cancels through Runtime", () =>
     Effect.gen(function* () {
       const fixture = makeRuntime()
-      const handler = makeHandler(fixture.runtime, { address, card })
+      const handler = yield* makeHandler(fixture.application, { address, card })
       const initial = yield* collectResponses(
         handler.sendMessageStream(request(message("wait")), new ServerCallContext()),
       )
@@ -442,7 +459,7 @@ describe("DefaultRequestHandler projection", () => {
       expect(resumedTask.status?.state).toBe(TaskState.TASK_STATE_COMPLETED)
 
       const second = makeRuntime()
-      const cancelHandler = makeHandler(second.runtime, { address, card })
+      const cancelHandler = yield* makeHandler(second.application, { address, card })
       const waitingResponses = yield* collectResponses(
         cancelHandler.sendMessageStream(request(message("wait")), new ServerCallContext()),
       )
@@ -497,7 +514,7 @@ describe("DefaultRequestHandler projection", () => {
   it.effect("rejects agent-role and unsupported content before Runtime admission", () =>
     Effect.gen(function* () {
       const fixture = makeRuntime()
-      const handler = makeHandler(fixture.runtime, { address, card })
+      const handler = yield* makeHandler(fixture.application, { address, card })
       const injected = { ...message("bad"), role: Role.ROLE_AGENT }
       const outcome = yield* collectResponses(
         handler.sendMessageStream(request(injected), new ServerCallContext()),

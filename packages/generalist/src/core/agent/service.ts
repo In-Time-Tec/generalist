@@ -2,7 +2,6 @@ import { Effect, Function, Option, Predicate, type Ref, Schema, Stream } from "e
 import { LanguageModel, Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import { AgentError, type AgentSuspended, type Event } from "./event.js"
 import type { BudgetLimits, RunBudget } from "../durable/run-budget.js"
-import type { DriverCheckpoint } from "../durable/driver/contract.js"
 import { type Key, Memory } from "../context/memory.js"
 import { type ModelSelection, ModelRegistry } from "../model/registry.js"
 import type { Authorizer } from "../tools/tool-authorization.js"
@@ -36,6 +35,9 @@ import type { HandlersFor } from "./tool/fan-out.js"
 import { Configuration as Tasks } from "../../tasks/internal.js"
 import type { ManagedArtifactTool } from "../artifact.js"
 import { definitionCapabilities } from "./lifecycle/construction.js"
+import { projectPublicRunOptions, type PublicRunOptionGuard } from "./lifecycle/hosted/options.js"
+import type * as CodeMode from "../program/code-mode-declaration.js"
+import { validateOptions as validateCodeModeOptions } from "../program/code-mode-declaration.js"
 export {
   AgentTypeId,
   close,
@@ -104,6 +106,7 @@ export interface MakeOptions<
   readonly gates?: ReadonlyArray<Gate<OutputSchema["Type"], unknown>>
   readonly onGateFailure?: GateFailureMode
   readonly sandbox?: SandboxService
+  readonly codeMode?: CodeMode.AnyOptions
 }
 /** Agent options with ordered static declarations instead of a pre-built toolkit. */
 export interface MakeToolsOptions<
@@ -135,6 +138,7 @@ type GateRequirement<O> = O extends { readonly gates: ReadonlyArray<infer G> }
     ? never
     : GateRequirements<G>
   : never
+type CodeModeRequirement<O> = O extends { readonly codeMode: infer C } ? CodeMode.Requirements<C> : never
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> = {
@@ -149,6 +153,7 @@ type OptionRequirements<Tools extends Record<string, Tool.Any>, O> =
   | PolicyRequirement<O>
   | AuthorizationRequirement<O>
   | GateRequirement<O>
+  | CodeModeRequirement<O>
   | InputCodecOf<O>["EncodingServices"]
   | OutputCodecOf<O>["DecodingServices"]
   | OutputCodecOf<O>["EncodingServices"]
@@ -171,6 +176,11 @@ type GateOutputConstraint<O> = {
       }
   >
 }
+
+const validateDeclaredCodeMode = (toolkit: Toolkit.Any, codeMode: CodeMode.AnyOptions | undefined): void => {
+  if (codeMode !== undefined) validateCodeModeOptions(toolkit, codeMode)
+}
+
 /** Defaults: empty toolkit, `defaultPolicy`. */
 export function make<
   const StaticTools extends ReadonlyArray<Tool.Any>,
@@ -212,6 +222,7 @@ export function make<
   const declaredTools: ReadonlyArray<Tool.Any> | undefined =
     "tools" in options && Array.isArray(options.tools) ? options.tools : undefined
   const toolkit = declaredTools === undefined ? (options.toolkit ?? Toolkit.empty) : Toolkit.make(...declaredTools)
+  validateDeclaredCodeMode(toolkit, options.codeMode)
   const gates = options.gates ?? []
   const onGateFailure = options.onGateFailure ?? "fail"
   validateAgentGates({ gates, sandbox: options.sandbox, failureMode: onGateFailure })
@@ -247,6 +258,7 @@ export function make<
     gates: gates as ReadonlyArray<AnyGate>,
     onGateFailure,
     sandbox: options.sandbox,
+    codeMode: options.codeMode,
     toolDeclarations: (declaredTools ?? Object.values(toolkit.tools)).map(
       (tool): ToolDeclaration => ({
         tool,
@@ -283,7 +295,7 @@ export type ProgressOverflowPolicy =
   | { readonly _tag: "Dropping"; readonly capacity: number }
   | { readonly _tag: "Sliding"; readonly capacity: number }
   | { readonly _tag: "Fail"; readonly capacity: number }
-/** Internal prompt-level options for an Agent run. */
+/** Options for one Agent run. */
 export interface RunOptions {
   /** Schema-encoded Agent input for the first turn. Ignored when `resume` is set. */
   readonly prompt: Prompt.RawInput
@@ -312,14 +324,6 @@ export interface RunOptions {
   readonly modelCallOrdinalStart?: number
   /** First turn number for a host continuing an existing transcript. */
   readonly turnStart?: number
-  /** @internal Runtime-owned inbox drain entering this hosted execution. */
-  readonly initialSteering?: { readonly queue: "steering" | "followUp"; readonly count: number; readonly turn: number }
-  /** Runtime-owned checkpoint used to reconstruct the same durable driver. */
-  readonly driverCheckpoint?: DriverCheckpoint
-  /** Pinned identity admitted by a durable host. */
-  readonly executableRef?: import("../durable/manifest/executable-manifest.js").ExecutableRef
-  /** Complete pinned closure used to resolve same-run handoffs exactly. */
-  readonly executableManifest?: import("../durable/manifest/executable-manifest.js").ExecutableManifest
   readonly toolOutputMaxBytes?: number
   /** Per-tool bounded buffering policy for progress events. Defaults to backpressure at capacity 64. */
   readonly toolProgress?: ProgressOverflowPolicy
@@ -367,6 +371,7 @@ interface StreamFunction {
   <InputValue, O extends InvocationOptions = Record<never, never>>(
     input: InputValue,
     options?: O,
+    ...guard: PublicRunOptionGuard<O>
   ): <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -395,6 +400,7 @@ interface StreamFunction {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
     input: InputCodec["Type"],
     options?: O,
+    ...guard: PublicRunOptionGuard<O>
   ): Stream.Stream<
     Event<OutputCodec["Type"]>,
     RunError,
@@ -421,16 +427,19 @@ export const stream: StreamFunction = Function.dual(
         const prompt = yield* encodeInput(agent.input, input)
         const tasks = yield* Effect.serviceOption(Tasks)
         const configured = Option.isSome(tasks) ? withTools(agent, tasks.value.tools) : agent
+        const publicOptions = projectPublicRunOptions({ ...options, prompt })
         return Stream.scoped(
-          Stream.unwrap(allocateRun(configured, { ...options, prompt }).pipe(Effect.map((current) => current.events))),
+          Stream.unwrap(allocateRun(configured, publicOptions).pipe(Effect.map((current) => current.events))),
         ).pipe(Stream.provideService(ProcessRunner, processRunner(yield* Effect.context<never>(), agentRunner)))
       }),
     ),
 )
+
 interface RunFunction {
   <InputValue, O extends InvocationOptions = Record<never, never>>(
     input: InputValue,
     options?: O,
+    ...guard: PublicRunOptionGuard<O>
   ): <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -459,6 +468,7 @@ interface RunFunction {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
     input: InputCodec["Type"],
     options?: O,
+    ...guard: PublicRunOptionGuard<O>
   ): Effect.Effect<
     OutputCodec["Type"],
     RunError,
@@ -480,7 +490,7 @@ export const run: RunFunction = Function.dual(
     input: InputCodec["Type"],
     options: InvocationOptions = {},
   ) =>
-    Stream.runLast(stream(agent, input, options)).pipe(
+    Stream.runLast(stream(agent, input, projectPublicRunOptions(options))).pipe(
       Effect.flatMap(
         Option.match({
           onNone: () => Effect.fail(AgentError.make({ message: "Agent run ended without a Completed event", turn: 0 })),

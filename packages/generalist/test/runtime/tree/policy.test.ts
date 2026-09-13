@@ -3,7 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, RunBudget, ToolExecutor } from "../../../src/index.js"
-import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { defaultTreePolicy, TREE_POLICY_MAX } from "../../../src/runtime/tree/policy.js"
 import { pinnedTestAgent, unusedModel } from "../run/identity.js"
 import { registrationsFor } from "../execution/fixtures.js"
@@ -127,8 +130,8 @@ it.effect("a spawned child with no budget survives cumulative usage beyond one m
 
   return Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const host = yield* RunExecutor.RunExecutor
-    const store = yield* RunStore.RunStore
+    const host = yield* RunExecutor
+    const store = yield* RunStore
     const parentReceipt = yield* runtime.send({
       to: address,
       sessionId: "thread:heavy",

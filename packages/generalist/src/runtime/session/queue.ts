@@ -37,6 +37,15 @@ export const QueueReceipt = Schema.Struct({
 })
 export type QueueReceipt = typeof QueueReceipt.Type
 
+export class SessionIdempotencyConflict extends ActionableTaggedError<SessionIdempotencyConflict>()(
+  "generalist/session/IdempotencyConflict",
+  {
+    sessionId: Schema.String,
+    commandId: Schema.String,
+    hint: errorHint("Retry the original Session command unchanged, or use a new command identity."),
+  },
+) {}
+
 /** A queue mutation lost a revision race or exceeded a supported bound. @experimental */
 export class SessionQueueConflict extends ActionableTaggedError<SessionQueueConflict>()(
   "generalist/session/SessionQueueConflict",
@@ -52,6 +61,7 @@ export const SubmitInput = Schema.Struct({
   commandId: Schema.String.check(Schema.isNonEmpty()),
   prompt: Prompt.Prompt,
   selection: Schema.optionalKey(SessionSelection),
+  agent: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty())),
 })
 export type SubmitInput = typeof SubmitInput.Type
 

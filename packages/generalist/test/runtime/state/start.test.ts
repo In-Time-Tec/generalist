@@ -4,7 +4,9 @@ import { provideScoped } from "../execution/scoped-provide.js"
 import { DateTime, Effect, Layer, Ref, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentManifest, ExecutableManifest, Pins } from "../../../src/index.js"
-import { Address, Errors, ExecutableResolver, RunStore, Runtime } from "../../../src/runtime/index.js"
+import { Address, Errors, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
 import {
   alternateAssistant,
@@ -199,7 +201,7 @@ layer(runtimeLayer)("Runtime exact root admission", (it) => {
   it.effect("resolves and attests the executable before admission succeeds", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const before = yield* store.list({ limit: 1000 })
       const unresolvable = yield* runtime
         .startExecution({
@@ -242,7 +244,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
   it.effect("admits, executes, and replays the root and child together", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const first = yield* runtime.startExecution(base)
       const duplicate = yield* runtime.startExecution(base)
       expect(duplicate).toEqual(first)
@@ -300,7 +302,7 @@ layer(initialChildrenLayer)("Runtime atomic initial children", (it) => {
   it.effect("rejects a rewind on a root with admitted children without mutating the Run", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const started = yield* runtime.startExecution({
         ...base,
         sessionId: "rewind-initial-root",
@@ -439,7 +441,7 @@ layer(initialChildrenLayer)("Runtime atomic initial fan-out", (it) => {
   it.effect("commits deterministic members and holds the original root result until join", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const first = yield* runtime.startExecution(input)
       const duplicate = yield* runtime.startExecution(input)
       expect(first.childRunIds).toEqual([])
@@ -567,7 +569,7 @@ standalone.effect("reopens an atomic object root and initial child admission", (
         expect(yield* runtime.list({ limit: 10 })).toEqual([])
         const receipt = yield* runtime.startExecution(input)
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("queued")
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const childRunId = receipt.childRunIds[0]!
         const claim = yield* store.claimExecution({
           commandId: `${childRunId}:start:claim`,
@@ -632,7 +634,7 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
         const receipt = yield* runtime.startExecution(input)
-        const execution = yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+        const execution = yield* (yield* RunStore).loadExecution(receipt.runId)
         assertFileBytes(execution.message.prompt)
         return receipt.runId
       }),
@@ -640,7 +642,7 @@ standalone.effect("loads typed root prompt bytes immediately and after reopening
     yield* provideScoped(
       objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
-        assertFileBytes((yield* (yield* RunStore.RunStore).loadExecution(runId)).message.prompt)
+        assertFileBytes((yield* (yield* RunStore).loadExecution(runId)).message.prompt)
       }),
     )
   }),
@@ -696,7 +698,7 @@ standalone.effect("reloads object registrations without address binding and clos
         Layer.provide(Layer.succeed(ExecutableResolver.ExecutableResolver, resolver)),
       ),
       Effect.gen(function* () {
-        const execution = yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+        const execution = yield* (yield* RunStore).loadExecution(receipt.runId)
         yield* Effect.scoped(
           resolver.resolve({
             runId: execution.runId,
@@ -711,7 +713,7 @@ standalone.effect("reloads object registrations without address binding and clos
     const persisted = yield* provideScoped(
       objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
-        return yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+        return yield* (yield* RunStore).loadExecution(receipt.runId)
       }),
     )
     const encodedRegistrations = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(
@@ -748,7 +750,7 @@ standalone.effect("recovers an addressed Run from persisted send registrations w
     const execution = yield* provideScoped(
       objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(resolverLayer)),
       Effect.gen(function* () {
-        return yield* (yield* RunStore.RunStore).loadExecution(receipt.runId)
+        return yield* (yield* RunStore).loadExecution(receipt.runId)
       }),
     )
     expect(execution.registrations).toEqual(

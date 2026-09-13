@@ -29,11 +29,11 @@ Server.api
     └── events.subscribe / events.connect
 ```
 
-SSE and WebSocket carry `Server.HostEvent`, including committed `Conversation` updates and Run-derived lifecycle events. Both use the Host Session's durable exclusive cursor, not a count of visible events and not a per-Run sequence. Runtime's underlying `HostSessionEvent` is tagged `Run | Conversation`. Run events that Host does not project are absent from the wire, so adjacent visible cursors need not be consecutive.
+SSE and WebSocket carry `Server.ClientEvent`; WebSocket also carries memory-only `Server.ClientPreview` frames. The server builds these values through explicit public projections, so executable manifests, registrations, recovery claims, and provider references never become ordinary reader fields. Committed events use the Host Session's durable exclusive cursor, not a count of visible events or a per-Run sequence. Runtime events that have no client variant are absent from the wire, so visible cursors are opaque tokens and need not encode consecutive numbers.
 
 ## Snapshot-first observation
 
-`client.sessions.snapshot({ sessionId })` returns the version-1 Session metadata, Run projections, active-path conversation, and exact cursor. `client.events.connect({ sessionId })` obtains that snapshot before following changes strictly after its cursor. `client.events.subscribe({ sessionId, cursor })` supplies cursor-based SSE observation when the caller already owns its starting state.
+`client.sessions.snapshot({ sessionId })` returns `ClientSessionSnapshot`: version-1 public Session metadata, bounded Run summaries, active-path conversation, and an opaque cursor. `client.events.connect({ sessionId })` obtains that snapshot before following changes strictly after its cursor. `client.events.subscribe({ sessionId, cursor })` supplies cursor-based SSE observation when the caller already owns its starting state. Persist and return a cursor unchanged; do not parse or increment it.
 
 Conversation entries preserve original Session entry IDs, parents, and leaf identity while omitting system/instruction, memory, and skill bodies. An update retains the visible prefix through `afterEntryId` and replaces its suffix; it can represent a branch change without any Run event. FoldKit restores user/tool/assistant rows from this conversation and fetches a fresh snapshot when the previous leaf or prefix is inconsistent. [Snapshot bounds](./server.md#snapshot-limits) reject oversized projections instead of truncating them.
 
@@ -43,9 +43,9 @@ Create a Host Session before starting a Run and retain its ID for snapshots and 
 
 - Runtime remains the execution and persistence authority; Host owns product Session membership and cursors.
 - `Last-Event-ID` takes precedence over the SSE `cursor` query parameter.
-- Reconnect cursors are exclusive: cursor `n` requests visible Host events after the authoritative Session entry at `n`.
+- Reconnect cursors are exclusive: a returned cursor requests visible client events after the authoritative Session position it represents.
 - Closing SSE or WebSocket never cancels a Run; cancellation is explicit.
 - Session-scoped WebSocket cancellation names a Run and rejects a Run outside that Session.
-- Conversation changes and Run events have one cursor and one canonical state authority; reconnect does not submit another user message or redispatch completed work.
+- `ConversationChanged` and Run-derived client events have one cursor and one canonical state authority; reconnect does not submit another user message or redispatch completed work.
 
 See [`server.md`](./server.md) for setup, routes, auth, clients, and OpenAPI.

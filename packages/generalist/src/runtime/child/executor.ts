@@ -19,6 +19,7 @@ import {
 import { DriverError, DriverStateInvalid } from "../../core/durable/service.js"
 import { supportsCancellation } from "../../core/tools/tool-executor-cancellation.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
+import { inheritanceFor } from "../../core/tools/tool-context/internal.js"
 import { managedToolHandlers } from "../../core/artifact.js"
 import {
   type CancellationRequest,
@@ -256,7 +257,8 @@ const makeExecutor = <
       )
       if (Result.isFailure(authority)) return domainFailure(authority.failure)
       const members: Array<FanOutGroupInput["members"][number]> = []
-      const parentHistory = context.history === undefined ? undefined : yield* context.history
+      const parentTranscript = inheritanceFor(context)?.history
+      const parentHistory = parentTranscript === undefined ? undefined : yield* parentTranscript
       for (const [index, member] of parameters.children.entries()) {
         const prompt = yield* definition
           .encodeInput(member.agent, member.input, environment)

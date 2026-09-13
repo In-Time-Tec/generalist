@@ -2,14 +2,17 @@ import { expect } from "@effect/vitest"
 import { Effect } from "effect"
 import { TestClock } from "effect/testing"
 import { Pins, ProgramCapabilities } from "../../../src/index.js"
-import { Errors, RunExecutor, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Errors } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore, type Service as RunStoreService } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../src/runtime/run/store.js"
 import type { ProgramStoreFailure } from "../../../src/runtime/program/store.js"
 import { objectWorkerId } from "../execution/object.js"
 import { program, programAddress } from "./fixture.js"
 
 const reserve = (
-  store: RunStore.Service,
+  store: RunStoreService,
   execution: ExecutionClaim,
   operation: string,
   budget: typeof program.pinned.manifest.budget,
@@ -37,7 +40,7 @@ const reserve = (
 
 const claimExistingProgram = (runId: string, label: string) =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     return yield* store.claimExecution({
       commandId: `runtime-program-store-contract:claim:${label}:${runId}`,
       runId,
@@ -57,13 +60,13 @@ const claimProgram = (label: string) =>
     return yield* claimExistingProgram(receipt.runId, label)
   })
 
-type ProgramContractServices = Runtime.Runtime | RunStore.RunStore
+type ProgramContractServices = Runtime.Runtime | RunStore
 
 type ProgramContractError = Runtime.SendError | WorkerMutationError | ProgramStoreFailure
 
 export const programBudgetContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> = Effect.gen(
   function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     let run = 0
     const claim = (dimension: string) => claimProgram(`${dimension}-${++run}`)
     const expectReservationFailure = (dimension: "toolCalls" | "agentRuns" | "logBytes" | "concurrency") =>
@@ -116,7 +119,7 @@ export const programBudgetContract: Effect.Effect<void, ProgramContractError, Pr
 
 export const programReplayDivergenceContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> =
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const execution = yield* claimProgram("replay-divergence")
     yield* reserve(
       store,
@@ -147,7 +150,7 @@ export const programReplayDivergenceContract: Effect.Effect<void, ProgramContrac
 export const programCancellationFenceContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> =
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const execution = yield* claimProgram("cancel-fence")
     yield* reserve(store, execution, "cancelled-operation", program.pinned.manifest.budget, {
       toolCalls: 1,
@@ -180,7 +183,7 @@ export const programCancellationFenceContract: Effect.Effect<void, ProgramContra
 
 export const programSettledReplayContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> =
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const success = yield* claimProgram("settled-replay-success")
     yield* reserve(store, success, "replayed-success", program.pinned.manifest.budget, { toolCalls: 1, activeSlots: 1 })
     yield* store.startProgramOperation({ ...success, operation: "replayed-success" })
@@ -284,7 +287,7 @@ export const programSettledReplayContract: Effect.Effect<void, ProgramContractEr
 export const programCancellationFinalizerContract: Effect.Effect<void, ProgramContractError, ProgramContractServices> =
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const execution = yield* claimProgram("cancel-finalizer")
     const reason = "cancel finalizer settlement"
     yield* reserve(store, execution, "finalized-operation", program.pinned.manifest.budget, {
@@ -321,12 +324,12 @@ export const programUnknownOutcomeContract = (
 ): Effect.Effect<
   void,
   ProgramContractError | Errors.OperationResolutionConflict,
-  ProgramContractServices | RunExecutor.RunExecutor
+  ProgramContractServices | RunExecutor
 > =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
-    const host = yield* RunExecutor.RunExecutor
+    const store = yield* RunStore
+    const host = yield* RunExecutor
     const execution = yield* claimProgram("unknown-outcome")
     const request = { operation: "echo", tool: "echo", input: "value" }
     yield* store.reserveProgramOperation({

@@ -2,7 +2,9 @@ import "./suites/session-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { DurableDriver, ToolContext } from "../../../src/index.js"
-import { ChildAdmission, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { ChildAdmission } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 import { provideScoped } from "../execution/scoped-provide.js"
 
@@ -49,7 +51,7 @@ const withCell =
 const parentRun = (label: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId: `${sessionId}:${label}`,
@@ -395,7 +397,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
   it.effect("scopes the counter per parent Run so one cell key cannot leak ordinals across Runs", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const children = ChildAdmission.makeAgentChildren(store)
       const operations = ChildAdmission.make(store)
       const left = yield* parentRun("scope-left")
@@ -436,7 +438,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
   it.effect("keeps ordinals stable across a host restart that loses every in-process counter", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { children, operations, parentRunId } = yield* parentRun("restarted-host")
       const cell = { runId: parentRunId, toolCallId: "call-1", operationKey: cellOperationKey }
 
@@ -457,7 +459,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
   it.effect("does not duplicate a child when a restarted host re-admits one spawn of many", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { children, operations, parentRunId } = yield* parentRun("partial-replay")
       const cell = { runId: parentRunId, toolCallId: "call-1", operationKey: cellOperationKey }
 
@@ -477,7 +479,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
   it.effect("never reuses an ordinal already taken under the operation, even a sparse one", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { operations, parentRunId } = yield* parentRun("sparse-ordinals")
       const children = ChildAdmission.makeAgentChildren(store)
       const cell = { runId: parentRunId, toolCallId: "call-1", operationKey: cellOperationKey }
@@ -514,7 +516,7 @@ layer(objectLayer)("child origin from the in-execution cell seam", (it) => {
 
   it.effect("keeps an empty operation key's origin and ordinal across a restarted host", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { operations, parentRunId } = yield* parentRun("empty-operation-key")
       const cell = { runId: parentRunId, toolCallId: "call-1", operationKey: "" }
 

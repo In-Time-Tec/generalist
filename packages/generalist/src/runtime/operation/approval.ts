@@ -4,7 +4,7 @@ import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import type { Approved, Denied } from "../../core/policy/approvals.js"
 import { RuleStore, type RuleStoreError } from "../../core/policy/permissions.js"
 import { IllegalOperatorAction } from "../errors.js"
-import { Runtime, type RespondApprovalError, type Service as RuntimeService } from "../service.js"
+import { Runtime, type RespondApprovalError, type Service as RuntimeService } from "../engine.js"
 
 /** Stable identity for one approval request. */
 export const ApprovalId = CoreApprovalId

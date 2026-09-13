@@ -3,7 +3,8 @@ import { Effect, Layer, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host, type SessionRunsPage } from "generalist/host"
-import { ExecutableResolver, RunStore } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import { RunStore } from "../../src/runtime/run/store.js"
 import { TestModel } from "generalist/testing"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 
@@ -37,7 +38,7 @@ it.effect(
               expectedRevision: pending.revision,
               agent: agent.name,
             })
-            const store = yield* RunStore.RunStore
+            const store = yield* RunStore
             const claim = yield* store.claimExecution({
               runId: activeRunId,
               ownerId: objectWorkerId,
@@ -93,7 +94,7 @@ it.effect(
             }
             expect(ids).toEqual(original.ids)
             expect(new Set(ids).size).toBe(129)
-            const store = yield* RunStore.RunStore
+            const store = yield* RunStore
             const claim = yield* store.claimExecution({
               runId: original.ids[0]!,
               ownerId: objectWorkerId,

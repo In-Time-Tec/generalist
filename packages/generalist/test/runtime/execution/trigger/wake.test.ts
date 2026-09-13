@@ -4,7 +4,10 @@ import { Clock, Effect, Layer, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolContext } from "generalist"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { provideScoped } from "../scoped-provide.js"
 
@@ -64,8 +67,8 @@ const fixture = () => {
 
 const suspend = Effect.fn("test.suspendAwaitEvent")(function* () {
   const runtime = yield* Runtime.Runtime
-  const executor = yield* RunExecutor.RunExecutor
-  const store = yield* RunStore.RunStore
+  const executor = yield* RunExecutor
+  const store = yield* RunStore
   yield* runtime.register(agent)
   const handle = yield* runtime.start(agent, "wait", {
     sessionId: "await-event-session",
@@ -98,8 +101,8 @@ it.effect("journals, deduplicates, and resumes one matching event without redisp
     state.layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       const runId = yield* suspend()
       const event = {
         _tag: "Webhook" as const,
@@ -137,8 +140,8 @@ it.effect("resumes an elapsed await with TimedOut under TestClock", () => {
     state.layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       const runId = yield* suspend()
       yield* TestClock.adjust("1 second")
       const now = yield* Clock.currentTimeMillis

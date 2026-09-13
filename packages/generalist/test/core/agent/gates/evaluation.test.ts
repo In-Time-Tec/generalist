@@ -4,9 +4,14 @@ import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, ExecutableManifest, Gate, Hooks, RunBudget } from "../../../../src/index.js"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { make as makeSandbox, type SandboxService } from "../../../../src/sandbox/index.js"
 import { TestModel } from "../../../../src/testing/index.js"
+import { HostedRun } from "../../../../src/core/agent/lifecycle/run-handle.js"
+import { externalRunInbox } from "../../../../src/core/turn/steering-inbox.js"
 import { allowAllAuthorization } from "../../../authorization.js"
 import { provideScoped } from "../../../runtime/execution/scoped-provide.js"
 
@@ -20,6 +25,8 @@ class GateDependency extends Context.Service<GateDependency, { readonly allowed:
 ) {}
 
 const stringify = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
+const hostedInbox = (runId: string) =>
+  externalRunInbox({ runId, takeSteering: Effect.succeed([]), takeFollowUp: Effect.succeed([]) })
 
 const dependentAgent = Agent.make({
   name: "dependent-gate",
@@ -233,18 +240,19 @@ it.effect("replays a checkpointed gate result without executing its predicate ag
           checkpoint = current
         }),
     }
-    yield* Agent.stream(agent, "finish", { executableRef: executable.ref }).pipe(
-      Stream.runDrain,
-      Effect.provide(fixture.layer),
-      Effect.provideService(DurableDriver.DriverJournal, journal),
-    )
+    yield* HostedRun.stream(
+      agent,
+      { prompt: "finish", executableRef: executable.ref },
+      hostedInbox("gate-replay"),
+    ).pipe(Stream.runDrain, Effect.provide(fixture.layer), Effect.provideService(DurableDriver.DriverJournal, journal))
     expect(checks).toBe(1)
     expect(checkpoint).toBeDefined()
 
-    const replayed = yield* Agent.stream(agent, "finish", {
-      driverCheckpoint: checkpoint!,
-      executableRef: executable.ref,
-    }).pipe(Stream.runCollect, Effect.provide(fixture.layer))
+    const replayed = yield* HostedRun.stream(
+      agent,
+      { prompt: "finish", driverCheckpoint: checkpoint!, executableRef: executable.ref },
+      hostedInbox("gate-replay"),
+    ).pipe(Stream.runCollect, Effect.provide(fixture.layer))
     expect(checks).toBe(1)
     expect(replayed.find((event) => event._tag === "GateResult")).toMatchObject({ name: "once", verdict: "pass" })
     expect(replayed.at(-1)?._tag).toBe("Completed")
@@ -306,8 +314,8 @@ it.effect("suspends on retry budget exhaustion without false completion", () =>
       Layer.merge(runtimeLayer, fixture.layer),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "finish", { budget: RunBudget.make({ tokens: 2 }) })
         yield* executor.execute(

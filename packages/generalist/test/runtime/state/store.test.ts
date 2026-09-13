@@ -3,15 +3,10 @@ import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } f
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor } from "../../../src/index.js"
 import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache.js"
-import {
-  Address,
-  RunExecutor,
-  Errors,
-  ExecutableResolver,
-  Runtime,
-  RunStore,
-  RunTree,
-} from "../../../src/runtime/index.js"
+import { Address, Errors, ExecutableResolver, RunTree } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../../src/runtime/execution/active-executions.js"
 import { make as makeRunExecutor } from "../../../src/runtime/execution/run-executor-internal.js"
 import {
@@ -111,7 +106,7 @@ it.live("resumes tree replay from an opaque cursor after an object-store reopen"
     readonly cursor: RunTree.ReplayPage["cursor"]
   }) =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const claim = yield* store.claimExecution({
         commandId: `${result.receipt.runId}:cursor:claim`,
         runId: result.receipt.runId,
@@ -152,7 +147,7 @@ it.live("persists a handoff checkpoint and active pin atomically across object-s
   } as const
   const admit = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId: "session:handoff",
@@ -189,7 +184,7 @@ it.live("persists a handoff checkpoint and active pin atomically across object-s
     expect(saved.executableManifest).toEqual(assistantRef.manifest)
   })
   const reopen = Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const saved = yield* store.loadExecution(runId)
     expect((yield* store.getOperation({ runId, operationId })).status).toBe("succeeded")
     expect(saved.checkpoint).toEqual(checkpoint)
@@ -299,9 +294,9 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
     const crashScope = yield* Scope.make()
     const committed = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const handoffCommitted = yield* Deferred.make<void>()
-      const crashStore = RunStore.RunStore.of({
+      const crashStore = RunStore.of({
         ...store,
         completeOperation: (input) =>
           store
@@ -317,7 +312,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
       return yield* scopedWith(activeExecutionsLayer)(
         Effect.gen(function* () {
           const crashHost = yield* makeRunExecutor.pipe(
-            Effect.provideService(RunStore.RunStore, crashStore),
+            Effect.provideService(RunStore, crashStore),
             Effect.provideService(ExecutableResolver.ExecutableResolver, firstResolver),
           )
           const receipt = yield* runtime.send({
@@ -433,8 +428,8 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
     })
     const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
       const session = yield* store.sessionReader("session:durable-handoff")
       if (Option.isNone(session)) return yield* Effect.die("expected durable Session")
       const conversationBeforeContinuation = Session.buildContext(yield* session.value.path())
@@ -517,7 +512,7 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
     const waitId = "wait:object"
     const admit = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         runId,
         to: assistantAddress,
@@ -545,7 +540,7 @@ it.live("persists caller RunId, wait resolution, and finite inspection reads acr
     })
     const reopen = Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const inspection = yield* runtime.inspect(runId)
       expect(inspection.waits).toEqual([])
       expect((yield* store.loadExecution(runId)).resolutions).toEqual([

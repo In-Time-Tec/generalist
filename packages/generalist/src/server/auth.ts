@@ -25,7 +25,7 @@ export interface Authorization {
   readonly authorize: (input: {
     readonly principal: Principal
     readonly resource: Resource
-    readonly action: "read" | "observe" | "mutate"
+    readonly action: "read" | "observe" | "mutate" | "operator"
   }) => Effect.Effect<boolean>
 }
 
@@ -37,13 +37,16 @@ export const authorize = ({
 }: {
   readonly policy: Authorization
   readonly resource: Resource
-  readonly action: "read" | "observe" | "mutate"
+  readonly action: "read" | "observe" | "mutate" | "operator"
 }) =>
   Effect.gen(function* () {
     const principal = yield* Schema.decodeEffect(Principal)(yield* CurrentPrincipal).pipe(
       Effect.mapError(() => Unauthorized.make({})),
     )
-    if (principal.tenantId !== policy.tenantId || (action === "mutate" && principal.role !== "controller")) {
+    if (
+      principal.tenantId !== policy.tenantId ||
+      ((action === "mutate" || action === "operator") && principal.role !== "controller")
+    ) {
       return yield* Forbidden.make({})
     }
     if (!(yield* policy.authorize({ principal, resource, action }))) return yield* Forbidden.make({})

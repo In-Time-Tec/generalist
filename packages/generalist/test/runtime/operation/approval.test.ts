@@ -3,7 +3,8 @@ import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { PermissionError, RuleStore, layerRuleStoreMemory, type Rule } from "../../../src/core/policy/permissions.js"
 import { Approvals } from "../../../src/index.js"
-import { Runtime, RunStore } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import { assistantAddress, objectLayer, openWait, suspension, textPrompt } from "../execution/fixtures.js"
 import { objectWorkerId } from "../execution/object.js"
 
@@ -26,7 +27,7 @@ const startRun = (key: string) =>
 
 const suspendOnApproval = (runId: string, waitToken: string) =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const claim = yield* store.claimExecution({
       commandId: `${waitToken}:claim`,
       runId,

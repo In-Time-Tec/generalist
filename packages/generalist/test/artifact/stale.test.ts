@@ -17,10 +17,9 @@ const runtime = objectRuntimeLayer(
 const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
   Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
 )
+const artifacts = artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore))
 const services = Layer.mergeAll(
-  runtime,
-  blobStore,
-  artifactLayer,
+  artifacts,
   TestModel.layer([
     TestModel.toolCall("artifact_read_c3RhbGUubWQ", {}, { id: "read-stale" }),
     TestModel.toolCall(

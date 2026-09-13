@@ -3,7 +3,7 @@ import { awaitEvent, AwaitEventResult, WakeEventFilter } from "../core/agent/too
 import { ToolContext } from "../core/tools/tool-context.js"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import type { Prompt } from "effect/unstable/ai"
-import type { RunHandle, Service, SpawnInput, SpawnError, InspectError } from "../runtime/service.js"
+import type { RunHandle, Service, SpawnInput, SpawnError, InspectError } from "../runtime/engine.js"
 import type { SessionError, HostSession } from "../runtime/session/host.js"
 import type { SessionHandle } from "./session.js"
 
@@ -42,7 +42,7 @@ export type HostRun<Output> = Omit<RunHandle<Output>, "runId"> & {
     options: ChildSpawnOptions,
   ) => Effect.Effect<
     ChildHandle,
-    SpawnError | InspectError | SessionError | import("../runtime/service.js").GetRunError
+    SpawnError | InspectError | SessionError | import("../runtime/engine.js").GetRunError
   >
 }
 

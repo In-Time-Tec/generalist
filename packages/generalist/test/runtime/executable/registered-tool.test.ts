@@ -44,6 +44,11 @@ it.effect("pins Boolean approval behavior and explicit implementation and policy
     const policy = yield* register(
       definition(false).annotate(ToolIdentity, { ...identity, policy: "checks-policy-v2" }),
     )
+    expect(
+      original.registrations.every((registration) =>
+        Schema.is(Schema.Struct({ pin: Schema.String, revision: Schema.Literal("1") }))(registration.payload),
+      ),
+    ).toBe(true)
     expect(approval.resolution.pinned.pin).not.toBe(original.resolution.pinned.pin)
     expect(approval.resolution.pinned.manifest.policy).not.toBe(original.resolution.pinned.manifest.policy)
     expect(implementation.resolution.pinned.pin).not.toBe(original.resolution.pinned.pin)

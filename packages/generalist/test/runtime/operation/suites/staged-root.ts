@@ -1,19 +1,21 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import { assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { objectWorkerId } from "../../execution/object.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface StagedRootSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
+  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
   readonly skip?: boolean
 }
 
 export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSuiteOptions<StoreError, Extra>) => {
   const describeBackend = options.skip === true ? describe.skip : describe
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
   const input = (label: string) => ({
     runId: `run:staged:${options.name}:${label}`,
@@ -24,7 +26,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     prompt: textPrompt(label),
   })
   const tags = (runId: string) =>
-    Effect.map(RunStore.RunStore, (store) => store).pipe(
+    Effect.map(RunStore, (store) => store).pipe(
       Effect.flatMap((store) => store.history({ runId, cursor: -1, limit: 100 })),
       Effect.map((events) => events.map((event) => event._tag)),
     )
@@ -34,7 +36,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
       provide(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const receipt = yield* runtime.admit(input("gate"))
 
           expect(receipt).not.toHaveProperty("childRunIds")
@@ -127,7 +129,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
       provide(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const receipt = yield* runtime.admit(input("cancel-first"))
 
           yield* runtime.cancel({

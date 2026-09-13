@@ -1,12 +1,12 @@
 import { Effect, Ref, Schema } from "effect"
 import type { Chat } from "effect/unstable/ai"
 import { LoopDriverState } from "../../durable/loop-driver-state.js"
-import type { RunOptions } from "../service.js"
+import type { HostedRunOptions } from "../lifecycle/hosted/options.js"
 import { AgentError } from "../event.js"
 import { checkpointFromHistory, type ToolCheckpoint } from "../suspension.js"
 
 export const recoverToolCheckpoint = (input: {
-  readonly options: RunOptions
+  readonly options: HostedRunOptions
   readonly chat: Chat.Service
 }): Effect.Effect<ToolCheckpoint | undefined, AgentError> =>
   Effect.gen(function* () {

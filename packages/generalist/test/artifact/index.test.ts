@@ -6,10 +6,11 @@ import { TestClock } from "effect/testing"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Host } from "generalist/host"
-import { ExecutableResolver, RunStore } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
 import { ObjectStore } from "../../src/durability/object-store.js"
+import { RunStore } from "../../src/runtime/run/store.js"
 
 const storage = makeObjectStorage()
 const runtime = objectRuntimeLayer(
@@ -19,6 +20,7 @@ const runtime = objectRuntimeLayer(
 const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
   Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
 )
+const artifacts = artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore))
 class ModelFixture extends Context.Service<ModelFixture, TestModel.Fixture>()(
   "generalist/test/artifact/index.test/ModelFixture",
 ) {}
@@ -38,15 +40,7 @@ const model = Layer.unwrap(
     TestModel.text("done"),
   ]).pipe(Effect.map((fixture) => Layer.merge(fixture.layer, Layer.succeed(ModelFixture, fixture)))),
 )
-const services = Layer.mergeAll(
-  runtime,
-  blobStore,
-  artifactLayer,
-  Yjs.layer(),
-  model,
-  Permissions.layerAllowAll,
-  Approvals.layerAutoApprove,
-)
+const services = Layer.mergeAll(artifacts, Yjs.layer(), model, Permissions.layerAllowAll, Approvals.layerAutoApprove)
 
 layer(services)("Artifact", (it) => {
   it.effect("merges overlapping human and Agent edits with attribution and replayable CRDT updates", () =>
@@ -92,7 +86,7 @@ layer(services)("Artifact", (it) => {
       expect(observed.map(({ result }) => result)).toEqual([1, 2])
 
       const current = yield* Artifact.read(document)
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const blobs = yield* BlobStore.BlobStore
       const crdt = yield* ArtifactCrdt
       const initial = yield* store.artifactSnapshot({ artifact: document.name, version: 0 })

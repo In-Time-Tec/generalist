@@ -1,6 +1,7 @@
 import { Context, Effect, Option } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { ToolContext } from "../../tools/tool-context.js"
+import { inheritanceFor } from "../../tools/tool-context/internal.js"
 import { FrameworkFailure, type Outcome, type Request } from "../../tools/tool-executor.js"
 import type { Child as LifecycleChild } from "../../../hooks/index.js"
 import { AgentError } from "../event.js"
@@ -46,7 +47,8 @@ export const execute = (parentAgent: AnyAgent, definition: Definition, request: 
       definition,
       parameters.children.map((member) => member.agent),
     )
-    const parentHistory = parent.history === undefined ? undefined : yield* parent.history
+    const parentTranscript = inheritanceFor(parent)?.history
+    const parentHistory = parentTranscript === undefined ? undefined : yield* parentTranscript
     const parentTasks = parameters.children.some((member) => member.inherit.tasks === "read")
       ? yield* currentTasks
       : undefined

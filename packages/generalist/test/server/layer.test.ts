@@ -1,17 +1,18 @@
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
 import { vi } from "vitest"
-import { Config, Context, Effect, Layer, Option, Redacted, Ref, Schema, Stream, type Types } from "effect"
+import { Config, Context, Effect, Layer, Option, Redacted, Ref, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter, HttpServer } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
-import { Host, type SessionRunsInput } from "generalist/host"
-import { ExecutableResolver, RunStore } from "generalist/runtime"
+import { Host } from "generalist/host"
+import { ExecutableResolver } from "generalist/runtime"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { Artifact, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
 import { ObjectStore } from "../../src/durability/object-store.js"
+import { RunStore } from "../../src/runtime/run/store.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 
 const authenticatedSocket = (url: string): WebSocket =>
@@ -20,12 +21,13 @@ const authenticatedSocket = (url: string): WebSocket =>
   )
 
 const storage = makeObjectStorage()
+const runtime = objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+const blobStore = BlobStore.layer({ environment: "test", tenant: "local" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
+)
+const artifacts = artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore))
 const services = Layer.mergeAll(
-  objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(ExecutableResolver.layerStatic([]))),
-  BlobStore.layer({ environment: "test", tenant: "local" }).pipe(
-    Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
-  ),
-  artifactLayer,
+  artifacts,
   TestModel.layer([]),
   Permissions.layerAllowAll,
   Approvals.layerAutoApprove,
@@ -65,7 +67,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
         input: "bounded direct input",
         commandId: "bounded:direct",
       })
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       for (const runId of [queued.activeRunId!, direct.id])
         expect(yield* store.loadExecution(runId)).toMatchObject({
           treePolicy: { ...limits.tree, concurrency: limits.concurrency },
@@ -85,7 +87,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
         const ids: Array<string> = []
         for (let index = 0; index < 129; index++)
           ids.push((yield* host.runs.start(session.id, agent, `input-${index}`)).id)
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const claim = yield* store.claimExecution({
           runId: ids[0]!,
           ownerId: objectWorkerId,
@@ -131,14 +133,14 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
         expect(snapshot.conversation.entries).toMatchObject([{ id: large.id, contentDeferred: true }])
         yield* host.runs.start(session.id, agent, "after opening")
         const loaded: Array<string> = []
-        let before: number | undefined
+        let before: string | undefined
         while (true) {
-          const request: Types.Mutable<SessionRunsInput & { readonly sessionId: string }> = {
+          const request = {
             sessionId: session.id,
             at: snapshot.cursor,
             limit: 23,
+            ...(before === undefined ? undefined : { before }),
           }
-          if (before !== undefined) request.before = before
           const page = yield* client.sessions.runs(request)
           loaded.unshift(...page.runs.map((run) => run.runId))
           if (page.nextBefore === null) break
@@ -217,10 +219,14 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
       const connection = yield* client.events
         .connect({ sessionId: session.id })
         .pipe(Effect.provideService(Socket.WebSocketConstructor, authenticatedSocket))
-      expect(connection.snapshot).toEqual(before)
+      expect(connection.snapshot).toMatchObject({
+        version: 1,
+        session: { id: before.session.id, lifecycle: "active" },
+        cursor: String(before.cursor),
+      })
       expect(connection.snapshot.runs.map((entry) => entry.runId)).toEqual([original.id])
       const events = yield* connection.events.pipe(Stream.take(1), Stream.runCollect)
-      expect(events[0]).toMatchObject({ _tag: "RunStarted", runId: yield* Ref.get(raced) })
+      expect(events[0]).toMatchObject({ _tag: "RunChanged", run: { runId: yield* Ref.get(raced) } })
       expect(yield* host.runs.list(session.id)).toHaveLength(2)
     }),
   )
@@ -268,7 +274,7 @@ layer(services, { excludeTestServices: true })("Local server transports", (it) =
         const initial = yield* client.sessions.snapshot({ sessionId: session.id })
         expect(initial.runs.map((entry) => entry.runId)).toEqual([run.id])
         const replay = yield* client.events.subscribe({ sessionId: session.id }).pipe(Stream.take(1), Stream.runCollect)
-        expect(replay[0]).toMatchObject({ _tag: "RunStarted", runId: run.id })
+        expect(replay[0]).toMatchObject({ _tag: "RunChanged", run: { runId: run.id } })
         const commands = [
           { path: `/sessions/${session.id}/ws`, body: { _tag: "Cancel", runId: run.id, commandId: "socket-cancel" } },
           {

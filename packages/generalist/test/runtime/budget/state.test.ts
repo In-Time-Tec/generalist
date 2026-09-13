@@ -10,14 +10,10 @@ import { TestClock } from "effect/testing"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, RunBudget } from "../../../src/index.js"
 import { TestModel } from "../../../src/testing/index.js"
-import {
-  Address,
-  ChildAdmission,
-  ExecutableResolver,
-  RunExecutor,
-  RunStore,
-  Runtime,
-} from "../../../src/runtime/index.js"
+import { Address, ChildAdmission, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { allowAllAuthorization } from "../../authorization.js"
 import {
   assistant,
@@ -73,8 +69,8 @@ const runtimeLayer = (
 
 const execute = Effect.fn("test.executeBudgetRun")(function* (budget: RunBudget.RunBudget) {
   const runtime = yield* Runtime.Runtime
-  const executor = yield* RunExecutor.RunExecutor
-  const store = yield* RunStore.RunStore
+  const executor = yield* RunExecutor
+  const store = yield* RunStore
   yield* runtime.register(agent)
   const handle = yield* runtime.start(agent, "run", { budget })
   yield* executor.execute(
@@ -92,8 +88,8 @@ it.effect("suspends on exhaustion, journals extension, and resumes", () =>
     runtimeLayer(textModel),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(agent)
       const handle = yield* runtime.start(agent, "run", {
         sessionId: "budget-suspend",
@@ -191,8 +187,8 @@ it.effect("suspends when elapsed duration is exhausted before provider dispatch"
     runtimeLayer(textModel, { reconcileInterval: "2 hours", ownershipLeaseMillis: 6 * 60 * 60 * 1000 }),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(agent)
       const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ duration: "1 second" }) })
       yield* TestClock.adjust("2 seconds")
@@ -293,8 +289,8 @@ it.effect("one tool-call extension pays for exactly one handler execution", () =
     ),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(toolAgent)
       const handle = yield* runtime.start(toolAgent, "run", { budget: RunBudget.make({ toolCalls: 0 }) })
       yield* executor.execute(
@@ -350,8 +346,8 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
     layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: address,
         sessionId: "budget-child",
@@ -453,8 +449,8 @@ it.effect("resumes a fan-out interrupted by zero child slots after one extension
     const runId = yield* Effect.scoped(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(parent)
         const handle = yield* runtime.start(parent, "run", { budget: RunBudget.make({ children: 0 }) })
         yield* executor.execute(
@@ -474,8 +470,8 @@ it.effect("resumes a fan-out interrupted by zero child slots after one extension
     yield* Effect.scoped(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(parent)
         expect(yield* runtime.inspect(runId)).toMatchObject({
           status: "waiting",
@@ -564,8 +560,8 @@ it.effect("recomputes spend after fresh object-host recovery and resumes without
     const runId = yield* Effect.scoped(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ tokens: 1 }) })
         yield* executor.execute(
@@ -593,8 +589,8 @@ it.effect("recomputes spend after fresh object-host recovery and resumes without
     yield* Effect.scoped(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         const reopened = yield* runtime.inspect(runId)
         expect(reopened).toMatchObject({
           status: "waiting",
@@ -664,8 +660,8 @@ it.effect("clears a stale budget suspension when child settlement refunds its di
       runtimeLayer(fixture.layer),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         const worker = Agent.make({ name: "refund-worker" })
         const delegate = AgentTool.fanOut({
           name: "delegate_refund",

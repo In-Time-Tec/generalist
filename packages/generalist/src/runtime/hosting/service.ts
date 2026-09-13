@@ -1,5 +1,6 @@
-import { Clock, DateTime, Effect, Layer, Option, Predicate, Ref, Schema, Stream } from "effect"
+import { Clock, DateTime, Effect, Layer, Option, Predicate, Ref, Schema, Stream, type Types } from "effect"
 import type { DurabilityFailure } from "../../durability/errors.js"
+import { make as makeSessions } from "./sessions.js"
 import { Prompt } from "effect/unstable/ai"
 /* eslint-disable max-lines -- the Runtime host layer implements one service contract */
 import {
@@ -24,9 +25,10 @@ import {
   type SendError,
   type RunSendOptions,
   type RunSendError,
+  type RuntimeInspection,
   type StartExecutionInput,
   type SpawnInput,
-} from "../service.js"
+} from "../engine.js"
 import { normalizePrompt } from "../state/prompt.js"
 import { normalizeInitialChild, normalizeInitialFanOut } from "../state/start.js"
 import { ActiveExecutions } from "../execution/active-executions.js"
@@ -62,6 +64,7 @@ import { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import { WakeEventInvalid } from "../execution/trigger/wake.js"
 import { make as makeChildAdmission } from "../child/admission.js"
 import { fieldsForEvents as inspectorFieldsForEvents } from "../execution/agent/inspection.js"
+import { executableRevision } from "../executable/public-identity.js"
 const nextMessageId = (prefix: string, key: string): string => `${prefix}:${key}`
 const startAddress = makeAddress("runtime:start")
 type MutableStartAdmission = { -readonly [Key in keyof AdmitStartInput]: AdmitStartInput[Key] }
@@ -505,6 +508,13 @@ const makeRuntimeWith = (
       createSession: store.createHostSession,
       configureDelegationPolicy: store.configureDelegationPolicy,
       sessionSelection: agentStart.sessionSelection,
+      hold: agentStart.hold,
+      sessions: makeSessions({
+        store,
+        agents,
+        selection: agentStart.sessionSelection,
+        control: (input) => service.controlSession(input),
+      }),
       submitSessionInput: store.submitSessionInput,
       updateSessionInput: store.updateSessionInput,
       removeSessionInput: store.removeSessionInput,
@@ -684,14 +694,21 @@ const makeRuntimeWith = (
               ),
             )
           const inspector = yield* inspectorFieldsForEvents(snapshot.usageFacts)(events)
-          const inspection = {
+          const revision = executableRevision(execution.registrations)
+          const inspection: Types.Mutable<RuntimeInspection> = {
             ...snapshot.run,
+            waitOpenedAtSequence: Object.fromEntries(
+              events.flatMap((event) =>
+                event._tag === "RunWaiting" ? [[event.wait.waitId, event.sequence] as const] : [],
+              ),
+            ),
             turn: snapshot.turn,
             ...inspector,
             budget: snapshot.budget,
             gates: snapshot.gates,
             children,
           }
+          if (revision !== undefined) inspection.revision = revision
           return execution.suspension === undefined ? inspection : { ...inspection, suspension: execution.suspension }
         }),
       fork: (runId, input) =>

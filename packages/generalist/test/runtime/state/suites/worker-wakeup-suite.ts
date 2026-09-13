@@ -1,7 +1,9 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import { ExecutableResolver, LocalScheduler, Runtime } from "../../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import { Agent } from "../../../../src/index.js"
 import { objectRuntimeLayer } from "../../execution/object.js"
 import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
@@ -60,7 +62,7 @@ it.effect("reclaims durable work after a missed wake across object-host reconstr
       second,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const scheduler = yield* LocalScheduler
         yield* scheduler.tick
         yield* scheduler.idle
         expect((yield* runtime.inspect(receipt.runId)).status).toBe("succeeded")

@@ -28,6 +28,8 @@ import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
 import { make as makeToolBatch, updateCall } from "../../../src/core/agent/tools/checkpoint.js"
 import { applyToolOutcome } from "../../../src/core/agent/tools/checkpoint-operation.js"
 import { allowAllAuthorization } from "../../authorization.js"
+import { HostedRun } from "../../../src/core/agent/lifecycle/run-handle.js"
+import { externalRunInbox } from "../../../src/core/turn/steering-inbox.js"
 
 type JsonRoundTripValue = typeof Schema.Unknown.Type
 const roundTrip = (value: JsonRoundTripValue): JsonRoundTripValue => Json.parse(Json.stringify(value))
@@ -38,6 +40,8 @@ const transcriptInputSchema = Schema.Struct({ transcriptDigest: Schema.String })
 const pendingPromptStateSchema = Schema.Struct({
   pending: Schema.Struct({ key: Schema.String, input: Schema.Struct({ promptDigest: Schema.String }) }),
 })
+const hostedInbox = (runId: string) =>
+  externalRunInbox({ runId, takeSteering: Effect.succeed([]), takeFollowUp: Effect.succeed([]) })
 
 describe("executable identity", () => {
   it("counts handoff edges by structural source and target identity", () => {
@@ -755,9 +759,11 @@ describe("DurableDriver Agent.stream integration", () => {
           const driver = DurableDriver.makeLoopDriver({ logicalOperationId: "first", sessionId: "first" })
           const checkpoint = yield* driver.initial({ prompt: Prompt.make("first"), budget: RunBudget.make({}) })
           const second = Agent.make({ name: "second" })
-          const failure = yield* Agent.stream(second, "second", {
-            driverCheckpoint: checkpoint,
-          }).pipe(Stream.runDrain, Effect.flip)
+          const failure = yield* HostedRun.stream(
+            second,
+            { prompt: "second", driverCheckpoint: checkpoint },
+            hostedInbox("checkpoint-without-identity"),
+          ).pipe(Stream.runDrain, Effect.flip)
           expect(failure._tag).toBe("generalist/core/DriverStateInvalid")
           expect(failure.message).toContain("explicit executable identity")
         }),
@@ -1507,21 +1513,31 @@ describe("DurableDriver Agent.stream integration", () => {
                 Effect.map(Session.buildContext),
               ),
             )
-          const baseline = yield* Agent.stream(agent, rawPrompt, {
-            logicalOperationId: "compacted-baseline",
-            executableRef: executable.ref,
-            sessionId: "compacted-baseline",
-            compaction: { contextWindow: 1 },
-          }).pipe(Stream.runCollect)
+          const baseline = yield* HostedRun.stream(
+            agent,
+            {
+              prompt: rawPrompt,
+              logicalOperationId: "compacted-baseline",
+              executableRef: executable.ref,
+              sessionId: "compacted-baseline",
+              compaction: { contextWindow: 1 },
+            },
+            hostedInbox("compacted-baseline"),
+          ).pipe(Stream.runCollect)
           const baselineFinal = yield* sessionContext("compacted-baseline")
 
           activeRun = "recovery"
-          const recoveryFiber = yield* Agent.stream(agent, rawPrompt, {
-            logicalOperationId: "compacted-recovery",
-            executableRef: executable.ref,
-            sessionId: "compacted-recovery",
-            compaction: { contextWindow: 1 },
-          }).pipe(Stream.runDrain, Effect.forkChild({ startImmediately: true }))
+          const recoveryFiber = yield* HostedRun.stream(
+            agent,
+            {
+              prompt: rawPrompt,
+              logicalOperationId: "compacted-recovery",
+              executableRef: executable.ref,
+              sessionId: "compacted-recovery",
+              compaction: { contextWindow: 1 },
+            },
+            hostedInbox("compacted-recovery"),
+          ).pipe(Stream.runDrain, Effect.forkChild({ startImmediately: true }))
           yield* Deferred.await(completionStarted)
           yield* Deferred.succeed(completionRelease, undefined)
           const interrupted = yield* Fiber.await(recoveryFiber)
@@ -1538,13 +1554,18 @@ describe("DurableDriver Agent.stream integration", () => {
           expect((yield* sessionContext("compacted-recovery")).content).toEqual(compactedRequest.content)
 
           replaySettled = true
-          const recovered = yield* Agent.stream(agent, Prompt.empty, {
-            logicalOperationId: "compacted-recovery",
-            executableRef: executable.ref,
-            driverCheckpoint: pendingCheckpoint!,
-            sessionId: "compacted-recovery",
-            compaction: { contextWindow: 1 },
-          }).pipe(Stream.runCollect)
+          const recovered = yield* HostedRun.stream(
+            agent,
+            {
+              prompt: Prompt.empty,
+              logicalOperationId: "compacted-recovery",
+              executableRef: executable.ref,
+              driverCheckpoint: pendingCheckpoint!,
+              sessionId: "compacted-recovery",
+              compaction: { contextWindow: 1 },
+            },
+            hostedInbox("compacted-recovery"),
+          ).pipe(Stream.runCollect)
           const recoveredFinal = yield* sessionContext("compacted-recovery")
 
           expect(normalizedCompactionInputs).toHaveLength(2)

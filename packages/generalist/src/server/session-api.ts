@@ -3,16 +3,17 @@ import { Prompt } from "effect/unstable/ai"
 import { QueueReceipt } from "../runtime/session/queue.js"
 import { SessionFamilyInput, SessionFamilyPage } from "../runtime/session/retained.js"
 import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { HostSession, HostSessionSnapshot } from "../runtime/session/host.js"
+import { SessionHistoryInput } from "../runtime/session/page.js"
+import { apiErrors, InvalidCursor } from "./errors.js"
 import {
-  SessionHistoryInput,
-  SessionHistoryPage,
-  SessionRunsInput,
-  SessionRunsPage,
-  SessionRunSummary,
-} from "../runtime/session/page.js"
-import { ConversationEntry } from "../runtime/session/conversation.js"
-import { apiErrors } from "./errors.js"
+  ClientConversationEntry,
+  ClientCursor,
+  ClientRunSummary,
+  ClientSession,
+  ClientSessionHistoryPage,
+  ClientSessionRunsPage,
+  ClientSessionSnapshot,
+} from "./projection/index.js"
 
 /**
  * A client-chosen Session id must be non-empty for canonical storage, short
@@ -35,43 +36,49 @@ const createSession = HttpApiEndpoint.post("create", "/sessions", {
     title: Schema.optionalKey(Schema.String),
     agent: Schema.optionalKey(Schema.String),
   }),
-  success: HostSession,
+  success: ClientSession,
   error: apiErrors,
 })
 const getSession = HttpApiEndpoint.get("get", "/sessions/:id", {
   params: { id: Schema.String },
-  success: HostSession,
+  success: ClientSession,
   error: apiErrors,
 })
 const listSessions = HttpApiEndpoint.get("list", "/sessions", {
-  success: Schema.Array(HostSession),
+  success: Schema.Array(ClientSession),
   error: apiErrors,
 })
 const snapshotSession = HttpApiEndpoint.get("snapshot", "/sessions/:id/snapshot", {
   params: { id: Schema.String },
-  success: HostSessionSnapshot,
+  success: ClientSessionSnapshot,
   error: apiErrors,
 })
 const historySession = HttpApiEndpoint.post("history", "/sessions/:id/history", {
   params: { id: Schema.String },
   payload: SessionHistoryInput,
-  success: SessionHistoryPage,
+  success: ClientSessionHistoryPage,
   error: apiErrors,
+})
+const SessionRunsPayload = Schema.Struct({
+  at: ClientCursor,
+  before: Schema.optionalKey(ClientCursor),
+  rootRunId: Schema.optionalKey(Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(1024))),
+  limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 64 })),
 })
 const pageSessionRuns = HttpApiEndpoint.post("runs", "/sessions/:id/runs/page", {
   params: { id: Schema.String },
-  payload: SessionRunsInput,
-  success: SessionRunsPage,
-  error: apiErrors,
+  payload: SessionRunsPayload,
+  success: ClientSessionRunsPage,
+  error: [...apiErrors, InvalidCursor],
 })
 const entrySession = HttpApiEndpoint.get("entry", "/sessions/:id/entries/:entryId", {
   params: { id: Schema.String, entryId: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(1024)) },
-  success: ConversationEntry,
+  success: ClientConversationEntry,
   error: apiErrors,
 })
 const runSession = HttpApiEndpoint.get("run", "/sessions/:id/runs/:runId", {
   params: { id: Schema.String, runId: Schema.String.check(Schema.isNonEmpty(), Schema.isMaxLength(1024)) },
-  success: SessionRunSummary,
+  success: ClientRunSummary,
   error: apiErrors,
 })
 const familySession = HttpApiEndpoint.post("family", "/sessions/:id/family", {

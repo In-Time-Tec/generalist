@@ -232,7 +232,7 @@ type CommandReceipt<K extends Method> = K extends "appendArtifact"
   ? ArtifactAppendReceipt
   : Effect.Success<ReturnType<Service[K]>>
 
-type CommandInput<K extends Method> = K extends "updateSessionInput"
+type CommandInput<K extends Method> = K extends "updateSessionInput" | "submitSessionInput"
   ? readonly [Parameters<Service[K]>[0]]
   : Readonly<Parameters<Service[K]>>
 

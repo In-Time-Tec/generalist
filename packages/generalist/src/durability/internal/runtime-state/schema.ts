@@ -45,6 +45,12 @@ import type { DataSchema, Reuse } from "./cache.js"
 
 const Counter = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))
 const strings = Schema.Array(Schema.String)
+const RewardCommand = Schema.Struct({
+  runId: Schema.String,
+  leaf: Schema.String,
+  value: Schema.Finite,
+  source: Schema.String,
+})
 
 export const SessionWriteClaim = Schema.Struct({
   sessionId: Schema.String,
@@ -256,6 +262,7 @@ export const fields = ({ reuse, table }: { readonly reuse: Reuse; readonly table
     ),
     lanes: rootMap(Schema.Struct({ queue: strings, acceptedSequence: Counter })),
     idempotency: rootMap(Schema.Struct({ digest: Schema.String, executable: ExecutableRef, receipt: RunReceipt })),
+    rewardCommands: Schema.optionalKey(rootMap(RewardCommand)),
     executableCatalog: rootMap(ExecutableManifest),
     registrationCatalog: rootMap(Schema.Struct({ digest: Schema.String, value: ExecutableRegistration })),
     fanOuts: rootMap(

@@ -1,7 +1,9 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Option, Stream, Tracer } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Approval, Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Approval, Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import { DurabilityFailure } from "../../../../src/durability/errors.js"
 import {
   assistantAddress,
@@ -28,7 +30,7 @@ const testTracer = () => {
 const admitWaitWithClaimedChild = (waitId: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const parent = yield* runtime.send({
       to: assistantAddress,
       sessionId: `session:cancel-wait:${waitId}`,
@@ -92,7 +94,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("enforces first-terminal-wins for complete after cancel", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:terminal",
@@ -135,7 +137,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("rejects a second respond for the same wait", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:respond",
@@ -177,7 +179,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("rejects a resolution kind the wait reason cannot accept and leaves the wait open", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:respond-kind",
@@ -223,7 +225,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("does not commit a signal issued before its wait is registered", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:signal-early",
@@ -294,7 +296,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("rejects a tool result for an approval wait and preserves the approval repair path", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:approval-kind",
@@ -346,7 +348,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("accepts a tool result for an external child placement wait", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:external-kind",
@@ -376,7 +378,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("rejects a tool result for a wait with no generic response control", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:timer-kind",
@@ -412,7 +414,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("preserves a typed approval request and response in Run and tree replay", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:approval-events",
@@ -594,7 +596,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("marks unknown operations without inventing a second payload vocabulary", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:unknown",
@@ -660,7 +662,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("resolves an expired non-replayable operation exactly once", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:resolve-operation",
@@ -755,7 +757,7 @@ layer(objectLayer)("Runtime control and terminals", (it) => {
   it.effect("keeps a cancelled needs-resolution Run unresolved", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:cancel-unknown",

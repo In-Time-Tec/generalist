@@ -7,7 +7,7 @@ import {
   CurrentPurpose,
   CurrentSummaryCall,
   type SummaryCallCell,
-} from "../model/telemetry/events.js"
+} from "../model/telemetry/context.js"
 
 /** Emit the compaction lifecycle around one pass that decided to do work. */
 export const withCompactionLifecycle: {

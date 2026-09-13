@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer } from "effect"
-import { Address, ChildAdmission, Errors, Message, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ChildAdmission, Errors, Message } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
   assistantRef,
@@ -15,8 +17,8 @@ import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface ChildAdmissionBoundsSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
+  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -24,7 +26,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
   options: ChildAdmissionBoundsSuiteOptions<StoreError, Extra>,
 ) => {
   const suite = options.skip === true ? describe.skip : describe
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
   const activate = options.activate ?? (() => Effect.void)
   let sequence = 0
@@ -35,7 +37,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
   }) =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const id = `${options.name}:bounds:${sequence++}`
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -406,7 +408,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
             depth: 0,
             treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
           })
-          const children = ChildAdmission.make(yield* RunStore.RunStore)
+          const children = ChildAdmission.make(yield* RunStore)
           const first = yield* admit(children, receipt.runId, "first")
           const second = yield* admit(children, receipt.runId, "second")
           expect(yield* runtime.inspect(first.childRunId)).toMatchObject({ childReadiness: "ready" })
@@ -462,7 +464,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
       provide(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const initialId = `${options.name}:bounds:initial:${sequence++}`
           const initialFailure = yield* runtime
             .startExecution({

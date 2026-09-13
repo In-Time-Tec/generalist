@@ -10,7 +10,9 @@ import {
   type ToolResolution,
   layerStatic,
 } from "../../../../src/runtime/executable/resolver.js"
-import { Runtime, RunStore, RunExecutor } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
 import type { Service as Executor } from "../../../../src/core/tools/tool-executor.js"
 import { provideScoped } from "../scoped-provide.js"
@@ -59,8 +61,8 @@ const start = (commandId: string) =>
   )
 const execute = (runId: string, commandId: string) =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
-    const host = yield* RunExecutor.RunExecutor
+    const store = yield* RunStore
+    const host = yield* RunExecutor
     yield* host.execute(yield* store.claimExecution({ runId, commandId, ownerId: objectWorkerId }))
   })
 
@@ -77,7 +79,7 @@ it.effect("retains a ToolWait across fresh hosts without redispatching a never-r
     const runId = yield* Effect.gen(function* () {
       const receipt = yield* start("waiting")
       yield* execute(receipt.runId, "first")
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       expect((yield* store.inspect(receipt.runId)).status).toBe("waiting")
       return receipt.runId
     }).pipe((effect) => provideScoped(fresh(), effect))
@@ -107,7 +109,7 @@ it.effect("recovers an interrupted unknown Tool only after an authoritative oper
   return Effect.gen(function* () {
     const identity = yield* Effect.gen(function* () {
       const receipt = yield* start("unknown")
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const claim = yield* store.claimExecution({
         runId: receipt.runId,
         commandId: "crash-claim",
@@ -157,7 +159,7 @@ it.effect("keeps a held-open Tool claim independent of another Run settling", ()
     yield* Effect.gen(function* () {
       const parent = yield* start("parent")
       const tool = yield* start("background")
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parentClaim = yield* store.claimExecution({
         runId: parent.runId,
         commandId: "parent-claim",
@@ -259,8 +261,8 @@ it.effect("persists progress and delivers semantic cancellation to the exact Too
     yield* Effect.gen(function* () {
       const receipt = yield* start("cancel-running")
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
       const fiber = yield* execute(receipt.runId, "cancel-start").pipe(Effect.forkChild)
       yield* Deferred.await(started)
       const events = yield* runtime.history({ runId: receipt.runId, limit: 100 })

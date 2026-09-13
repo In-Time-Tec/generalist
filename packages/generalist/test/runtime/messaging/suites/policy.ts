@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
-import { AgentDirectory, Errors, Messaging, Runtime } from "../../../../src/runtime/index.js"
+import { AgentDirectory, Errors, Messaging } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
 import { textPrompt } from "../../execution/fixtures.js"
 import { messagingBackend, type MessagingBackend } from "../scenario.js"
 

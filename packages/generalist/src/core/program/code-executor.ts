@@ -75,6 +75,15 @@ export interface Request {
     readonly subrequests: number
     readonly outputBytes: number
   }
+  readonly budget: {
+    readonly agentRuns: number
+    readonly concurrency: number
+    readonly toolCalls: number
+    readonly tokens: number
+    readonly wallClockMillis: number
+    readonly logBytes: number
+    readonly outputBytes: number
+  }
   readonly capabilities: ReadonlyArray<CapabilityGrant>
 }
 
@@ -326,6 +335,9 @@ export const makeRequest = (input: {
   readonly outputBytes: number
   readonly toolCalls: number
   readonly agentRuns: number
+  readonly concurrency: number
+  readonly tokens: number
+  readonly logBytes: number
   readonly tools: ReadonlyArray<string>
   readonly steps: ReadonlyArray<string>
   readonly agents: ReadonlyArray<string>
@@ -343,6 +355,15 @@ export const makeRequest = (input: {
     limits: {
       cpuMillis: Math.max(1, input.wallTimeMillis),
       subrequests: Math.max(1, input.toolCalls + input.agentRuns),
+      outputBytes: input.outputBytes,
+    },
+    budget: {
+      agentRuns: input.agentRuns,
+      concurrency: input.concurrency,
+      toolCalls: input.toolCalls,
+      tokens: input.tokens,
+      wallClockMillis: input.wallTimeMillis,
+      logBytes: input.logBytes,
       outputBytes: input.outputBytes,
     },
     capabilities: [

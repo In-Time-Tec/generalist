@@ -342,11 +342,15 @@ export const make = () => {
                 ...ids.map((id) => ({ id, after: previous?.artifacts.get(id)?.updates.length ?? 0 })),
               )
           }
-          for (const key of Record.keys(state)) {
-            const field = state[key]
+          const withSparseFields = (value: HydratedState) => ({ ...value, rewardCommands: value.rewardCommands })
+          const fields = withSparseFields(state)
+          const beforeFields = previous === undefined ? undefined : withSparseFields(previous)
+          const retainedFields = installed === undefined ? undefined : withSparseFields(installed.view)
+          for (const key of Record.keys(fields)) {
+            const field = fields[key]
             if (!(field instanceof Map)) continue
-            const before = previous?.[key]
-            const retained = installed?.view[key]
+            const before = beforeFields?.[key]
+            const retained = retainedFields?.[key]
             const projected = projectTable(
               field,
               before instanceof Map ? before : undefined,

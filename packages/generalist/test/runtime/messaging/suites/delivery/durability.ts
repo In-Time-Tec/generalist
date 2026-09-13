@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
-import { AgentDirectory, Errors, Runtime, RunStore } from "../../../../../src/runtime/index.js"
+import { AgentDirectory, Errors } from "../../../../../src/runtime/index.js"
+import * as Runtime from "../../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { assistantAddress, textPrompt } from "../../../execution/fixtures.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
 
@@ -16,10 +18,10 @@ const encodePrompt = (prompt: Prompt.Prompt): string => Schema.encodeSync(Schema
 export interface MessagingDurabilitySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly layers: () => {
-    readonly admit: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
-    readonly reopen: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
+    readonly admit: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+    readonly reopen: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
   }
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -33,7 +35,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
   const familyIn = (sessionId: string) =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId,
@@ -163,7 +165,7 @@ export const messagingDurabilitySuite = <StoreError, Extra = never>(
       const reopen = provideScoped(
         layers.reopen,
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const resolved = yield* store.resolveAddress(
             AgentDirectory.nameAddress({ scope, name: AgentDirectory.makeName("reviewer") }),
           )

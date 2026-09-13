@@ -24,6 +24,8 @@ import {
   Descriptor as CapabilityDescriptor,
   type Descriptor as CapabilityDescriptorValue,
 } from "../../capability/state.js"
+import { bindCapabilities, capabilitiesFor } from "./hosted/capability-binding.js"
+import { inheritanceFor } from "../../tools/tool-context/internal.js"
 
 const CapabilityDescriptors = Schema.Array(CapabilityDescriptor)
 const isCapabilityDescriptors = Schema.is(CapabilityDescriptors)
@@ -130,7 +132,7 @@ const validCapabilityTools = (
   const handleTools = descriptors.map((descriptor) => descriptor.tool)
   if (!childTools.every((name) => handleTools.includes(name))) return false
   if (!handleTools.every((name) => childTools.includes(name) && parentTools.includes(name))) return false
-  const parentCapabilities = parent.capabilities
+  const parentCapabilities = capabilitiesFor(parent)
   return (
     parentCapabilities === undefined ||
     descriptors.every((descriptor) =>
@@ -182,9 +184,10 @@ const inheritedCapabilities = (
   tools: Inheritance["tools"],
 ): ReadonlyArray<CapabilityDescriptorValue> | undefined => {
   if (isCapabilityDescriptors(tools)) return tools
-  if (parent.capabilities === undefined) return undefined
-  if (tools === "same") return parent.capabilities
-  return parent.capabilities.filter((descriptor) => Object.hasOwn(child.toolkit.tools, descriptor.tool))
+  const parentCapabilities = capabilitiesFor(parent)
+  if (parentCapabilities === undefined) return undefined
+  if (tools === "same") return parentCapabilities
+  return parentCapabilities.filter((descriptor) => Object.hasOwn(child.toolkit.tools, descriptor.tool))
 }
 
 /** @internal Apply process-local child inheritance after authority validation. */
@@ -197,11 +200,11 @@ export const applyInheritance = <A extends AnyAgent>(
   Effect.gen(function* () {
     yield* validateAuthority(parent, child, inherit)
     const sandbox = yield* inheritedSandbox(parent, child, inherit.sandbox)
-    const capabilities = inheritedCapabilities(parent, child, inherit.tools)
+    const derivedCapabilities = inheritedCapabilities(parent, child, inherit.tools)
+    const capabilities = derivedCapabilities ?? capabilitiesFor(child)
     const inherited = {
       ...child,
       ...Object.assign({}, inherit.tools === "same" ? { toolkit: parent.toolkit } : undefined),
-      ...Object.assign({}, capabilities === undefined ? undefined : { capabilities }),
       ...Object.assign(
         {},
         inherit.permissions === "inherit" && parent.authorization !== undefined
@@ -220,7 +223,7 @@ export const applyInheritance = <A extends AnyAgent>(
       ),
       ...Object.assign({}, sandbox === undefined ? undefined : { sandbox }),
     }
-    return inherited
+    return bindCapabilities(inherited, capabilities)
   })
 
 /** One typed Agent invocation admitted into a process-local fan-out. */
@@ -288,12 +291,13 @@ export const recursiveAgentRunner = (execute: RunChild): AgentRunner => ({
     Effect.gen(function* () {
       const context = yield* Effect.serviceOption(ToolContext)
       const parent = Option.isSome(context) ? context.value : undefined
+      const inherited = parent === undefined ? undefined : inheritanceFor(parent)
       let inheritedAgent = agent
-      if (parent?.agent !== undefined) inheritedAgent = yield* applyInheritance(parent.agent, agent, inherit)
+      if (inherited?.agent !== undefined) inheritedAgent = yield* applyInheritance(inherited.agent, agent, inherit)
       else if (isCapabilityDescriptors(inherit.tools)) {
         inheritedAgent = yield* applyInheritance(agent, agent, { ...inherit, sandbox: "share" })
       }
-      const parentHistory = history ?? (parent?.history === undefined ? undefined : yield* parent.history)
+      const parentHistory = history ?? (inherited?.history === undefined ? undefined : yield* inherited.history)
       const historyProjection = inheritedHistory(inherit.history, parentHistory)
       return yield* execute(tasks === undefined ? inheritedAgent : withInheritedTasks(inheritedAgent, tasks), input, {
         ...Object.assign({}, inherit.budget === undefined ? undefined : { budget: inherit.budget }),

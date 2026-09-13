@@ -12,7 +12,11 @@ import {
   ProgramCapabilities,
   CodeExecutor,
 } from "../../src/index.js"
-import { CodeMode, ExecutableResolver, LocalScheduler, RunStore, Runtime } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import * as RunStore from "../../src/runtime/run/store.js"
+import * as LocalScheduler from "../../src/runtime/execution/local-scheduler.js"
+import * as CodeMode from "../../src/runtime/code-mode/internal.js"
 import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor-internal.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
 import { allowAllAuthorization } from "../authorization.js"

@@ -23,7 +23,7 @@ layer(
         .pipe(Effect.flip)
       expect(failure._tag).toBe("generalist/foldkit/SendFailed")
       yield* connection.send({ _tag: "Cancel", sessionId: "run-1", commandId: "cancel-run-1" })
-      expect(Chat.initialModel("run-1").lastSeq).toBe(-1)
+      expect(Chat.initialModel("run-1").lastSeq).toBeNull()
     }),
   )
 

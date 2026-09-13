@@ -45,6 +45,15 @@ const request = (signal = new AbortController().signal): CodeExecutor.Request =>
     signal,
     deadlineMillis: 10_000,
     limits: { cpuMillis: 50, subrequests: 3, outputBytes: 1_024 },
+    budget: {
+      agentRuns: 1,
+      concurrency: 1,
+      toolCalls: 3,
+      tokens: 100,
+      wallClockMillis: 10_000,
+      logBytes: 1_024,
+      outputBytes: 1_024,
+    },
     capabilities: [{ operation: "callTool", names: ["echo"] }],
   }
 }

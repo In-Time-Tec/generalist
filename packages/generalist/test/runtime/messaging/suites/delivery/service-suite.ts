@@ -3,7 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest } from "../../../../../src/index.js"
-import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../../src/runtime/index.js"
+import * as Runtime from "../../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../../src/runtime/execution/run-executor.js"
 import { registrationsFor, textPrompt } from "../../../execution/fixtures.js"
 import { closedTestAgent, pinnedTestAgent } from "../../../run/identity.js"
 import { provideScoped } from "../../../execution/scoped-provide.js"
@@ -92,8 +95,8 @@ it.effect("delivers an addressed message at the next turn boundary without inter
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const target = yield* runtime.send({
           to: address,
           sessionId: "session:boundary-delivery",
@@ -173,8 +176,8 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const target = yield* runtime.send({
           to: address,
           sessionId: "session:sender-attribution",
@@ -244,8 +247,8 @@ it.effect("holds a message for an idle target until its next execution drains it
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const target = yield* runtime.send({
           to: address,
           sessionId: "session:idle-target",

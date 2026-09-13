@@ -3,7 +3,15 @@ import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
-import { Address, ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import type {
+  Cleared as ModelPreviewCleared,
+  Event as ModelPreviewEvent,
+  Frame as ModelPreviewFrame,
+} from "../../../../src/runtime/execution/model-response/preview.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { pinnedTestExecutable as testExecutable } from "../../run/identity.js"
 import { registrationsFor } from "../fixtures.js"
 import { allowAllAuthorization } from "../../../authorization.js"
@@ -28,7 +36,7 @@ const execute = (input: {
 }) =>
   Effect.gen(function* () {
     const releaseModel = yield* Deferred.make<void>()
-    const previewSeen = yield* Deferred.make<Runtime.ModelPreviewEvent>()
+    const previewSeen = yield* Deferred.make<ModelPreviewEvent>()
     const agent = Agent.make({ name: `preview-${input.backend}-${input.observer}` })
     const executable = testExecutable(agent, `preview-${input.backend}-${input.observer}`)
     const address = Address.make(`agent:preview-${input.backend}-${input.observer}`)
@@ -68,8 +76,8 @@ const execute = (input: {
     return yield* scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: `session:${input.backend}:${input.observer}`,
@@ -138,7 +146,7 @@ it.effect("publishes live preview without allowing a blocked subscriber to affec
 it.effect("keeps the claim-wide preview sink open across a tool continuation", () =>
   Effect.gen(function* () {
     const releaseSecondModel = yield* Deferred.make<void>()
-    const secondPreview = yield* Deferred.make<Runtime.ModelPreviewFrame>()
+    const secondPreview = yield* Deferred.make<ModelPreviewFrame>()
     const tool = Tool.make("continue", { parameters: Schema.Struct({}), success: Schema.String })
     const toolkit = Toolkit.make(tool)
     const agent = Agent.make({ name: "preview-tool-continuation", toolkit })
@@ -189,8 +197,8 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
     yield* scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:preview-tool-continuation",
@@ -294,16 +302,16 @@ it.effect("retires the published frame when a response commits while keeping the
     yield* scopedWith(layer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:preview-discard-commit",
           idempotencyKey: "preview-discard-commit",
           prompt: "use the tool, then answer",
         })
-        const events = yield* Ref.make<ReadonlyArray<Runtime.ModelPreviewEvent>>([])
-        const secondPreview = yield* Deferred.make<Runtime.ModelPreviewFrame>()
+        const events = yield* Ref.make<ReadonlyArray<ModelPreviewEvent>>([])
+        const secondPreview = yield* Deferred.make<ModelPreviewFrame>()
         const subscriber = yield* runtime.previews({ runId: receipt.runId }).pipe(
           Stream.runForEach((event) =>
             Effect.all([
@@ -328,10 +336,8 @@ it.effect("retires the published frame when a response commits while keeping the
         yield* Fiber.join(execution)
         yield* Fiber.interrupt(subscriber)
         const observed = yield* Ref.get(events)
-        const frames = observed.filter((event): event is Runtime.ModelPreviewFrame => event._tag === "ModelPreview")
-        const clears = observed.filter(
-          (event): event is Runtime.ModelPreviewCleared => event._tag === "ModelPreviewCleared",
-        )
+        const frames = observed.filter((event): event is ModelPreviewFrame => event._tag === "ModelPreview")
+        const clears = observed.filter((event): event is ModelPreviewCleared => event._tag === "ModelPreviewCleared")
         expect(frames.map((frame) => frame.turn)).toContain(0)
         expect(frames.map((frame) => frame.turn)).toContain(1)
         expect(

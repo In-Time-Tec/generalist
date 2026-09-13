@@ -3,7 +3,7 @@ import type { Address } from "../address.js"
 import type { ExecutableManifest, ExecutableRef, PinnedExecutable } from "../executable/manifest.js"
 import type { Message } from "../messaging/message.js"
 import type { RunReceipt, RunStatus } from "../run.js"
-import type { RunEvent, SteeringDiscardReason } from "../run/event.js"
+import type { RewardInput, RunEvent, SteeringDiscardReason } from "../run/event.js"
 import type { CursorExpired, RuntimeUnavailable, SubscriberLagged } from "../errors.js"
 import type { OperationRecord } from "../operation/record.js"
 import type { ExecutionCheckpoint, ExecutionSuspension } from "../execution/state.js"
@@ -176,6 +176,7 @@ export interface RuntimeState {
   readonly treeRoots: ReadonlyMap<string, TreeRoot>
   readonly lanes: ReadonlyMap<string, Lane>
   readonly idempotency: ReadonlyMap<string, IdempotencyEntry>
+  readonly rewardCommands?: ReadonlyMap<string, RewardInput>
   readonly executableCatalog: ReadonlyMap<string, ExecutableManifest>
   readonly registrationCatalog: ReadonlyMap<string, { readonly digest: string; readonly value: ExecutableRegistration }>
   readonly fanOuts: ReadonlyMap<string, StoredFanOut>
@@ -242,6 +243,7 @@ export const emptyState = (input: {
   treeRoots: new Map(),
   lanes: new Map(),
   idempotency: new Map(),
+  rewardCommands: new Map(),
   executableCatalog: new Map(),
   registrationCatalog: new Map(),
   fanOuts: new Map(),

@@ -23,6 +23,7 @@ import { TestClock } from "effect/testing"
 import { layerRuleStoreMemory } from "../../src/core/policy/permissions.js"
 import { runAddress } from "../../src/runtime/execution/agent/directory.js"
 import { durableIdentity } from "../../src/runtime/executable/registered-agent.js"
+import { engineFor } from "../../src/runtime/hosting/application.js"
 import { SessionSender } from "../../src/runtime/session/message.js"
 import { makeObjectStorage } from "./execution/object.js"
 
@@ -171,7 +172,7 @@ describe("Runtime.layer", () => {
             storage: storageLayer(),
             namespace,
           }),
-        ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime))),
+        ).pipe(Effect.flatMap((context) => engineFor(Context.get(context, Runtime.Runtime)))),
       )
       expect(runtime.start).toBeTypeOf("function")
     }),
@@ -276,7 +277,7 @@ describe("Runtime.layer", () => {
           storage: storageLayer(),
           namespace: { ...namespace, partition: "composition-exec" },
         }),
-      ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime)))
+      ).pipe(Effect.flatMap((context) => engineFor(Context.get(context, Runtime.Runtime))))
       const run = yield* runtime.start(assistant, "Say hi", { idempotencyKey: "exec-1" })
       expect(yield* run.await).toBe("done")
     }).pipe(Effect.scoped),
@@ -284,7 +285,7 @@ describe("Runtime.layer", () => {
 
   it("fails compilation when a declared Agent service is missing", () => {
     const assistant = Agent.make({ name: "assistant-unclosed" })
-    const unclosed = Runtime.layer({
+    const unclosed = Runtime.layer<{ readonly assistant: typeof assistant }, never, never, never, never>({
       agents: { assistant },
       revision: "assistant-v1",
       // @ts-expect-error the services Layer must close LanguageModel for this Agent
@@ -310,7 +311,7 @@ describe("Runtime.layer", () => {
             scheduler: { pollInterval: "1 hour" },
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         const run = yield* runtime.start(assistant, "persist me", { idempotencyKey: "retained-1" })
         return run.runId
       }).pipe(Effect.scoped)
@@ -326,7 +327,7 @@ describe("Runtime.layer", () => {
             scheduler: { pollInterval: "50 millis" },
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         const handle = yield* runtime.getRun(runId)
         const exit = yield* Effect.exit(handle.await)
         return Exit.isFailure(exit) ? Cause.squash(exit.cause) : exit.value
@@ -358,7 +359,7 @@ describe("Runtime.layer", () => {
             scheduler: { pollInterval: "1 hour" },
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         const run = yield* runtime.start(assistant, "persist me", { idempotencyKey: "mismatched-1" })
         return run.runId
       }).pipe(Effect.scoped)
@@ -383,7 +384,7 @@ describe("Runtime.layer", () => {
               }),
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         const handle = yield* runtime.getRun(runId)
         const exit = yield* Effect.exit(handle.await)
         return Exit.isFailure(exit) ? Cause.squash(exit.cause) : exit.value
@@ -415,7 +416,7 @@ describe("Runtime.layer", () => {
             scheduler: { pollInterval: "1 hour" },
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         const run = yield* runtime.start(assistant, "persist me", { idempotencyKey: "resumed-1" })
         return run.runId
       }).pipe(Effect.scoped)
@@ -446,7 +447,7 @@ describe("Runtime.layer", () => {
                   }),
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         const handle = yield* runtime.getRun(runId)
         return yield* handle.await
       }).pipe(Effect.scoped)
@@ -469,7 +470,7 @@ describe("Runtime.layer", () => {
             scheduler: { pollInterval: "1 hour" },
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         return (yield* runtime.start(agent, "recover after registration", { idempotencyKey: "registration-1" })).runId
       }).pipe(Effect.scoped)
 
@@ -484,7 +485,7 @@ describe("Runtime.layer", () => {
             scheduler: { pollInterval: "25 millis" },
           }),
         )
-        const runtime = Context.get(context, Runtime.Runtime)
+        const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
         return yield* (yield* runtime.getRun(runId)).await
       }).pipe(Effect.scoped)
 
@@ -555,7 +556,7 @@ describe("Runtime.layer", () => {
           namespace: { ...namespace, partition: "composition-ready" },
           scheduler: { pollInterval: "50 millis" },
         }),
-      ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime)))
+      ).pipe(Effect.flatMap((context) => engineFor(Context.get(context, Runtime.Runtime))))
       const run = yield* runtime.start(agent, "Say hi", { idempotencyKey: "ready-1" })
       expect(yield* run.await).toBe("done")
     }).pipe(Effect.scoped),
@@ -574,7 +575,7 @@ describe("Runtime.layer", () => {
           namespace: { ...namespace, partition: "composition-held-admission" },
           scheduler: { pollInterval: "25 millis" },
         }),
-      ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime)))
+      ).pipe(Effect.flatMap((context) => engineFor(Context.get(context, Runtime.Runtime))))
       const held = yield* runtime.admit({
         executable: identity.executable,
         registrations: identity.registrations,
@@ -605,7 +606,7 @@ describe("Runtime.layer", () => {
           scheduler: { pollInterval: "1 hour" },
         }),
       ).pipe(Scope.provide(scope))
-      const runtime = Context.get(context, Runtime.Runtime)
+      const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
       const run = yield* runtime.start(agent, "keep accepting addressed input", { idempotencyKey: "retired-runtime-0" })
       const retained = yield* runtime.getRun(run.runId)
       yield* runtime.send(run.runId, "accept before retirement", { idempotencyKey: "retired-runtime-1" })
@@ -669,7 +670,7 @@ describe("Runtime.layer", () => {
           scheduler: { pollInterval: "1 hour" },
         }),
       ).pipe(Scope.provide(scope))
-      const runtime = Context.get(context, Runtime.Runtime)
+      const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
       const run = yield* runtime.start(agent, "keep commands addressable", { idempotencyKey: "retired-resume-0" })
 
       yield* Scope.close(scope, Exit.void)
@@ -787,7 +788,7 @@ describe("Runtime.layer", () => {
           scheduler: { pollInterval: "25 millis" },
         }),
       ).pipe(Scope.provide(scope))
-      const runtime = Context.get(context, Runtime.Runtime)
+      const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
 
       yield* runtime.start(agent, "stay active until scope release", {
         idempotencyKey: "scope-retirement-1",
@@ -816,7 +817,7 @@ describe("Runtime.layer", () => {
           scheduler: { pollInterval: "1 hour" },
         }),
       ).pipe(Scope.provide(scope))
-      const runtime = Context.get(context, Runtime.Runtime)
+      const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
       const run = yield* runtime.start(agent, "keep accepting addressed input", { idempotencyKey: "ownership-loss-0" })
       yield* runtime.send(run.runId, "accept before ownership loss", { idempotencyKey: "ownership-loss-1" })
       yield* runtime.sendMessage({

@@ -9,7 +9,10 @@ import {
   ProgramCapabilities,
   ProgramHandlers,
 } from "../../../src/index.js"
-import { Address, ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { provideScoped } from "../execution/scoped-provide.js"
@@ -118,8 +121,8 @@ it.effect("assigns a fresh identity to every prototype-member operation on a for
     fixture.layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
 
       const source = yield* runtime.send({
         to: fixture.address,

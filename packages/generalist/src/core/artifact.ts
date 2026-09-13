@@ -330,24 +330,30 @@ export interface RegisteredArtifact {
 
 export interface ArtifactRegistryService {
   readonly register: (artifact: RegisteredArtifact) => Effect.Effect<void, ArtifactAlreadyOpen>
+  readonly unregister: (artifact: RegisteredArtifact) => Effect.Effect<void>
   readonly get: (name: string) => Effect.Effect<RegisteredArtifact, ArtifactNotFound>
 }
 
-/** Process-scoped registry joining opened artifacts to Agent and Host surfaces. @internal */
-export class ArtifactRegistry extends Context.Service<ArtifactRegistry, ArtifactRegistryService>()(
-  "generalist/core/artifact/ArtifactRegistry",
-) {}
+const ManagedArtifactToolTypeId: unique symbol = Symbol("generalist/artifact/ManagedArtifactTool")
 
-/** @internal Marker for tool handlers supplied dynamically by ArtifactRegistry. */
-export const ManagedArtifactToolTypeId = "generalist/artifact/ManagedArtifactTool" as const
-/** @internal */
+/** @internal Nominal marker for an Artifact tool with framework-owned handlers. */
 export interface ManagedArtifactTool {
-  readonly [ManagedArtifactToolTypeId]: typeof ManagedArtifactToolTypeId
-  readonly handlers: Context.Context<never>
+  readonly [ManagedArtifactToolTypeId]: true
 }
 
-/** @internal Resolve an open artifact's self-contained handler Context. */
-export const managedToolHandlers = (tool: Tool.Any): Context.Context<never> | undefined =>
-  ManagedArtifactToolTypeId in tool && "handlers" in tool && Context.isContext(tool.handlers)
-    ? tool.handlers
-    : undefined
+const managedHandlers = new WeakMap<Tool.Any, Context.Context<never>>()
+
+/** @internal Bind handlers to one exact framework-created Artifact tool without widening its public shape. */
+// oxlint-disable-next-line effecttsgo/missing-pipeable-signature -- Internal tool binding receives its exact tool and handler context together.
+export const bindManagedArtifactTool = <T extends Tool.Any>(
+  tool: T,
+  handlers: Context.Context<never>,
+): T & ManagedArtifactTool => {
+  const managed = Object.assign(tool, { [ManagedArtifactToolTypeId]: true as const })
+  Object.defineProperty(managed, ManagedArtifactToolTypeId, { enumerable: false })
+  managedHandlers.set(managed, handlers)
+  return managed
+}
+
+/** @internal Resolve handler Context only for the original framework-created Artifact tool identity. */
+export const managedToolHandlers = (tool: Tool.Any): Context.Context<never> | undefined => managedHandlers.get(tool)

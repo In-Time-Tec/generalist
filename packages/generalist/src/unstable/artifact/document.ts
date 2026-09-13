@@ -1,22 +1,22 @@
-import { Context, Effect, Encoding, Schema, Stream } from "effect"
+import { Deferred, Effect, Encoding, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { DurabilityFailure } from "../../durability/errors.js"
-import { BlobStore } from "../../blob-store/index.js"
+import type { BlobStore } from "../../blob-store/index.js"
 import {
   ArtifactBaseStale,
   ArtifactError,
-  ArtifactRegistry,
   ArtifactStorageError,
   artifactEditToolPrefix,
   artifactReadToolPrefix,
+  bindManagedArtifactTool,
   EditResult,
   ReadResult,
   RangeOperation,
   Version,
-  ManagedArtifactToolTypeId,
   type ArtifactAppendReceipt,
   type ArtifactCheckpoint,
   type ArtifactHead,
+  type ArtifactRegistryService,
   type CrdtService,
   type HumanEdit,
   type ManagedArtifactTool,
@@ -25,7 +25,7 @@ import {
 import { DriverInterpreter } from "../../core/durable/driver/interpreter.js"
 import { LoopDriverState } from "../../core/durable/loop-driver-state.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
-import { RunStore } from "../../runtime/run/store.js"
+import type { Backend } from "../../runtime/artifact/export.js"
 
 const toolSuffix = (name: string): string => Encoding.encodeBase64Url(name).replaceAll("=", "")
 
@@ -38,8 +38,11 @@ const normalizeError = <Error>(artifact: string, operation: string, error: Error
 const mapStorageError = (artifact: string, operation: string) =>
   Effect.mapError(<Error>(error: Error) => normalizeError(artifact, operation, error))
 
-const managedTool = <T extends Tool.Any>(value: T, handlers: Context.Context<never>): T & ManagedArtifactTool =>
-  Object.assign(value, { [ManagedArtifactToolTypeId]: ManagedArtifactToolTypeId, handlers })
+interface DocumentServices {
+  readonly backend: Backend
+  readonly blobs: BlobStore["Service"]
+  readonly registry: ArtifactRegistryService
+}
 
 const readCheckpoint = (artifact: string) =>
   Effect.gen(function* () {
@@ -54,55 +57,52 @@ interface Position extends ArtifactCheckpoint {
 }
 
 const positionFor = (
+  services: DocumentServices,
   artifact: string,
   checkpoint: ArtifactCheckpoint,
   runId: string | undefined,
-): Effect.Effect<Position, ArtifactError, RunStore> =>
+): Effect.Effect<Position, ArtifactError> =>
   Effect.gen(function* () {
     if (runId === undefined) return { ...checkpoint } satisfies Position
-    const store = yield* RunStore
-    const forked = yield* store
-      .artifactRunIsFork(runId)
+    const forked = yield* services.backend
+      .isFork(runId)
       .pipe(Effect.catchTag("generalist/runtime/RunNotFound", () => Effect.succeed(false)))
     return forked && checkpoint.branch !== runId
       ? ({ version: checkpoint.version, branch: runId, source: checkpoint } satisfies Position)
       : ({ ...checkpoint } satisfies Position)
   }).pipe(mapStorageError(artifact, "resolve Run artifact branch"))
 
-const loadBytes = (artifact: string, operation: string, head: ArtifactHead) =>
+const loadBytes = (services: DocumentServices, artifact: string, operation: string, head: ArtifactHead) =>
   Effect.gen(function* () {
-    const blobs = yield* BlobStore
-    return (yield* blobs.get(head.snapshot.sha256)).data
+    return (yield* services.blobs.get(head.snapshot.sha256)).data
   }).pipe(mapStorageError(artifact, operation))
 
-const putBytes = (artifact: string, bytes: Uint8Array) =>
-  Effect.gen(function* () {
-    const blobs = yield* BlobStore
-    return yield* blobs.put({
+const putBytes = (services: DocumentServices, artifact: string, bytes: Uint8Array) =>
+  services.blobs
+    .put({
       data: bytes,
       mediaType: "application/vnd.generalist.artifact-crdt",
       filename: `${artifact}.crdt`,
     })
-  }).pipe(mapStorageError(artifact, "store CRDT snapshot"))
+    .pipe(mapStorageError(artifact, "store CRDT snapshot"))
 
 const maxCommitConflicts = 8
 
-const ensurePosition = (artifact: string, crdt: CrdtService, position: Position) =>
+const ensurePosition = (services: DocumentServices, artifact: string, crdt: CrdtService, position: Position) =>
   Effect.gen(function* () {
-    const store = yield* RunStore
     if (position.source === undefined || position.branch === undefined) {
-      return yield* store.artifactSnapshot({
+      return yield* services.backend.snapshot({
         artifact,
         version: position.version,
         ...(position.branch === undefined ? undefined : { branch: position.branch }),
       })
     }
-    const source = yield* store.artifactSnapshot({
+    const source = yield* services.backend.snapshot({
       artifact,
       version: position.source.version,
       ...(position.source.branch === undefined ? undefined : { branch: position.source.branch }),
     })
-    return yield* store.forkArtifact({
+    return yield* services.backend.fork({
       artifact,
       crdt: crdt.id,
       branch: position.branch,
@@ -114,11 +114,10 @@ const ensurePosition = (artifact: string, crdt: CrdtService, position: Position)
     })
   }).pipe(mapStorageError(artifact, "open Run artifact branch"))
 
-const readHead = (artifact: string, crdt: CrdtService, branch?: string) =>
+const readHead = (services: DocumentServices, artifact: string, crdt: CrdtService, branch?: string) =>
   Effect.gen(function* () {
-    const store = yield* RunStore
-    const head = yield* store.artifactHead({ artifact, ...(branch === undefined ? undefined : { branch }) })
-    const content = yield* crdt.read(yield* loadBytes(artifact, "load current snapshot", head))
+    const head = yield* services.backend.head({ artifact, ...(branch === undefined ? undefined : { branch }) })
+    const content = yield* crdt.read(yield* loadBytes(services, artifact, "load current snapshot", head))
     return {
       artifact,
       version: head.version,
@@ -127,15 +126,15 @@ const readHead = (artifact: string, crdt: CrdtService, branch?: string) =>
     } satisfies ReadResult
   }).pipe(mapStorageError(artifact, "read artifact"))
 
-const readForAgent = (artifact: string, crdt: CrdtService) =>
+const readForAgent = (services: DocumentServices, artifact: string, crdt: CrdtService) =>
   Effect.gen(function* () {
     const context = yield* ToolContext
     const checkpoint = yield* readCheckpoint(artifact)
-    if (checkpoint === undefined) return yield* readHead(artifact, crdt)
-    const position = yield* positionFor(artifact, checkpoint, context.runId)
-    if (position.source === undefined) return yield* readHead(artifact, crdt, position.branch)
-    const head = yield* ensurePosition(artifact, crdt, position)
-    return yield* readHead(artifact, crdt, head.branch)
+    if (checkpoint === undefined) return yield* readHead(services, artifact, crdt)
+    const position = yield* positionFor(services, artifact, checkpoint, context.runId)
+    if (position.source === undefined) return yield* readHead(services, artifact, crdt, position.branch)
+    const head = yield* ensurePosition(services, artifact, crdt, position)
+    return yield* readHead(services, artifact, crdt, head.branch)
   })
 
 const sameOperation = (left: RangeOperation, right: RangeOperation): boolean => {
@@ -207,67 +206,73 @@ const receiptLookupInput = (input: CommitInput) => ({
   ...(input.position.branch === undefined ? undefined : { branch: input.position.branch }),
 })
 
-const commit = (input: CommitInput, conflicts = 0): Effect.Effect<EditResult, ArtifactError, RunStore | BlobStore> =>
-  Effect.gen(function* () {
-    const store = yield* RunStore
-    return yield* Effect.suspend(() =>
-      Effect.gen(function* () {
-        const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
-        if (prior !== undefined) return yield* reconcileReceipt(input, prior)
-        const baseHead = yield* ensurePosition(input.artifact, input.crdt, input.position)
-        const current = yield* store.artifactHead({
-          artifact: input.artifact,
-          ...(baseHead.branch === undefined ? undefined : { branch: baseHead.branch }),
-        })
-        const [baseBytes, currentBytes] = yield* Effect.all([
-          loadBytes(input.artifact, "load edit base", baseHead),
-          loadBytes(input.artifact, "load current snapshot", current),
-        ])
-        const edited = yield* input.crdt.edit({
-          artifact: input.artifact,
-          base: baseBytes,
-          current: currentBytes,
-          operation: input.operation,
-        })
-        const snapshot = yield* putBytes(input.artifact, edited.snapshot)
-        const update = yield* store.appendArtifact({
-          artifact: input.artifact,
-          commandId: input.commandId,
-          crdt: input.crdt.id,
-          expected: current.version,
-          base: input.position.version,
-          operation: input.operation,
-          attribution: input.attribution,
-          update: edited.update,
-          snapshot,
-          ...(current.branch === undefined ? undefined : { branch: current.branch }),
-        })
-        return {
-          artifact: input.artifact,
-          base: input.position.version,
-          result: update.result,
-          attribution: input.attribution,
-          ...(update.branch === undefined ? undefined : { branch: update.branch }),
-        }
-      }).pipe(
-        Effect.catchTag("generalist/artifact/ArtifactVersionConflict", (error) =>
-          conflicts >= maxCommitConflicts ? error : commit(input, conflicts + 1),
-        ),
-        Effect.catchIf(Schema.is(DurabilityFailure), (error) =>
-          error.reason === "input-conflict"
-            ? Effect.gen(function* () {
-                const prior = yield* store.artifactAppendReceipt(receiptLookupInput(input))
-                if (prior === undefined) return yield* error
-                return yield* reconcileReceipt(input, prior)
-              })
-            : Effect.fail(error),
-        ),
-        mapStorageError(input.artifact, "edit artifact"),
+const commit = (
+  services: DocumentServices,
+  input: CommitInput,
+  conflicts = 0,
+): Effect.Effect<EditResult, ArtifactError> =>
+  Effect.suspend(() =>
+    Effect.gen(function* () {
+      const prior = yield* services.backend.receipt(receiptLookupInput(input))
+      if (prior !== undefined) return yield* reconcileReceipt(input, prior)
+      const baseHead = yield* ensurePosition(services, input.artifact, input.crdt, input.position)
+      const current = yield* services.backend.head({
+        artifact: input.artifact,
+        ...(baseHead.branch === undefined ? undefined : { branch: baseHead.branch }),
+      })
+      const [baseBytes, currentBytes] = yield* Effect.all([
+        loadBytes(services, input.artifact, "load edit base", baseHead),
+        loadBytes(services, input.artifact, "load current snapshot", current),
+      ])
+      const edited = yield* input.crdt.edit({
+        artifact: input.artifact,
+        base: baseBytes,
+        current: currentBytes,
+        operation: input.operation,
+      })
+      const snapshot = yield* putBytes(services, input.artifact, edited.snapshot)
+      const update = yield* services.backend.append({
+        artifact: input.artifact,
+        commandId: input.commandId,
+        crdt: input.crdt.id,
+        expected: current.version,
+        base: input.position.version,
+        operation: input.operation,
+        attribution: input.attribution,
+        update: edited.update,
+        snapshot,
+        ...(current.branch === undefined ? undefined : { branch: current.branch }),
+      })
+      return {
+        artifact: input.artifact,
+        base: input.position.version,
+        result: update.result,
+        attribution: input.attribution,
+        ...(update.branch === undefined ? undefined : { branch: update.branch }),
+      }
+    }).pipe(
+      Effect.catchTag("generalist/artifact/ArtifactVersionConflict", (error) =>
+        conflicts >= maxCommitConflicts ? error : commit(services, input, conflicts + 1),
       ),
-    )
-  })
+      Effect.catchIf(Schema.is(DurabilityFailure), (error) =>
+        error.reason === "input-conflict"
+          ? Effect.gen(function* () {
+              const prior = yield* services.backend.receipt(receiptLookupInput(input))
+              if (prior === undefined) return yield* error
+              return yield* reconcileReceipt(input, prior)
+            })
+          : Effect.fail(error),
+      ),
+      mapStorageError(input.artifact, "edit artifact"),
+    ),
+  )
 
-const editForAgent = (artifact: string, crdt: CrdtService, input: { base: Version; operation: RangeOperation }) =>
+const editForAgent = (
+  services: DocumentServices,
+  artifact: string,
+  crdt: CrdtService,
+  input: { base: Version; operation: RangeOperation },
+) =>
   Effect.gen(function* () {
     const context = yield* ToolContext
     const commandId = context.operationKey
@@ -286,8 +291,8 @@ const editForAgent = (artifact: string, crdt: CrdtService, input: { base: Versio
         ...(checkpoint === undefined ? undefined : { expected: checkpoint.version }),
       })
     }
-    const position = yield* positionFor(artifact, checkpoint, context.runId)
-    return yield* commit({
+    const position = yield* positionFor(services, artifact, checkpoint, context.runId)
+    return yield* commit(services, {
       artifact,
       crdt,
       position,
@@ -301,8 +306,8 @@ const editForAgent = (artifact: string, crdt: CrdtService, input: { base: Versio
     })
   })
 
-const editForHuman = (artifact: string, crdt: CrdtService, input: HumanEdit) =>
-  commit({
+const editForHuman = (services: DocumentServices, artifact: string, crdt: CrdtService, input: HumanEdit) =>
+  commit(services, {
     artifact,
     crdt,
     position: { version: input.base },
@@ -347,10 +352,14 @@ export interface Document {
   readonly readTool: ReadTool
 }
 
-export const make = (options: { readonly name: string; readonly crdt: CrdtService }) =>
+export const make = (options: {
+  readonly name: string
+  readonly crdt: CrdtService
+  readonly services: DocumentServices
+}) =>
   Effect.gen(function* () {
-    const { name, crdt } = options
-    const services = yield* Effect.context<RunStore | BlobStore>()
+    const { name, crdt, services } = options
+    const closed = yield* Deferred.make<void>()
     const suffix = toolSuffix(name)
     const rawReadTool = Tool.make(`${artifactReadToolPrefix}${suffix}`, {
       description: `Read the current ${name} artifact and its exact version before editing it.`,
@@ -371,29 +380,34 @@ export const make = (options: { readonly name: string; readonly crdt: CrdtServic
     const toolkit = Toolkit.make(rawReadTool, rawEditTool)
     /* oxlint-disable typescript/no-unsafe-type-assertion -- SAFETY: the computed keys are the exact two tools in this toolkit; their handlers use their declared schemas. */
     const handlerDefinitions = {
-      [rawReadTool.name]: () => readForAgent(name, crdt),
-      [rawEditTool.name]: (edit: { base: Version; operation: RangeOperation }) => editForAgent(name, crdt, edit),
+      [rawReadTool.name]: () => readForAgent(services, name, crdt),
+      [rawEditTool.name]: (edit: { base: Version; operation: RangeOperation }) =>
+        editForAgent(services, name, crdt, edit),
     } as Toolkit.HandlersFrom<typeof toolkit.tools>
     /* oxlint-enable typescript/no-unsafe-type-assertion */
     const handlers = yield* toolkit.toHandlers(handlerDefinitions)
-    const readTool = managedTool(rawReadTool, handlers)
-    const editTool = managedTool(rawEditTool, handlers)
-    const read = readHead(name, crdt).pipe(Effect.provide(services))
+    const readTool = bindManagedArtifactTool(rawReadTool, handlers)
+    const editTool = bindManagedArtifactTool(rawEditTool, handlers)
+    const read = readHead(services, name, crdt)
     const registered: RegisteredArtifact = {
       name,
       read,
-      edit: (edit) => editForHuman(name, crdt, edit).pipe(Effect.provide(services)),
+      edit: (edit) => editForHuman(services, name, crdt, edit),
       subscribe: (version = 0) =>
-        Effect.gen(function* () {
-          const store = yield* RunStore
-          return store
-            .artifactUpdates({ artifact: name, version })
-            .pipe(Stream.mapError((error) => normalizeError(name, "subscribe to artifact", error)))
-        }).pipe(Effect.provide(services)),
+        Effect.succeed(
+          Stream.interruptWhen(
+            services.backend
+              .updates({ artifact: name, version })
+              .pipe(Stream.mapError((error) => normalizeError(name, "subscribe to artifact", error))),
+            Deferred.await(closed),
+          ),
+        ),
       readTool,
       editTool,
     }
-    const registry = yield* ArtifactRegistry
-    yield* registry.register(registered)
+    yield* services.registry.register(registered)
+    yield* Effect.addFinalizer(() =>
+      Deferred.succeed(closed, undefined).pipe(Effect.andThen(services.registry.unregister(registered)), Effect.asVoid),
+    )
     return { name, read, readTool, editTool } satisfies Document
   })

@@ -3,7 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
-import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { registrationsFor } from "../../execution/fixtures.js"
 import { testExecutable } from "../../run/identity.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
@@ -112,8 +115,8 @@ export const register = ({
         fixture.runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
-          const host = yield* RunExecutor.RunExecutor
+          const store = yield* RunStore
+          const host = yield* RunExecutor
           const receipt = yield* runtime.send({
             to: fixture.address,
             sessionId: `session:linear-storage:${scale}`,
@@ -139,7 +142,7 @@ export const register = ({
         fixture.runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(yield* runtime.inspect(runId)).toMatchObject({ status: "succeeded" })
           const history: Array<RunEvent> = []
           const limit = scale * 8 + 20

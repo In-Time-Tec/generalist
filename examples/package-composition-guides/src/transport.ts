@@ -1,5 +1,5 @@
 import { BunCrypto } from "@effect/platform-bun"
-import { Config, Console, Effect, Layer, ManagedRuntime, Option, Stream, type Types } from "effect"
+import { Config, Console, Effect, Layer, ManagedRuntime, Option, type Types } from "effect"
 import { Agent, AgentManifest, Approvals, Permissions, Pins } from "generalist"
 import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
@@ -82,14 +82,21 @@ const program = Effect.gen(function* () {
   const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
   const session = yield* host.sessions.create({ id: "guide-session" })
   const handle = yield* host.runs.start(session.id, agent, "Say hello", { idempotencyKey: "guide-message-1" })
-  const first = yield* (yield* host.events.subscribe(session.id)).pipe(Stream.take(1), Stream.runHead)
-  const encoded = yield* Server.eventCodec.encode(Option.getOrThrow(first))
-  yield* Console.log(
-    `admitted ${handle.id}; first Server event: ${first.pipe(
-      Option.map((event) => event._tag),
-      Option.getOrUndefined,
-    )}; wire bytes: ${encoded.length}`,
-  )
+  const first = Server.ClientEvent.make({
+    _tag: "RunChanged",
+    sessionId: session.id,
+    cursor: "opaque-admission-cursor",
+    run: {
+      runId: handle.id,
+      rootRunId: handle.id,
+      agent: { name: agent.name, revision: host.revision },
+      status: "pending",
+      cursor: "0",
+      turn: 0,
+    },
+  })
+  const encoded = yield* Server.eventCodec.encode(first)
+  yield* Console.log(`admitted ${handle.id}; first Client event: ${first._tag}; wire bytes: ${encoded.length}`)
 })
 
 const runtime = ManagedRuntime.make(Layer.merge(runtimeLayer, agentServices))

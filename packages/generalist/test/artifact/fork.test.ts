@@ -5,10 +5,12 @@ import { Effect, Layer } from "effect"
 import { Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, BlobStore, Permissions } from "generalist"
 import { Host } from "generalist/host"
-import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "generalist/runtime"
+import { ExecutableResolver, Runtime } from "generalist/runtime"
+import * as RunExecutor from "../../src/runtime/execution/run-executor.js"
 import { TestModel } from "generalist/testing"
 import { Artifact, ArtifactCrdt, Yjs, layer as artifactLayer } from "generalist/unstable/artifact"
 import { ObjectStore } from "../../src/durability/object-store.js"
+import { RunStore } from "../../src/runtime/run/store.js"
 
 const storage = makeObjectStorage()
 const runtime = objectRuntimeLayer(
@@ -18,6 +20,7 @@ const runtime = objectRuntimeLayer(
 const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
   Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
 )
+const artifacts = artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore))
 const model = TestModel.layer([
   TestModel.toolCall("artifact_read_Zm9yay5tZA", {}, { id: "read-source" }),
   TestModel.text("source done"),
@@ -28,15 +31,7 @@ const model = TestModel.layer([
   ),
   TestModel.text("branch done"),
 ])
-const services = Layer.mergeAll(
-  runtime,
-  blobStore,
-  artifactLayer,
-  Yjs.layer(),
-  model,
-  Permissions.layerAllowAll,
-  Approvals.layerAutoApprove,
-)
+const services = Layer.mergeAll(artifacts, Yjs.layer(), model, Permissions.layerAllowAll, Approvals.layerAutoApprove)
 
 layer(services)("Artifact Runtime fork", (it) => {
   it.effect("forks the artifact at the model-read version and keeps later edits private", () =>
@@ -49,7 +44,7 @@ layer(services)("Artifact Runtime fork", (it) => {
       const host = yield* Host.make({ revision: "local", agents: { [writer.name]: writer } })
       const session = yield* host.sessions.create({ id: "session:artifact:fork" })
       const source = yield* host.runs.start(session.id, writer, "read the plan")
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const executor = yield* RunExecutor.RunExecutor
       yield* executor.execute(
         yield* store.claimExecution({ runId: source.id, ownerId: objectWorkerId, commandId: "artifact-source-claim" }),

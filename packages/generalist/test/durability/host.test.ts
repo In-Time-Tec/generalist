@@ -105,7 +105,7 @@ layer(BunCrypto.layer)("object discovery host", (it) => {
       const inspected = yield* inspect({ ...tenant, partition: "unknown" }).pipe(
         Effect.provideService(ObjectStore, fresh.store),
       )
-      expect(inspected).toMatchObject({ status: "committed", head: { sequence: "0" } })
+      expect(inspected).toMatchObject({ status: "committed", cursor: "0", runCount: 1, sessionCount: 0 })
       expect(fixture.counts.executions).toBe(0)
       const options: Options = {
         ...tenant,
@@ -149,7 +149,7 @@ layer(BunCrypto.layer)("object discovery host", (it) => {
       const location = { ...tenant, partition: "uncommitted" }
       expect(yield* inspect(location).pipe(Effect.provideService(ObjectStore, observed))).toEqual({
         status: "uncommitted",
-        location,
+        namespace: location,
       })
       const result = yield* reconcilePage({
         ...tenant,

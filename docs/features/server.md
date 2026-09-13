@@ -43,9 +43,9 @@ void services
 
 This is a composition fragment, not a runnable server. Provide the activated object-backed Host dependencies and platform HTTP server. The permissive resource callback above is for a single-principal demonstration; a real application must authorize each resource.
 
-`Server.layer({ host, auth, authorization, operator? })` returns an Effect `HttpApiBuilder` Layer. `operator` defaults to false. Operator reads remain available, while mutation routes return `OperatorDisabled` until the server is built with `operator: true`.
+`Server.layer({ host, auth, authorization, operator? })` returns an Effect `HttpApiBuilder` Layer. `operator` defaults to false. Recovery explanation remains available to principals separately approved for the `operator` authorization action, while mutation routes also return `OperatorDisabled` until the server is built with `operator: true`.
 
-`Server.authBearer({ token, principal })` rejects an empty token or invalid principal at construction. The principal has nonempty `id` and `tenantId` plus role `controller` or `spectator`. Authorization checks tenant identity, prevents spectator mutations, and invokes the application resource policy before bytes or mutations cross the boundary. Custom `Server.Authentication` implementations must provide `Server.CurrentPrincipal`. Operator attribution uses that authenticated principal. `/openapi.json` is public; every declared API route uses Authentication.
+`Server.authBearer({ token, principal })` rejects an empty token or invalid principal at construction. The principal has nonempty `id` and `tenantId` plus role `controller` or `spectator`. Authorization checks tenant identity, prevents spectators from mutation and operator actions, and invokes the application resource policy with `read`, `observe`, `mutate`, or `operator` before bytes or mutations cross the boundary. Custom `Server.Authentication` implementations must provide `Server.CurrentPrincipal`. Operator attribution uses that authenticated principal. `/openapi.json` is public; every declared API route uses Authentication.
 
 ## Typed client
 
@@ -123,31 +123,31 @@ Future ingress features add one HttpApi group to `Server.api` and one matching i
 
 ## SSE and WebSocket
 
-Both streaming transports carry the same Schema-validated `Server.HostEvent`. Events are Session-scoped and use the Host's durable exclusive cursor. SSE sets `id` to the Host cursor, uses the Host wrapper tag as `event`, and JSON-encodes the complete HostEvent as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter; a malformed cursor query is ignored when the header is present, while a malformed winning source is rejected with `400` before the stream opens. Authorization is rechecked before each committed event and preview delivery, so a revoked resource closes its stream instead of retaining opening-time authority.
+Both streaming transports carry the same Schema-validated `Server.ClientEvent`; WebSocket additionally carries `Server.ClientPreview`. Events are Session-scoped and use the Host's durable exclusive cursor, encoded as an opaque string. SSE sets `id` to that cursor, uses the client variant tag as `event`, and JSON-encodes the explicit public DTO as `data`. `Last-Event-ID` takes precedence over the `cursor` query parameter; a malformed cursor query is ignored when the header is present, while a malformed winning source is rejected with `400` before the stream opens. Authorization is rechecked before each committed event and preview delivery, so a revoked resource closes its stream instead of retaining opening-time authority.
 
-`Conversation` events carry committed conversation changes alongside the Run lifecycle wrappers. Both advance the same Session cursor. A Conversation event has `sessionId`, `cursor`, and `update`; it is not a Run event and has no `runId` or `event` field. Host filters some Runtime Run events, so visible cursor values need not be consecutive.
+`ConversationChanged` carries committed conversation changes alongside `RunChanged`, `ToolProgress`, and `ApprovalRequested`. These variants advance the same Session cursor. The projector names every output field and omits internal executable, registration, claim, checkpoint, provider, and credential records. Host filters some Runtime Run events, so clients must persist and return cursors unchanged instead of parsing or incrementing them.
 
 Both event routes resolve the Session before committing an SSE response or upgrading a WebSocket. An unknown Session therefore returns the declared `SessionNotFound` JSON body with HTTP 404. If an SSE stream fails after its HTTP 200 headers have been committed—for example, because its cursor expired or its subscriber lagged—Effect HttpApi emits one terminal `effect/httpapi/stream/failure` event containing the encoded `ApiError`, then closes the stream. The generated client decodes that event into the typed stream failure.
 
 The WebSocket URL is `/sessions/:id/ws`. Server frames use `Server.eventCodec`. The client cancellation command is `{ _tag: "Cancel", runId, commandId, reason? }`; the server verifies that the Run belongs to the path Session before cancelling it. Preserve `commandId` when retrying. Closing a stream only stops observation.
 
-The default client reconnect schedule is jittered exponential backoff bounded by two elapsed minutes. Reconnection resumes strictly after the last admitted Host cursor. A bounded WebSocket queue prevents an unbounded slow-client buffer.
+The default client reconnect schedule is jittered exponential backoff bounded by two elapsed minutes. Reconnection returns the last admitted client cursor unchanged and resumes strictly after it. A bounded WebSocket queue prevents an unbounded slow-client buffer.
 
 Browser WebSocket constructors cannot attach an Authorization header. A bearer-protected browser should use the SSE and HTTP methods, or the application should provide an Authentication implementation compatible with its cookie or gateway policy rather than putting credentials in a WebSocket URL.
 
 ## Session snapshot and resynchronization
 
-`client.sessions.snapshot({ sessionId })` returns the current version-1 `HostSessionSnapshot`: Session metadata, its exact exclusive `cursor`, recent Run summaries, and `conversation: { leafId, entries, nextLeafId? }`. The conversation follows the authoritative active Session path. Each visible entry retains its original `id`, `parentId`, and Effect AI `Prompt.Message` values; `leafId` remains the original Session leaf, even when that leaf or a parent is a filtered context entry. This is a committed user/tool/assistant display projection, not a transcript reconstructed from Run summaries. System messages and internal context bodies, including memory and skill entries, are omitted.
+`client.sessions.snapshot({ sessionId })` returns the current version-1 `ClientSessionSnapshot`: explicit public Session metadata, its opaque exclusive `cursor`, recent `ClientRunSummary` values, and `conversation: { leafId, entries, nextLeafId? }`. It never returns the Session's executable selection, registrations, recovery authority, or provider references. The conversation follows the authoritative active Session path. Each visible entry retains its original `id`, `parentId`, and Effect AI `Prompt.Message` values; `leafId` remains the original Session leaf, even when that leaf or a parent is a filtered context entry. System messages and internal context bodies, including memory and skill entries, are omitted.
 
 `client.events.connect({ sessionId })` obtains the snapshot before observing events strictly after its cursor. A Conversation update contains `previousLeafId`, `leafId`, `afterEntryId`, and `entries`. For an append, retain the visible prefix through `afterEntryId` and replace the rest with `entries`; an empty suffix can still advance a leaf through a non-display entry. A `reset: true` update replaces the display with its bounded page and optional `nextLeafId`. It does not delete the old branch's immutable entries.
 
 FoldKit validates the previous leaf, retained-prefix anchor, and duplicate entry IDs. An inconsistent update triggers bounded snapshot resynchronization rather than an invented append. Each accepted snapshot establishes a new connection-local epoch; deliveries from obsolete epochs cannot modify it. Reopening or resynchronizing restores committed user messages, tool calls/results, and assistant text without sending another user message. Snapshots are projections of the canonical state, not a second journal.
 
-The FoldKit adapter reads canonical `session.activeRunId` at startup and after root admission or terminal events. Its local `HostDelivery` frame includes that value, or null while idle; the reducer does not infer ownership from a later queued admission. Cancellation and WebSocket preview selection use the same canonical metadata. Queue promotion can therefore change control without waiting for a new admission event from an already-admitted Run. Preview fences remain memory-only and are retired on completion.
+The FoldKit adapter reads canonical `session.activeRunId` at startup and after root admission or terminal events. Its local `HostDelivery` frame pairs that value, or null while idle, with a `ClientEvent`; the reducer does not infer ownership from a later queued admission. Cancellation and WebSocket preview selection use the same canonical metadata. Queue promotion can therefore change control without waiting for a new admission event from an already-admitted Run. Preview authority remains server-internal and is retired on completion.
 
 ### Snapshot limits
 
-The first view contains at most 32 recent Run summaries, selected from the last 256 Session events, plus the canonical `session.activeRunId` summary if it is absent from that window. The total is at most 33, with no duplicate IDs. It traverses at most 64 native conversation entries. Those Run summaries are a keyed activity overlay, not the first admission-history page, and admission order does not determine conversational control. Session selection and pending queue metadata remain canonical and are not projected from history. Start complete Run history separately at the snapshot cursor and reconcile matching IDs with the live overlay. The snapshot does not enumerate the partition's Runs or accumulate all their events, manifests, usage facts, compactions, and results. A summary reports Run identity, family identity, current status and Run cursor, with bounded turn/approval display data. Full inspection and committed-event APIs retain their existing roles.
+The first view contains at most 32 recent Run summaries, selected from the last 256 Session events, plus the canonical `session.activeRunId` summary if it is absent from that window. The total is at most 33, with no duplicate IDs. It traverses at most 64 native conversation entries. Those Run summaries are a keyed activity overlay, not the first admission-history page, and admission order does not determine conversational control. Public queue entries retain their prompt, revision, source, and Agent identity; the executable selections behind them remain internal. Start complete Run history separately at the snapshot cursor and reconcile matching IDs with the live overlay. The snapshot does not enumerate the partition's Runs or accumulate all their events, manifests, usage facts, compactions, and results. A summary reports Run identity, family identity, current status and Run cursor, with bounded turn and approval display data.
 
 Use these Session-authorized methods for older content:
 
@@ -158,7 +158,7 @@ Use these Session-authorized methods for older content:
 
 The HTTP routes are `POST /sessions/:id/history`, `POST /sessions/:id/runs/page`, `GET /sessions/:id/runs/:runId`, and `GET /sessions/:id/entries/:entryId`. All require Session read authorization before accessing storage. Schema rejects malformed or out-of-range request bodies. Unknown or cross-Session selectors return `SessionPageInvalid` with HTTP 400. The existing Session event stream and disposable previews remain the live delivery paths; pagination adds neither a second store nor a UI scheduler.
 
-These bounds apply to display projection and response work. They do not solve canonical partition growth, reduce retained receipts, or certify cold-recovery cost. The durability engine still materializes its canonical state. The administrative `runs.list` and full Run inspection APIs are not bounded display pages.
+These bounds apply to display projection and response work. They do not solve canonical partition growth, reduce retained receipts, or certify cold-recovery cost. The durability engine still materializes its canonical state. Administrative Run list and inspection routes return `ClientRun` projections; separately authorized operator routes retain deliberate recovery diagnostics.
 
 Browser authentication and snapshot/resync are implemented contracts, not a claim of completed browser acceptance. Verify your own cookie/header policy, tenant denials, initial view, reconnect, lag, and spectator behavior before deployment.
 
@@ -166,10 +166,10 @@ Browser authentication and snapshot/resync are implemented contracts, not a clai
 
 - Host is the only Session, Run, execution, approval, operator, and cursor authority.
 - The server validates every serialized request, response, event, and command with Schema.
-- SSE and WebSocket share one HostEvent codec and one exclusive Session cursor contract.
+- SSE and WebSocket share one `ClientEvent` codec and one exclusive, opaque Session cursor contract.
 - Operator mutations are denied by default even though their typed routes remain discoverable.
 - `/openapi.json` and `docs/openapi.json` come from `Server.api`; `bun run test` checks the committed document for drift.
-- The server does not expose Runtime model-response records that Host intentionally filters from its product event projection.
+- Ordinary client DTOs omit executable recovery records even when Runtime and Host retain them; operator diagnostics remain a separate route contract.
 
 ## Related
 

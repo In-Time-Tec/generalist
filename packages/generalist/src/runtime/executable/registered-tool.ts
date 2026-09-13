@@ -97,7 +97,12 @@ export const capture = <T extends Tool.Any>(
     return {
       source: tool,
       context: captured,
-      registrations: [...requiredPins(executable)].map((pin) => ({ pin, codec, version: "1", payload: {} })),
+      registrations: [...requiredPins(executable)].map((pin) => ({
+        pin,
+        codec,
+        version: "1",
+        payload: { pin, revision },
+      })),
       resolution: {
         _tag: "Tool",
         pinned,

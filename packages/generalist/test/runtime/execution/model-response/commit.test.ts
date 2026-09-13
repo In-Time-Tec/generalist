@@ -2,7 +2,8 @@ import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Pins, Session } from "../../../../src/index.js"
-import { Runtime, RunStore } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore, type Service as RunStoreService } from "../../../../src/runtime/run/store.js"
 import { assistantAddress, objectLayer, textPrompt } from "../fixtures.js"
 import { objectWorkerId } from "../object.js"
 
@@ -46,7 +47,7 @@ const completion = (operationKey: string, sessionParentId: string | null, text =
 
 const schedule = (runId: string) =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const claim = yield* store.claimExecution({
       commandId: "runtime-execution-model-response-commit-test-ts-claim-1",
       runId,
@@ -79,14 +80,14 @@ const schedule = (runId: string) =>
     return { store, claim, operation, operationKey, sessionParentId: prefix.id }
   })
 
-const sessionPath = (store: RunStore.Service, sessionId: string) =>
+const sessionPath = (store: RunStoreService, sessionId: string) =>
   Effect.gen(function* () {
     const maybeSession = yield* store.sessionReader(sessionId)
     if (Option.isNone(maybeSession)) return yield* Effect.die("expected Session store")
     return yield* maybeSession.value.path()
   })
 
-const sessionProjection = (store: RunStore.Service, sessionId: string) =>
+const sessionProjection = (store: RunStoreService, sessionId: string) =>
   sessionPath(store, sessionId).pipe(Effect.map(Session.buildContext))
 
 layer(objectLayer)("atomic model response memory commit", (suite) => {

@@ -9,7 +9,9 @@ import { ObjectStore } from "../../../../src/durability/object-store.js"
 import { Address } from "../../../../src/runtime/address.js"
 import { make as makeExecutable, makeTest } from "../../../../src/runtime/executable/manifest.js"
 import { layerStatic, type StaticToolExecutable } from "../../../../src/runtime/executable/resolver.js"
-import { Runtime, RunExecutor, RunStore } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { completedResult } from "../../../runtime/execution/fixtures.js"
 import { provideScoped } from "../../../runtime/execution/scoped-provide.js"
@@ -120,7 +122,7 @@ it.effect("reserves canonical settlement and cancellation bytes when admission i
       fresh(),
       Effect.gen(function* () {
         yield* activate
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const first = yield* store.admitSend(admission("incurred"))
         const cancelled = yield* store.admitSend(admission("cancelled"))
         const claim = yield* store.claimExecution({
@@ -178,7 +180,7 @@ it.effect("reserves canonical settlement and cancellation bytes when admission i
     yield* provideScoped(
       fresh(),
       Effect.gen(function* () {
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         expect((yield* store.inspect(retained.first.runId)).status).toBe("succeeded")
         expect((yield* store.inspect(retained.cancelled.runId)).status).toBe("cancelled")
         expect(
@@ -206,6 +208,7 @@ it.effect("rejects invalid reserved-byte configuration instead of disabling admi
     expect(reserve("admitStart", state)).toBe(4 * 1024 * 1024)
     expect(reserve("startOperation", state)).toBe(4 * 1024 * 1024)
     expect(reserve("completeOperation", state)).toBe(0)
+    expect(reserve("recordReward", state)).toBe(0)
     expect(reserve("cancel", state)).toBe(0)
     expect(toolObligationBytes(1024)).toBe(2_627_584)
   }),
@@ -241,8 +244,8 @@ it.effect("reserves every admitted Tool obligation before fresh-host bounded set
       fresh(),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const executor = yield* RunExecutor
         for (const [index, receipt] of settled.entries()) {
           yield* executor.execute(
             yield* store.claimExecution({
@@ -265,7 +268,7 @@ it.effect("reserves every admitted Tool obligation before fresh-host bounded set
       fresh(),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         for (const receipt of settled) {
           const operation = yield* store.getOperationByKey({
             runId: receipt.runId,

@@ -14,7 +14,7 @@ import {
   fromControlState,
   toControlState,
 } from "../agent/handoff/state.js"
-import type { RunOptions } from "../agent/service.js"
+import type { HostedRunOptions } from "../agent/lifecycle/hosted/options.js"
 import { RunError } from "../agent/run/error.js"
 import { AgentError } from "../agent/event.js"
 import { assemble, type Candidate } from "../tools/tool-registry.js"
@@ -35,7 +35,7 @@ export interface ExecuteInput {
   readonly toolCallId: string
   readonly specialist: string
   readonly params: unknown
-  readonly options: RunOptions
+  readonly options: HostedRunOptions
   readonly session: Option.Option<SessionStore>
   readonly handoffState: Ref.Ref<HandoffRunState>
   readonly chat: Chat.Service
@@ -114,7 +114,7 @@ const verifyTargetModel = (target: Target, turn: number, logicalId: string, hand
       })
 }
 
-const verifyPinnedTarget = (target: Target, options: RunOptions, handoffId: string, turn: number) =>
+const verifyPinnedTarget = (target: Target, options: HostedRunOptions, handoffId: string, turn: number) =>
   Effect.gen(function* () {
     const pinnedRef = options.executableRef
     if (pinnedRef === undefined) return

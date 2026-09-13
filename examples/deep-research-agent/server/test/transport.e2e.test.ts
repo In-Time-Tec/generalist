@@ -153,10 +153,8 @@ describe("deep-research-agent server e2e", () => {
                     ),
                   )
                   const approval = first.find((item) => item._tag === "ApprovalRequested")
-                  if (approval === undefined || approval.event._tag !== "ApprovalRequested") {
-                    return yield* Effect.die("expected ApprovalRequested")
-                  }
-                  const approvalId = approval.event.request.approvalId
+                  if (approval === undefined) return yield* Effect.die("expected ApprovalRequested")
+                  const approvalId = approval.approval.id
                   const explanation = yield* client.operator.explain({ runId: run.id }).pipe(
                     Effect.repeat({
                       schedule: Schedule.spaced("25 millis"),
@@ -177,19 +175,22 @@ describe("deep-research-agent server e2e", () => {
                   })
                   const resumed = Array.from(
                     yield* client.events.subscribe({ sessionId: session.id, cursor: approval.cursor }).pipe(
-                      Stream.takeUntil((item) => item._tag === "Completed"),
+                      Stream.takeUntil(
+                        (item) =>
+                          item._tag === "RunChanged" && item.run.runId === run.id && item.run.status === "succeeded",
+                      ),
                       Stream.runCollect,
                     ),
                   )
                   const completed = resumed.find(
-                    (item) => item._tag === "Completed" && item.event._tag === "RunCompleted",
+                    (item) =>
+                      item._tag === "RunChanged" && item.run.runId === run.id && item.run.status === "succeeded",
                   )
 
-                  expect(first[0]).toMatchObject({ _tag: "RunStarted", runId: run.id })
+                  expect(first[0]).toMatchObject({ _tag: "RunChanged", run: { runId: run.id, status: "pending" } })
                   expect(completed).toMatchObject({
-                    _tag: "Completed",
-                    runId: run.id,
-                    event: { _tag: "RunCompleted" },
+                    _tag: "RunChanged",
+                    run: { runId: run.id, status: "succeeded" },
                   })
                   expect(yield* client.runs.inspect({ runId: run.id })).toMatchObject({ status: "succeeded" })
                 }),

@@ -14,7 +14,7 @@ import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import type { ModelSelection, Registration as ModelRegistration } from "../../core/model/registry.js"
 import { AddContext, onRunStart, type Declaration } from "../../hooks/index.js"
 import type { RunInspection } from "../../runtime/run.js"
-import type { Service as RuntimeService } from "../../runtime/service.js"
+import type { Service as RuntimeService } from "../../runtime/engine.js"
 import {
   Trajectory,
   fromJournal,

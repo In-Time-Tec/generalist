@@ -3,16 +3,12 @@ import { Prompt } from "effect/unstable/ai"
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
 import { Ref as MediaRef } from "../media/ref.js"
 import { BudgetLimits } from "../core/durable/run-budget.js"
-import { HostEvent } from "../host/event.js"
 import { sessions } from "./session-api.js"
 import { Decision } from "../runtime/operation/approval.js"
 import { Explanation, UnknownResolution } from "../runtime/execution/recovery/operator.js"
-import { RunInspection, RunReceipt } from "../runtime/run.js"
-import { RuntimeInspectionResponse } from "../runtime/inspection.js"
-import type { RuntimeInspection } from "../runtime/service.js"
+import { RunReceipt } from "../runtime/run.js"
 import { Authentication } from "./auth.js"
 import { apiErrors, artifactApiErrors, hostTransportErrors, InvalidCursor } from "./errors.js"
-import { CursorFromString } from "./wire.js"
 import { MailboxEntry } from "../runtime/messaging/mailbox.js"
 import { SteeringReceipt } from "../runtime/run/steering.js"
 import {
@@ -21,6 +17,7 @@ import {
   ReadResult as ArtifactReadResult,
   Version as ArtifactVersion,
 } from "../core/artifact.js"
+import { ClientCursor, ClientEvent, ClientRun } from "./projection/index.js"
 
 export const RunStarted = Schema.Struct({ id: Schema.String })
 export type RunStarted = typeof RunStarted.Type
@@ -61,7 +58,7 @@ export type RunMessagePayload = typeof RunMessagePayload.Type
 export interface EventStreamItem {
   readonly id: string
   readonly event: string
-  readonly data: HostEvent
+  readonly data: ClientEvent
 }
 
 interface EventStreamItemEncoded {
@@ -73,7 +70,7 @@ interface EventStreamItemEncoded {
 export const EventStreamItem: Schema.Codec<EventStreamItem, EventStreamItemEncoded> = Schema.Struct({
   id: Schema.String,
   event: Schema.String,
-  data: Schema.fromJsonString(HostEvent),
+  data: Schema.fromJsonString(ClientEvent),
 })
 
 const EndpointError = Schema.Union(apiErrors)
@@ -111,13 +108,12 @@ const startRun = HttpApiEndpoint.post("start", "/sessions/:sessionId/runs", {
 })
 const listRuns = HttpApiEndpoint.get("list", "/sessions/:sessionId/runs", {
   params: { sessionId: Schema.String },
-  success: Schema.Array(RunInspection),
+  success: Schema.Array(ClientRun),
   error: apiErrors,
 })
-const inspectRunResponse: Schema.Codec<RuntimeInspection, unknown> = RuntimeInspectionResponse
 const inspectRun = HttpApiEndpoint.get("inspect", "/runs/:id", {
   params: { id: Schema.String },
-  success: inspectRunResponse,
+  success: ClientRun,
   error: apiErrors,
 })
 const cancelRun = HttpApiEndpoint.post("cancel", "/runs/:id/cancel", {
@@ -145,12 +141,12 @@ const admitChild = HttpApiEndpoint.post("admitChild", "/runs/:id/children", {
 })
 const listChildren = HttpApiEndpoint.get("listChildren", "/runs/:id/children", {
   params: { id: Schema.String },
-  success: Schema.Unknown,
+  success: Schema.Array(ClientRun),
   error: hostTransportErrors,
 })
 const inspectChild = HttpApiEndpoint.get("inspectChild", "/runs/:id/children/:childId", {
   params: { id: Schema.String, childId: Schema.String },
-  success: Schema.Unknown,
+  success: ClientRun,
   error: hostTransportErrors,
 })
 const runs: HttpApiGroup.HttpApiGroup<
@@ -184,7 +180,7 @@ const startTool = HttpApiEndpoint.post("start", "/runs/:id/tools/:name", {
 })
 const inspectTool = HttpApiEndpoint.get("inspect", "/tools/:name/runs/:id", {
   params: { name: Schema.String, id: Schema.String },
-  success: inspectRunResponse,
+  success: ClientRun,
   error: hostTransportErrors,
 })
 const tools: HttpApiGroup.HttpApiGroup<"tools", typeof startTool | typeof inspectTool> = HttpApiGroup.make("tools").add(
@@ -197,18 +193,18 @@ const subscribeEvents = HttpApiEndpoint.get("subscribe", "/sessions/:id/events",
   query: {
     cursor: Schema.optionalKey(
       Schema.String.annotate({
-        description: "Integer Host cursor. Ignored when the Last-Event-ID header is present.",
+        description: "Opaque Session cursor. Ignored when the Last-Event-ID header is present.",
       }),
     ),
   },
-  headers: { "last-event-id": Schema.optionalKey(CursorFromString) },
+  headers: { "last-event-id": Schema.optionalKey(ClientCursor) },
   success: eventStream,
   error: [...apiErrors, InvalidCursor],
 })
 const connectEvents = HttpApiEndpoint.get("connect", "/sessions/:id/ws", {
   params: { id: Schema.String },
-  query: { cursor: Schema.optionalKey(CursorFromString) },
-  error: apiErrors,
+  query: { cursor: Schema.optionalKey(ClientCursor) },
+  error: [...apiErrors, InvalidCursor],
 })
 const events: HttpApiGroup.HttpApiGroup<"events", typeof subscribeEvents | typeof connectEvents> = HttpApiGroup.make(
   "events",

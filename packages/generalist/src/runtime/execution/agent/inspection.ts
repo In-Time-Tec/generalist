@@ -1,7 +1,7 @@
 import { DateTime, Effect, Option, Schema } from "effect"
 import type { RawUsageFact } from "../../run.js"
 import { AgentLoopEventSchema, type RunEvent } from "../../run/event.js"
-import type { RuntimeInspection } from "../../service.js"
+import type { RuntimeInspection } from "../../engine.js"
 import { isInspectionEvent, type InspectionEvent } from "./event.js"
 
 const usageFor = (facts: ReadonlyArray<RawUsageFact>) => {

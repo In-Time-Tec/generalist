@@ -2,7 +2,9 @@ import { expect, it as testIt, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Deferred, Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { RunStore, RunTree, Runtime } from "../../../src/runtime/index.js"
+import { RunTree } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import {
   assistantAddress,
   completedResult,
@@ -60,7 +62,7 @@ const immediateDescendantDelivery = () =>
 const subscribeBeforeReplayRace = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const root = yield* startRoot("tree-follow:subscribe-before-replay")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const claim = yield* store.claimExecution({
@@ -112,7 +114,7 @@ const followCursorValidation = () =>
 const missedWakeRecovery = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const root = yield* startRoot("tree-follow:recovery")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const initialRead = yield* Deferred.make<void>()
@@ -150,7 +152,7 @@ const missedWakeRecovery = () =>
 const replayEquivalence = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const root = yield* startRoot("tree-follow:replay")
     const child = yield* runtime.spawn({
       parentRunId: root.runId,
@@ -246,7 +248,7 @@ testIt.live("replays a terminal object tree immediately after host reopen", () =
     const seeded = yield* provideScoped(
       first,
       Effect.gen(function* () {
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const root = yield* startRoot("tree-follow:restart")
         const before = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
         const claim = yield* store.claimExecution({

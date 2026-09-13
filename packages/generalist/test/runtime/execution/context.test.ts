@@ -1,7 +1,8 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { DurableDriver, ToolContext } from "../../../src/index.js"
-import { ChildAdmission, Errors, Messaging, RunStore } from "../../../src/runtime/index.js"
+import { ChildAdmission, Errors, Messaging } from "../../../src/runtime/index.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import { objectLayer, textPrompt } from "./fixtures.js"
 import { family } from "../messaging/scenario.js"
 import { provideScoped } from "./scoped-provide.js"
@@ -64,7 +65,7 @@ layer(objectLayer)("in-execution parent authority", (it) => {
 
   it.effect("admits a child under the ambient Run even when the caller names another parent", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { parent, first } = yield* family("thread:authority-admit")
       const children = ChildAdmission.makeAgentChildren(store)
       const forged = {
@@ -91,7 +92,7 @@ layer(objectLayer)("in-execution parent authority", (it) => {
 
   it.effect("refuses admission when the ambient ToolContext carries no tool call", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { parent } = yield* family("thread:authority-no-call")
       const children = ChildAdmission.makeAgentChildren(store)
 
@@ -108,7 +109,7 @@ layer(objectLayer)("in-execution parent authority", (it) => {
 
   it.effect("inspects, joins, and cancels only under the ambient Run", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { parent, first } = yield* family("thread:authority-lookup")
       const children = ChildAdmission.makeAgentChildren(store)
       const receipt = yield* children
@@ -147,7 +148,7 @@ layer(objectLayer)("in-execution parent authority", (it) => {
 
   it.effect("lists only the ambient Run's direct children", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const { parent, first } = yield* family("thread:authority-list")
       const children = ChildAdmission.makeAgentChildren(store)
       const receipt = yield* children

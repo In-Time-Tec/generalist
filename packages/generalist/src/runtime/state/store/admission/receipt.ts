@@ -1,5 +1,5 @@
 import type { RunReceipt } from "../../../run.js"
-import type { StartReceipt } from "../../../service.js"
+import type { StartReceipt } from "../../../engine.js"
 import type { FanOutReceipt } from "../../../child/fan-out.js"
 import { childRunIdFor, fanOutIdFor, type AdmitFanOutInput } from "../../../child/fan-out-internal.js"
 import { fanOutMemberSessionId } from "../../../child/session.js"

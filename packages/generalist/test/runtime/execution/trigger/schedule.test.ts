@@ -4,7 +4,10 @@ import { Effect, Layer, Queue, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent } from "generalist"
-import { ExecutableResolver, LocalScheduler, RunStore, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import { DurabilityFailure } from "../../../../src/durability/errors.js"
 import { make as makeTriggerScheduler } from "../../../../src/runtime/execution/trigger/scheduler.js"
 import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
@@ -81,7 +84,7 @@ it.effect("does not persist empty automatic schedule claims while idle or before
       layer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const scheduler = yield* LocalScheduler
         const activatedWrites = writes
         for (let index = 0; index < 16; index++) yield* scheduler.tick
         expect(writes - activatedWrites).toBe(0)
@@ -107,7 +110,7 @@ it.effect("reconciles an attempted claim after its retained lease moves the next
       state.layer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         yield* runtime.register(agent)
         yield* runtime.schedule(agent, "retained claim", {
           rrule: "FREQ=SECONDLY",
@@ -121,7 +124,7 @@ it.effect("reconciles an attempted claim after its retained lease moves the next
           ownerId: "claim-owner",
           nextScheduleAt: Effect.sync(() => nextScheduleAt),
         }).pipe(
-          Effect.provideService(RunStore.RunStore, {
+          Effect.provideService(RunStore, {
             ...store,
             claimSchedules: (input) =>
               store.claimSchedules(input).pipe(
@@ -157,7 +160,7 @@ it.effect("fires fixed UTC recurrences from the Runtime-scoped scheduler under T
       state.layer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const scheduler = yield* LocalScheduler
         yield* runtime.register(agent)
         const receipt = yield* runtime.schedule(agent, "run", {
           rrule: "FREQ=SECONDLY",
@@ -327,8 +330,8 @@ it.effect("fails typed when a stored recurrence cannot advance past the represen
       state.layer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
-        const store = yield* RunStore.RunStore
+        const scheduler = yield* LocalScheduler
+        const store = yield* RunStore
         yield* runtime.register(agent)
         yield* runtime.schedule(agent, "run", {
           rrule: "FREQ=SECONDLY",

@@ -36,7 +36,7 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
   ModelSchema.make({
     sessionId: changes.sessionId ?? model.sessionId,
     connection: changes.connection ?? model.connection,
-    lastSeq: changes.lastSeq ?? model.lastSeq,
+    lastSeq: changes.lastSeq === undefined ? model.lastSeq : changes.lastSeq,
     connectionEpoch: changes.connectionEpoch ?? model.connectionEpoch,
     run: changes.run ?? model.run,
     entries: changes.entries ?? model.entries,
@@ -45,16 +45,6 @@ const changeModel = (model: Model, changes: Partial<Model>): Model =>
     previewAuthority: changes.previewAuthority === undefined ? model.previewAuthority : changes.previewAuthority,
     draft: changes.draft ?? model.draft,
   })
-
-const previewPosition = (
-  authority: NonNullable<Model["previewAuthority"]>,
-  event: Extract<(typeof PreviewDelivery.Type)["delivery"]["event"], { readonly _tag: "ModelPreview" }>,
-): number => {
-  if (event.attemptFence !== authority.attemptFence) return event.attemptFence - authority.attemptFence
-  if (event.generation !== authority.generation) return event.generation - authority.generation
-  if (event.turn !== authority.turn) return event.turn - authority.turn
-  return event.attempt - authority.attempt
-}
 
 const tombstonePreview = (model: Model): Model =>
   changeModel(model, {
@@ -66,66 +56,32 @@ const tombstonePreview = (model: Model): Model =>
 const applyPreview = (model: Model, delivery: typeof PreviewDelivery.Type): Model => {
   if (delivery.epoch !== model.connectionEpoch || delivery.delivery.sessionId !== model.sessionId) return model
   if (model.run._tag !== "Running") return model
-  const { authorityAttemptFence, event, runId } = delivery.delivery
-  if (event.runId !== runId || event.attemptFence !== authorityAttemptFence) return model
+  const event = delivery.delivery
+  const runId = event.runId
   const authority = model.previewAuthority
   if (authority === null || authority.runId !== runId) return model
-  if (event._tag === "ModelPreviewCleared") {
-    if (
-      event.attemptFence < authority.attemptFence ||
-      (event.attemptFence === authority.attemptFence && event.generation < authority.generation)
-    ) {
-      return model
-    }
-    return changeModel(model, {
-      preview: null,
-      previewAuthority:
-        event.attemptFence === authority.attemptFence && event.generation === authority.generation
-          ? { ...authority, tombstoned: true }
-          : {
-              runId,
-              attemptFence: event.attemptFence,
-              generation: event.generation,
-              turn: -1,
-              attempt: -1,
-              modelCallId: null,
-              modelAttemptId: null,
-              sequence: -1,
-              tombstoned: true,
-            },
-    })
+  if (event.attempt < authority.attempt) return model
+  const nextAttempt = event.attempt > authority.attempt
+  if (authority.tombstoned && !nextAttempt) return model
+  if (!nextAttempt && event.sequence < authority.sequence) return model
+  if (!nextAttempt && event.sequence > authority.sequence + 1) return tombstonePreview(model)
+  let text = nextAttempt ? "" : (model.preview?.text ?? "")
+  let reasoning = nextAttempt ? "" : (model.preview?.reasoning ?? "")
+  const value = event.channel === "final" ? text : reasoning
+  const offset = event.droppedBefore ?? 0
+  if (!nextAttempt && event.sequence === authority.sequence && offset === 0 && value.length > 0) return model
+  if (offset !== value.length || value.length + event.append.length > MaxPreviewStateCharacters) {
+    return tombstonePreview(model)
   }
-
-  const position = previewPosition(authority, event)
-  if (position < 0) return model
-  if (position > 0) {
-    if (event.sequence !== 0) return tombstonePreview(model)
-  } else {
-    if (authority.tombstoned) return model
-    if (event.modelCallId !== authority.modelCallId || event.modelAttemptId !== authority.modelAttemptId) {
-      return tombstonePreview(model)
-    }
-    if (event.sequence <= authority.sequence) return model
-    if (event.sequence !== authority.sequence + 1) return tombstonePreview(model)
-  }
-
-  let text = position === 0 ? (model.preview?.text ?? "") : ""
-  let reasoning = position === 0 ? (model.preview?.reasoning ?? "") : ""
-  for (const change of event.changes) {
-    const value = change.channel === "text" ? text : reasoning
-    if (change.offset !== value.length || value.length + change.delta.length > MaxPreviewStateCharacters) {
-      return tombstonePreview(model)
-    }
-    if (change.channel === "text") text += change.delta
-    else reasoning += change.delta
-  }
+  if (event.channel === "final") text += event.append
+  else reasoning += event.append
   return changeModel(model, {
     preview: {
       runId,
-      attemptFence: authorityAttemptFence,
-      turn: event.turn,
-      modelCallId: event.modelCallId,
-      modelAttemptId: event.modelAttemptId,
+      attemptFence: event.attempt,
+      turn: model.run.turn,
+      modelCallId: "",
+      modelAttemptId: "",
       attempt: event.attempt,
       sequence: event.sequence,
       text,
@@ -133,12 +89,12 @@ const applyPreview = (model: Model, delivery: typeof PreviewDelivery.Type): Mode
     },
     previewAuthority: {
       runId,
-      attemptFence: authorityAttemptFence,
-      generation: event.generation,
-      turn: event.turn,
+      attemptFence: event.attempt,
+      generation: 0,
+      turn: model.run.turn,
       attempt: event.attempt,
-      modelCallId: event.modelCallId,
-      modelAttemptId: event.modelAttemptId,
+      modelCallId: null,
+      modelAttemptId: null,
       sequence: event.sequence,
       tombstoned: false,
     },
@@ -156,12 +112,15 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
   if (Schema.is(HostDelivery)(action.event)) {
     if (action.event.epoch !== model.connectionEpoch) return [model, [], Option.none()]
     const event = action.event.event
-    if (event.sessionId !== model.sessionId || event.cursor <= model.lastSeq) return [model, [], Option.none()]
+    if (event.sessionId !== model.sessionId || event.cursor === model.lastSeq) return [model, [], Option.none()]
     const activeRunId = action.event.activeRunId
+    let eventRunId: string | null = null
+    if (event._tag === "RunChanged") eventRunId = event.run.runId
+    else if ("runId" in event) eventRunId = event.runId
     const clearsPreview =
-      event._tag !== "Conversation" &&
-      model.previewAuthority?.runId === event.runId &&
-      (event._tag === "Completed" || (event._tag === "Turn" && event.event._tag === "TurnCompleted"))
+      event._tag === "RunChanged" &&
+      model.previewAuthority?.runId === event.run.runId &&
+      (event.run.status === "succeeded" || event.run.status === "failed" || event.run.status === "cancelled")
     let base = model
     const previousRunId =
       model.run._tag === "Idle" || model.run._tag === "Failed" ? null : (model.previewAuthority?.runId ?? null)
@@ -187,11 +146,21 @@ const updateReceived = (model: Model, action: typeof ReceivedConnection.Type): U
     } else if (clearsPreview) {
       base = tombstonePreview(model)
     }
-    const otherRoot = "event" in event && event.event.parentRunId === undefined && event.runId !== activeRunId
-    if (otherRoot && event._tag !== "Completed")
+    const otherRoot =
+      event._tag === "RunChanged" && event.run.parentRunId === undefined && event.run.runId !== activeRunId
+    if (
+      otherRoot &&
+      event.run.status !== "succeeded" &&
+      event.run.status !== "failed" &&
+      event.run.status !== "cancelled"
+    )
       return [changeModel(base, { lastSeq: event.cursor }), [], Option.none()]
     const [next, output] = applyHostEvent(base, event)
-    return [otherRoot && activeRunId !== null ? changeModel(next, { run: base.run }) : next, [], output]
+    return [
+      otherRoot && activeRunId !== null && eventRunId !== activeRunId ? changeModel(next, { run: base.run }) : next,
+      [],
+      output,
+    ]
   }
   if (action.event.sessionId !== model.sessionId || action.event.epoch < model.connectionEpoch)
     return [model, [], Option.none()]
@@ -268,7 +237,7 @@ export const update: {
         changeModel(model, {
           sessionId: action.sessionId,
           connection: "connecting",
-          lastSeq: -1,
+          lastSeq: null,
           connectionEpoch: -1,
           run: Idle(),
           entries: [],

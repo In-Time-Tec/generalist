@@ -4,7 +4,10 @@ import { Effect, FileSystem, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolContext } from "../../src/index.js"
 import { Cell, CellTool, KernelPool, KernelSnapshotStore } from "../../src/repl/index.js"
-import { ExecutableResolver, RunEvent, RunExecutor, Runtime, RunStore } from "../../src/runtime/index.js"
+import { ExecutableResolver, RunEvent } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import {
   makeBunKernelProvider,
   SandboxProvider,
@@ -149,8 +152,8 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
       Effect.scoped(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const executor = yield* RunExecutor
+          const store = yield* RunStore
           yield* runtime.register(agent)
           const handle = yield* runtime.start(agent, "look it up", {
             sessionId: "session:counterfactual-fork",
@@ -208,8 +211,8 @@ it.live("replays a substituted tool result after reopen without redispatch", () 
     yield* scopedWith(recoveredLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const branch = yield* runtime.fork(source.runId, {
           commandId: "fork:substitute",
@@ -280,8 +283,8 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
         )(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const executor = yield* RunExecutor.RunExecutor
+            const store = yield* RunStore
+            const executor = yield* RunExecutor
             yield* runtime.register(agent)
             const handle = yield* runtime.start(agent, "write source state", { sessionId: sourceSessionId })
             yield* executor.execute(
@@ -321,8 +324,8 @@ it.live("restores a forked Run from a Sandbox snapshot persisted before SQLite r
         )(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const executor = yield* RunExecutor.RunExecutor
+            const store = yield* RunStore
+            const executor = yield* RunExecutor
             yield* runtime.register(agent)
             const handle = yield* runtime.fork(source.runId, {
               commandId: "fork:branch",
@@ -393,8 +396,8 @@ it.live("restores a rewound Run from the retained Sandbox snapshot", () =>
         yield* scopedWith(runtimeLayer)(
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const store = yield* RunStore.RunStore
-            const executor = yield* RunExecutor.RunExecutor
+            const store = yield* RunStore
+            const executor = yield* RunExecutor
             yield* runtime.register(agent)
             const handle = yield* runtime.start(agent, "build state to rewind")
             yield* executor.execute(

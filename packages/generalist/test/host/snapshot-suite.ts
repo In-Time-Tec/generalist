@@ -3,7 +3,9 @@ import { Deferred, Effect, Fiber, Layer, Option, Schema, Stream, type Types } fr
 import { Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host, type SessionRunsInput, type SessionRunsPage } from "generalist/host"
-import { ExecutableResolver, RunStore, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
 import { HostSessionSnapshot } from "../../src/runtime/session/host.js"
 import { applyConversationUpdate } from "../../src/runtime/session/conversation.js"
 import { TestModel } from "generalist/testing"
@@ -34,7 +36,7 @@ export const register = ({
               const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
               const session = yield* host.sessions.create({ id: "conversation-session" })
               const run = yield* host.runs.start(session.id, agent, "original question")
-              const store = yield* RunStore.RunStore
+              const store = yield* RunStore
               const claim = yield* store.claimExecution({
                 runId: run.id,
                 ownerId: objectWorkerId,
@@ -140,7 +142,7 @@ export const register = ({
               const reopened = yield* host.sessions.snapshot(original.snapshot.session.id)
               expect(reopened.conversation).toEqual(original.snapshot.conversation)
               const run = yield* host.runs.start(reopened.session.id, agent, "branch question")
-              const store = yield* RunStore.RunStore
+              const store = yield* RunStore
               const claim = yield* store.claimExecution({
                 runId: run.id,
                 ownerId: objectWorkerId,
@@ -199,7 +201,7 @@ export const register = ({
               const runIds: Array<string> = []
               for (let index = 0; index < 129; index++)
                 runIds.push((yield* host.runs.start(session.id, agent, `input-${index}`)).id)
-              const store = yield* RunStore.RunStore
+              const store = yield* RunStore
               const runId = runIds[0]!
               const claim = yield* store.claimExecution({
                 runId,
@@ -257,7 +259,7 @@ export const register = ({
               }
               expect(ids).toEqual(original.runIds)
               expect(new Set(ids).size).toBe(129)
-              const store = yield* RunStore.RunStore
+              const store = yield* RunStore
               const runtime = yield* Runtime.Runtime
               const claim = yield* store.claimExecution({
                 runId: original.runId,
@@ -404,7 +406,7 @@ export const register = ({
           const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
           const session = yield* host.sessions.create({ id: "conversation-bytes" })
           const run = yield* host.runs.start(session.id, agent, "bounded conversation")
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const claim = yield* store.claimExecution({
             runId: run.id,
             ownerId: objectWorkerId,

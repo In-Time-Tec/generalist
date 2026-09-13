@@ -1,6 +1,8 @@
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
-import { Errors, Runtime, RunStore, RunTree } from "../../../../../src/runtime/index.js"
+import { Errors, RunTree } from "../../../../../src/runtime/index.js"
+import * as Runtime from "../../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../execution/object.js"
 import {
   assistantAddress,
@@ -49,7 +51,7 @@ const admit = (
 
 const succeed = (runId: string, text = runId) =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const claim = yield* store.claimExecution({
       commandId: `${runId}:fan-out:succeed:claim`,
       runId,
@@ -64,7 +66,7 @@ const succeed = (runId: string, text = runId) =>
 
 const fail = (runId: string) =>
   Effect.gen(function* () {
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const claim = yield* store.claimExecution({
       commandId: `${runId}:fan-out:fail:claim`,
       runId,
@@ -248,7 +250,7 @@ layer(objectLayer)("Runtime fan-out", (it) => {
   it.effect("makes a parked outcome win steering and new fan-out admission", () =>
     Effect.gen(function* () {
       const { runtime, parent, input, receipt } = yield* admit("pending-wins", { count: 1 })
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       yield* runtime.send(parent.runId, "prior", { idempotencyKey: "prior" })
       const claim = yield* store.claimExecution({
         commandId: "runtime-state-store-fan-out-service-test-ts-claim-3",
@@ -285,7 +287,7 @@ layer(objectLayer)("Runtime fan-out", (it) => {
           yield* succeed(admitted.parent.runId)
           yield* succeed(admitted.receipt.childRunIds[0]!)
         } else {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           yield* store.claimExecution({
             commandId: "runtime-state-store-fan-out-service-test-ts-claim-5",
             runId: admitted.parent.runId,
@@ -411,7 +413,7 @@ layer(objectLayer)("Runtime fan-out", (it) => {
   it.effect("keeps cancellation nonterminal until a claimed member settles", () =>
     Effect.gen(function* () {
       const { runtime, parent, receipt } = yield* admit("cancel-claimed", { count: 1 })
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const claim = yield* store.claimExecution({
         commandId: "runtime-state-store-fan-out-service-test-ts-claim-6",
         runId: receipt.childRunIds[0]!,
@@ -555,7 +557,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
     yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const before = yield* runtime.inspectFanOut(admitted.fanOutId)
         expect(before.members.map((member) => member.status)).toEqual(["running", "pending", "pending"])
         expect(before.members.map((member) => member.readiness)).toEqual(["ready", "queued", "queued"])
@@ -599,7 +601,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
     yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const second = yield* store.claimExecution({
           commandId: "runtime-sql-store-fan-out-service-test-ts-claim-2",
           runId: admitted.childRunIds[1]!,
@@ -648,7 +650,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
     const admitted = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: "object:terminal-parent-fan-out-join",
@@ -690,7 +692,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
     const settled = yield* withObject(storage)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
         const childClaim = yield* store.claimExecution({
           commandId: "runtime-sql-store-fan-out-service-test-ts-claim-4",
@@ -829,7 +831,7 @@ layer(objectLayer)("keeps object storage fan-out cancellation pending for a clai
   it.effect("keeps object storage fan-out cancellation pending for a claimed member", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "object:fan-out-cancel-claimed",
@@ -867,7 +869,7 @@ layer(objectLayer)("rejects object storage fan-out admission after the parent is
   it.effect("rejects object storage fan-out admission after the parent is terminal", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "object:terminal-parent-fan-out",

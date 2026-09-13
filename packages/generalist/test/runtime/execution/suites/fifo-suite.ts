@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Fiber, Stream } from "effect"
-import { Runtime, RunStore } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import { objectWorkerId } from "../object.js"
 import {
   assistantAddress,
@@ -16,7 +17,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("keeps only the lane head runnable until it settles", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:fifo",
@@ -50,7 +51,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("serializes one Session across different addresses without collapsing idempotency", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:cross-address",
@@ -85,7 +86,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("keeps successors pending across waits on the lane head", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:wait",
@@ -130,7 +131,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("lets cancel bypass the FIFO lane", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:cancel",
@@ -174,7 +175,7 @@ layer(objectLayer)("Runtime FIFO lanes", (it) => {
   it.effect("lets signal bypass the FIFO lane for a waiting head", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const driver = yield* RunStore.RunStore
+      const driver = yield* RunStore
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:signal",

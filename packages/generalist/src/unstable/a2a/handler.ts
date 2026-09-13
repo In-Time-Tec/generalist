@@ -25,8 +25,10 @@ import type { Address } from "../../runtime/address.js"
 import { origin, type Cursor } from "../../runtime/cursor.js"
 import type { RunStatus } from "../../runtime/run.js"
 import type { RunEvent } from "../../runtime/run/event.js"
-import type { EventsError, Service as RuntimeService } from "../../runtime/service.js"
-import { RunNotFound } from "../../runtime/errors.js"
+import type { EventsError, Service as RuntimeService } from "../../runtime/engine.js"
+import type { Service as ApplicationRuntimeService } from "../../runtime/service.js"
+import { engineFor } from "../../runtime/hosting/application.js"
+import { RunNotFound, type RuntimeUnavailable } from "../../runtime/errors.js"
 import { Effect, Function, Option, Schema, Stream } from "effect"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { decode } from "./content.js"
@@ -403,10 +405,14 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
 
 /** @experimental Construct the SDK handler while keeping Runtime as task authority. */
 export const make: {
-  (runtime: RuntimeService, deployment: Deployment): DefaultRequestHandler
-  (deployment: Deployment): (runtime: RuntimeService) => DefaultRequestHandler
+  (runtime: ApplicationRuntimeService, deployment: Deployment): Effect.Effect<DefaultRequestHandler, RuntimeUnavailable>
+  (deployment: Deployment): (runtime: ApplicationRuntimeService) => Effect.Effect<DefaultRequestHandler, RuntimeUnavailable>
 } = Function.dual(
   2,
-  (runtime: RuntimeService, deployment: Deployment): DefaultRequestHandler =>
-    new RuntimeRequestHandler(deployment.card, makeTaskStore(runtime), makeExecutor(runtime, deployment), runtime),
+  (runtime: ApplicationRuntimeService, deployment: Deployment): Effect.Effect<DefaultRequestHandler, RuntimeUnavailable> =>
+    engineFor(runtime).pipe(
+      Effect.map((engine) =>
+        new RuntimeRequestHandler(deployment.card, makeTaskStore(engine), makeExecutor(engine, deployment), engine),
+      ),
+    ),
 )

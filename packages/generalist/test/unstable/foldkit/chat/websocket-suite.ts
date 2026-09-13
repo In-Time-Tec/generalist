@@ -7,7 +7,8 @@ import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter, HttpServer 
 import { Socket } from "effect/unstable/socket"
 import { Agent, Approvals, Permissions } from "generalist"
 import { Host } from "generalist/host"
-import { ExecutableResolver, RunStore } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import { Server } from "generalist/server"
 import { TestModel } from "generalist/testing"
 import { SessionCursorExpired, SessionSubscriberLagged } from "../../../../src/runtime/session/host.js"
@@ -139,7 +140,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
               Stream.tap((event) =>
                 mode === "conversation-gap" && event._tag === "SessionSnapshot" && event.epoch === 0
                   ? Effect.gen(function* () {
-                      const store = yield* RunStore.RunStore
+                      const store = yield* RunStore
                       const claim = yield* store.claimExecution({
                         runId: original.id,
                         ownerId: objectWorkerId,
@@ -171,7 +172,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
                         seen &&
                         model.connectionEpoch === 1 &&
                         model.connection === "open" &&
-                        model.lastSeq >= lateCursor,
+                        model.lastSeq === String(lateCursor),
                     ),
                     Stream.map(({ model }) => model),
                   )
@@ -187,7 +188,12 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
         )
         const snapshots = (yield* Ref.get(received)).filter(Schema.is(Connection.SessionSnapshot))
         expect(snapshots).toHaveLength(reconnects + 1)
-        expect(snapshots[0]?.snapshot).toEqual(firstSnapshot)
+        expect(snapshots[0]?.snapshot).toMatchObject({
+          version: 1,
+          session: { id: firstSnapshot.session.id, lifecycle: "active" },
+          cursor: String(firstSnapshot.cursor),
+          conversation: firstSnapshot.conversation,
+        })
         expect(snapshots[0]?.snapshot.runs.map((run) => run.runId)).toEqual([original.id])
         expect(snapshots[1]?.snapshot.runs.map((run) => run.runId)).toEqual([original.id, replacementRunId])
         expect(snapshots[1]?.snapshot.session.activeRunId).toBe(original.id)
@@ -198,7 +204,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
           ])
         expect(models.at(-1)).toMatchObject({
           connectionEpoch: reconnects,
-          lastSeq: mode === "status-backlog" ? lateCursor : snapshots[1]?.snapshot.cursor,
+          lastSeq: mode === "status-backlog" ? String(lateCursor) : snapshots[1]?.snapshot.cursor,
           run: { _tag: persistent ? "Failed" : "Running" },
         })
         expect(sockets).toHaveLength(reconnects + 1)
@@ -219,7 +225,7 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
           expect(current.previewAuthority?.runId).toBe(original.id)
           expect((yield* Ref.get(received)).findLast(Schema.is(Connection.HostDelivery))).toMatchObject({
             activeRunId: original.id,
-            event: { cursor: lateCursor, _tag: "RunStarted" },
+            event: { cursor: String(lateCursor), _tag: "RunChanged" },
           })
           const withPreview = Chat.update(
             current,
@@ -227,22 +233,13 @@ layer(services, { excludeTestServices: true })("Foldkit real Server client", (it
               event: Connection.PreviewDelivery({
                 epoch: 1,
                 delivery: {
-                  _tag: "PreviewDelivery",
+                  _tag: "Preview",
                   sessionId: session.id,
                   runId: original.id,
-                  authorityAttemptFence: 1,
-                  event: {
-                    _tag: "ModelPreview",
-                    runId: original.id,
-                    attemptFence: 1,
-                    turn: 0,
-                    modelCallId: "current-call",
-                    modelAttemptId: "current-attempt",
-                    attempt: 0,
-                    generation: 1,
-                    sequence: 0,
-                    changes: [{ channel: "text", offset: 0, delta: "current preview" }],
-                  },
+                  attempt: 0,
+                  sequence: 0,
+                  channel: "final",
+                  append: "current preview",
                 },
               }),
             }),

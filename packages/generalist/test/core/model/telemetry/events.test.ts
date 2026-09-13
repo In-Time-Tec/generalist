@@ -2,6 +2,11 @@ import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Schema } from "effect"
 import { AiError, Response } from "effect/unstable/ai"
 import { ModelStreamTermination, ModelTelemetry } from "../../../../src/index.js"
+import {
+  CurrentCompactionId,
+  CurrentInstrumentation,
+  CurrentPurpose,
+} from "../../../../src/core/model/telemetry/context.js"
 
 const aiError = (reason: AiError.AiError["reason"]): AiError.AiError =>
   AiError.make({ module: "TestLanguageModel", method: "streamText", reason })
@@ -258,9 +263,9 @@ describe("ModelTelemetry", () => {
 
   it.effect("defaults the current purpose to conversation", () =>
     Effect.gen(function* () {
-      const purpose = yield* ModelTelemetry.CurrentPurpose
-      const compactionId = yield* ModelTelemetry.CurrentCompactionId
-      const instrumentation = yield* ModelTelemetry.CurrentInstrumentation
+      const purpose = yield* CurrentPurpose
+      const compactionId = yield* CurrentCompactionId
+      const instrumentation = yield* CurrentInstrumentation
 
       expect(purpose).toBe("conversation")
       expect(compactionId).toBeUndefined()

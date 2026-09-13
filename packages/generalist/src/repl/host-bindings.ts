@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { ToolContext, type Service as ToolContextService } from "../core/tools/tool-context.js"
+import { copyInheritance } from "../core/tools/tool-context/internal.js"
 
 /** Every host operation failure is tagged, so a cell can discriminate it as data. */
 export interface Tagged {
@@ -126,7 +127,7 @@ const callContext = <R>(request: Request, base: Context.Context<R>): Context.Con
     request.cellId === undefined
       ? { ...ambient, sessionId: request.sessionId }
       : { ...ambient, sessionId: request.sessionId, toolCallId: request.cellId }
-  return Context.add(base, ToolContext, ToolContext.of(toolContext))
+  return Context.add(base, ToolContext, copyInheritance(ambient, ToolContext.of(toolContext)))
 }
 
 /** Mount modules and reject duplicate module or operation names. */

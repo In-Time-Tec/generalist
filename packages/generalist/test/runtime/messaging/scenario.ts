@@ -1,6 +1,8 @@
 import { objectRuntimeLayer, type ObjectRuntimeOptions } from "../execution/object.js"
 import { Effect, Layer } from "effect"
-import { Runtime, RunStore, type AgentDirectory, type Messaging } from "../../../src/runtime/index.js"
+import { type AgentDirectory, type Messaging } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import type { Client, Simulator } from "../../../src/testing/durability/index.js"
 import {
   assistantAddress,
@@ -41,10 +43,8 @@ export const messagingLayer = (overrides: MessagingOverrides, storage?: Client |
  */
 export interface MessagingBackend<StoreError, Extra = never> {
   readonly name: string
-  readonly layer: (
-    overrides: MessagingOverrides,
-  ) => Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
+  readonly layer: (overrides: MessagingOverrides) => Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -53,7 +53,7 @@ export const messagingBackend = <StoreError, Extra = never>(backend: MessagingBa
   return {
     provide:
       (overrides: MessagingOverrides = {}) =>
-      <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
+      <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
         provideScoped(backend.layer(overrides), effect),
     familyFor: (sessionId: string) => family(sessionId).pipe(Effect.tap(({ parent }) => activate(parent.runId))),
     strangerFor: (sessionId: string) => stranger(sessionId).pipe(Effect.tap((entry) => activate(entry.runId))),
@@ -69,7 +69,7 @@ export const messagingBackend = <StoreError, Extra = never>(backend: MessagingBa
 export const family = (sessionId: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const parent = yield* runtime.send({
       to: assistantAddress,
       sessionId,
@@ -103,7 +103,7 @@ export const family = (sessionId: string) =>
 export const stranger = (sessionId: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId,

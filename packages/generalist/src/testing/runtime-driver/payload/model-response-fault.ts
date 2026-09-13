@@ -4,7 +4,7 @@ import { Prompt, Response } from "effect/unstable/ai"
 import { digest as pinDigest } from "../../../core/durable/pin.js"
 import type { Address } from "../../../runtime/address.js"
 import { RunStore } from "../../../runtime/run/store.js"
-import { Runtime } from "../../../runtime/service.js"
+import { Runtime } from "../../../runtime/engine.js"
 import type { ClaimExecution, Services } from "../contract.js"
 
 /** The atomic projection has one publication boundary, not independently durable statement stages. */

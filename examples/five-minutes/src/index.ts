@@ -2,9 +2,8 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { Config, Console, Effect, Layer, Option, Schema, type Types } from "effect"
 import { Agent } from "generalist"
-import { activate, layer as layerDurability } from "generalist/durability"
 import { type ConnectionOptions, layer as layerS3 } from "generalist/durability/s3"
-import { ExecutableResolver, LocalScheduler, Runtime } from "generalist/runtime"
+import { Runtime } from "generalist/runtime"
 import { layer as testModel, object, text } from "generalist/testing/model"
 
 const assistant = Agent.make({
@@ -56,28 +55,20 @@ const program = Effect.gen(function* () {
   }
   const storage = layerS3(connection)
   // Both scopes use the same remote namespace. Only the reopened scope executes the accepted work.
-  const runtimeLayer = () => {
-    const reconstructed = layerDurability({
-      environment,
-      tenant,
-      partition,
-      addresses: [],
-      schedulerMode: "external",
-    }).pipe(
-      Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)),
-      Layer.provide(storage),
-      Layer.provide(BunCrypto.layer),
-    )
-    return Layer.merge(reconstructed, model)
-  }
+  const runtimeLayer = Runtime.layer({
+    agents: { "five-minute-assistant": assistant },
+    revision: "five-minutes-v1",
+    namespace: { environment, tenant, partition },
+    storage: Layer.merge(storage, BunCrypto.layer),
+    services: model,
+  })
   const start = Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    yield* runtime.register(assistant)
-    return yield* runtime.start(assistant, input, startOptions)
+    return yield* runtime.hold(assistant, input, startOptions)
   })
 
   const firstRunId = yield* Effect.scoped(
-    Layer.build(runtimeLayer()).pipe(
+    Layer.build(runtimeLayer).pipe(
       Effect.flatMap((context) =>
         start.pipe(
           Effect.provide(context),
@@ -88,13 +79,11 @@ const program = Effect.gen(function* () {
   )
 
   const recovered = yield* Effect.scoped(
-    Layer.build(runtimeLayer()).pipe(
+    Layer.build(runtimeLayer).pipe(
       Effect.flatMap((context) =>
         Effect.gen(function* () {
           const handle = yield* start
-          yield* activate
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          yield* scheduler.drain()
+          yield* handle.activate("activate:five-minutes")
           return { runId: handle.runId, output: yield* handle.await }
         }).pipe(Effect.provide(context)),
       ),

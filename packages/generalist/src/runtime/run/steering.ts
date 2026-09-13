@@ -14,7 +14,7 @@ import type { Service as ActiveExecutionsService } from "../execution/active-exe
 import { authorize, type MessagingPolicy } from "../messaging/service.js"
 import { Message } from "../messaging/message.js"
 import type { AdmitSteeringInput, Service as RunStoreService, SteeringAdmission } from "./store.js"
-import type { RunSendError, RunSendOptions } from "../service.js"
+import type { RunSendError, RunSendOptions } from "../engine.js"
 import { requireAgentOrProgram } from "../executable/manifest-internal.js"
 import { RuntimeUnavailable } from "../errors.js"
 

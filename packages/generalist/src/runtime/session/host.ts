@@ -2,7 +2,7 @@ import { Schema, type Effect, type Stream } from "effect"
 import type { DurabilityFailure } from "../../durability/errors.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
 import { Cursor } from "../cursor.js"
-import type { PayloadTooLarge, RuntimeAvailabilityError, RuntimeUnavailable } from "../errors.js"
+import type { PayloadTooLarge, RuntimeAvailabilityError, RuntimeUnavailable, UnknownAgent } from "../errors.js"
 import type { RunInspection } from "../run.js"
 import { RunEvent } from "../run/event.js"
 import { Conversation, ConversationUpdate } from "./conversation.js"
@@ -122,6 +122,7 @@ export class SessionSubscriberLagged extends ActionableTaggedError<SessionSubscr
 export type SessionError = SessionNotFound | RuntimeUnavailable | DurabilityFailure
 export type CreateSessionError = SessionConflict | PayloadTooLarge | RuntimeUnavailable | DurabilityFailure
 export type SessionAdmissionError =
+  | UnknownAgent
   | SessionNotFound
   | SessionQueueConflict
   | PayloadTooLarge
@@ -148,6 +149,7 @@ export interface RuntimeHostSessions {
   ) => Effect.Effect<SessionFamilyPage, SessionError | SessionPageInvalid>
   readonly submitSessionInput: (
     input: SubmitInput,
+    resolveSelection?: import("./queue.js").SelectionResolver,
   ) => Effect.Effect<import("./queue.js").QueueReceipt, SessionAdmissionError>
   readonly updateSessionInput: import("../run/store.js").Service["updateSessionInput"]
   readonly removeSessionInput: import("../run/store.js").Service["removeSessionInput"]

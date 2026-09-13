@@ -27,6 +27,9 @@ import { Identity, ensure } from "./discovery-marker.js"
 export type { Json, Patch, State } from "./protocol.js"
 export const defaultMaxStateBytes = 16 * 1024 * 1024
 export const defaultMaxCommitBytes = 1024 * 1024
+export const defaultMaxReplayBytes = 16 * 1024 * 1024
+export const snapshotByteLimit = (input: { readonly maxStateBytes: number; readonly maxCommitBytes: number }): number =>
+  input.maxStateBytes + input.maxCommitBytes + 4096
 export interface Head {
   readonly sequence: string
   readonly digest: string
@@ -87,9 +90,9 @@ export const make = (options: Options): Effect.Effect<Journal, DurabilityFailure
     }
     const maxStateBytes = options.maxStateBytes ?? defaultMaxStateBytes
     const maxCommitBytes = options.maxCommitBytes ?? defaultMaxCommitBytes
-    const maxSnapshotBytes = maxStateBytes + maxCommitBytes + 4096
+    const maxSnapshotBytes = snapshotByteLimit({ maxStateBytes, maxCommitBytes })
     const snapshotEvery = options.snapshotEvery ?? 128
-    const maxReplayBytes = options.maxReplayBytes ?? 16 * 1024 * 1024
+    const maxReplayBytes = options.maxReplayBytes ?? defaultMaxReplayBytes
     const maxConflictRetries = options.maxConflictRetries ?? 64
     for (const [name, value] of Object.entries({
       maxStateBytes,

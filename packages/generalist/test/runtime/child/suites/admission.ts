@@ -1,14 +1,16 @@
 import { describe, expect, it } from "@effect/vitest"
 import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer } from "effect"
-import { ChildAdmission, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { ChildAdmission } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 import { assistantAddress, completedResult, textPrompt } from "../../execution/fixtures.js"
 
 const parentRun = <R>(label: string, activate: (runId: string) => Effect.Effect<void, never, R>) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId: `session:children:${label}`,
@@ -21,15 +23,15 @@ const parentRun = <R>(label: string, activate: (runId: string) => Effect.Effect<
 
 export interface ChildAdmissionSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore.RunStore | Extra>
+  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
   readonly skip?: boolean
 }
 
 export const childAdmissionSuite = <StoreError, Extra = never>(
   options: ChildAdmissionSuiteOptions<StoreError, Extra>,
 ) => {
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
   const describeBackend = options.skip === true ? describe.skip : describe
   const activate = options.activate ?? (() => Effect.void)

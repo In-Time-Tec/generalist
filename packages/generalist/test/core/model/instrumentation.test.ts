@@ -8,6 +8,7 @@ import {
   type InstrumentOptions,
   makeIdentityCell,
 } from "../../../src/core/model/instrumentation.js"
+import { CurrentCompactionId, CurrentPurpose } from "../../../src/core/model/telemetry/context.js"
 
 const transientError = AiError.make({
   module: "TestLanguageModel",
@@ -1202,8 +1203,8 @@ describe("model instrumentation", () => {
       yield* wrapped
         .generateText({ prompt: "summarize" })
         .pipe(
-          Effect.provideService(ModelTelemetry.CurrentPurpose, "compaction-summary"),
-          Effect.provideService(ModelTelemetry.CurrentCompactionId, "compaction-1"),
+          Effect.provideService(CurrentPurpose, "compaction-summary"),
+          Effect.provideService(CurrentCompactionId, "compaction-1"),
           Effect.provideService(Model.ProviderName, "test-provider"),
           Effect.provideService(Model.ModelName, "test-model"),
         )

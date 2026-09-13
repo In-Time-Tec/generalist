@@ -1,6 +1,6 @@
 # Five minutes
 
-Keep accepted agent work recoverable when its Runtime closes. This example admits a Run into a real S3-compatible object Runtime, closes it, then reopens the same namespace and recovers the Run. The reopened scope explicitly activates durability and drains its external scheduler, showing the storage-backed recovery path rather than merely running the agent again.
+Keep accepted agent work recoverable when its Runtime closes. This example holds a typed Run in an S3-compatible object store, closes the Runtime, then reopens the same namespace and retrieves the same Run through its original idempotency key. The reopened scope activates the held handle and awaits its output; `Runtime.layer` owns registration, activation, and scheduling, so the application never handles a claim or drains an executor.
 
 Generalist's core agent loop does not require storage. This example adds the optional durable Runtime and uses a scripted model, so no model API key is needed.
 

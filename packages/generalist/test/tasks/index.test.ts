@@ -5,7 +5,10 @@ import { Deferred, Effect, Fiber, Layer, Option, Ref, Schema, Stream } from "eff
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, Approvals, Compaction, Hooks, Permissions, RunBudget, Tasks } from "../../src/index.js"
 import { Host } from "../../src/host/index.js"
-import { RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { JournalFault } from "../../src/runtime/operation/journal-fault.js"
 
 const usage = Response.Usage.make({
@@ -110,8 +113,8 @@ it.live("emits TasksUpdated and restores the list from object storage without re
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const session = yield* host.sessions.create({ id: "session:tasks-reopen" })
         const handle = yield* host.runs.start(session.id, agent, "make a task list", startOptions)
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* executor.execute(
           yield* store.claimExecution({
             runId: handle.id,
@@ -146,8 +149,8 @@ it.live("emits TasksUpdated and restores the list from object storage without re
       Effect.gen(function* () {
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent } })
         const handle = yield* host.runs.start(run.sessionId, agent, "make a task list", startOptions)
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         expect(handle.id).toBe(run.runId)
         yield* executor.execute(
           yield* store.claimExecution({
@@ -349,8 +352,8 @@ it.effect("journals task inheritance for durable children", () => {
   return scopedWith(layer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "delegate after writing tasks", {
         budget: RunBudget.make({ children: 2 }),
@@ -461,8 +464,8 @@ it.effect("applies Tasks.update through runtime steer", () =>
     yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "start tasks", {
           sessionId: "session:tasks-steering",

@@ -2,7 +2,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Exit, Fiber, Layer, Option, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, ToolContext, ToolExecutor } from "../../../../src/index.js"
-import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { LoopDriverState } from "../../../../src/core/durable/loop-driver-state.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { registrationsFor } from "../fixtures.js"
@@ -20,7 +23,7 @@ const objectClaims = new Map<
 >()
 
 const objectClaim = (runId: string, label: string) =>
-  Effect.flatMap(RunStore.RunStore, (store) =>
+  Effect.flatMap(RunStore, (store) =>
     store
       .claimExecution({
         commandId: `runtime-execution-recovery-exclusive-test-ts-claim-${label}`,
@@ -142,8 +145,8 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     const runId = yield* scopedWith(firstLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "write exactly once", startOptions)
         yield* host.execute(
@@ -184,8 +187,8 @@ it.live("reopens a typed Agent start without redispatching its completed tool ca
     yield* scopedWith(recoveredLayer)(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "write exactly once", startOptions)
 
@@ -265,8 +268,8 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:execution-crash-recovery",
@@ -354,8 +357,8 @@ it.live("reconciles a crashed framework tool before resuming its Agent", () =>
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
 
         const reopened = yield* runtime.inspect(first.runId)
         if (reopened.status === "running") {
@@ -477,8 +480,8 @@ it.live("keeps one tool operation key across approval suspension and object stor
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:approval-operation-key-restart",
@@ -566,8 +569,8 @@ it.live("keeps one tool operation key across approval suspension and object stor
     )(
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const reopened = yield* store.loadExecution(suspended.runId)
         if (reopened.checkpoint === undefined || !("driverVersion" in reopened.checkpoint)) {
           return yield* Effect.die("reopened checkpoint missing")
@@ -637,7 +640,7 @@ it.effect("object storage reconciles every running operation before execution", 
   return scopedWith(runtimeLayer)(
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: address,
         sessionId: `session:retry-safe-recovery-${backend}`,

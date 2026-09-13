@@ -6,7 +6,9 @@ import { cost as catalogCost } from "../ai/model-catalog.js"
 import type { InvalidOutput } from "../core/agent/event.js"
 import type { DuplicateAgent } from "../runtime/errors.js"
 import type { RunCancelled, RunFailed } from "../runtime/run/event.js"
-import { Runtime, type EventsError, type StartError } from "../runtime/service.js"
+import type { EventsError, StartError } from "../runtime/engine.js"
+import { Runtime } from "../runtime/service.js"
+import { engineFor } from "../runtime/hosting/application.js"
 import { fromJournal, type FromJournalError, type Trajectory } from "../trajectory/index.js"
 
 export const Score = Schema.Struct({
@@ -286,7 +288,7 @@ export const runSuite: RunSuite = Function.dual(
       if (!Number.isSafeInteger(options.concurrency) || options.concurrency < 1) {
         return yield* InvalidSuiteOptions.make({ message: "concurrency must be a positive safe integer" })
       }
-      const runtime = yield* Runtime
+      const runtime = yield* Effect.flatMap(Runtime, engineFor)
       yield* runtime.register(agent)
       const rows = yield* Effect.forEach(
         dataset,

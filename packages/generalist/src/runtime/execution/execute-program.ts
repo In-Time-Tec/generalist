@@ -8,12 +8,15 @@ import { failureMessage } from "../run/errors-internal.js"
 import { AgentExecutionFailure, RunTerminal } from "../errors.js"
 import { make as makeProgramRunner } from "../program/runner.js"
 import { programWait } from "../program/approval.js"
+import type { Any as AnyAgent } from "../../core/agent/lifecycle/definition.js"
+import type { ChildCapabilities } from "./scope.js"
 
 export const executeProgram = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly store: RunStore
   readonly resolution: ProgramResolution
+  readonly children?: ChildCapabilities<Readonly<Record<string, AnyAgent>>>
 }): Effect.Effect<void, never, Scope.Scope> => {
   const { claim, claimed, resolution, store } = input
   const programRunner = makeProgramRunner({
@@ -22,6 +25,7 @@ export const executeProgram = (input: {
     store,
     executor: resolution.executor,
     handlers: resolution.handlers,
+    ...Object.assign({}, input.children === undefined ? undefined : { children: input.children }),
   })
   const execution = run(resolution.program, claimed.message.prompt).pipe(
     Effect.provideService(ProgramRunner, programRunner),

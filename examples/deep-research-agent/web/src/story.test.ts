@@ -1,9 +1,8 @@
 // @vitest-environment happy-dom
 
 import { Prompt, Response } from "effect/unstable/ai"
-import { HostEvent } from "generalist/host"
 import { Chat, Connection } from "generalist/unstable/foldkit"
-import { Errors, ExecutableManifest, RunEvent } from "generalist/runtime"
+import type { ClientEvent } from "generalist/server"
 import { Schema } from "effect"
 import { Story } from "foldkit"
 import { describe, expect, test } from "vitest"
@@ -11,25 +10,44 @@ import { GotChatAction, OpenedSession, SessionReady, init, type Model, update } 
 
 const sessionId = "deep-research-story"
 
-const agent = ExecutableManifest.makeTest("deep-research", "1").ref
-const runEvent = <Fields extends object>(sequence: number, fields: Fields): RunEvent.RunEvent =>
-  Schema.decodeUnknownSync(RunEvent.RunEvent)({
-    specVersion: "1",
-    eventId: `${sessionId}:${sequence}`,
-    runId: sessionId,
-    sequence,
-    executableRef: agent,
-    rootRunId: sessionId,
-    depth: 0,
-    occurredAt: "2026-08-03T00:00:00.000Z",
-    ...fields,
-  })
-
-const eventFrame = (cursor: number, tag: HostEvent["_tag"], event: RunEvent.RunEvent): Connection.Incoming =>
+const eventFrame = (event: ClientEvent, activeRunId: string | null = sessionId): Connection.Incoming =>
   Connection.HostDelivery({
     epoch: 0,
-    activeRunId: tag === "Completed" ? null : sessionId,
-    event: Schema.decodeUnknownSync(HostEvent)({ _tag: tag, sessionId, cursor, runId: sessionId, event }),
+    activeRunId,
+    event,
+  })
+
+const runFrame = (
+  cursor: number,
+  status: "pending" | "running" | "waiting" | "succeeded" | "failed" | "cancelled",
+  turn: number,
+): Connection.Incoming =>
+  eventFrame(
+    {
+      _tag: "RunChanged",
+      sessionId,
+      cursor: String(cursor),
+      run: {
+        runId: sessionId,
+        rootRunId: sessionId,
+        agent: { name: "deep-research", revision: "1" },
+        status,
+        cursor: String(cursor),
+        turn,
+      },
+    },
+    status === "succeeded" || status === "failed" || status === "cancelled" ? null : sessionId,
+  )
+
+const toolFrame = (cursor: number, status: "started" | "waiting" | "completed" | "failed"): Connection.Incoming =>
+  eventFrame({
+    _tag: "ToolProgress",
+    sessionId,
+    cursor: String(cursor),
+    runId: sessionId,
+    toolCallId: "search-1",
+    tool: "web_search",
+    status,
   })
 
 const agentAction = (event: Connection.Incoming) => GotChatAction({ action: Chat.ReceivedConnection({ event }) })
@@ -47,8 +65,13 @@ const readyModel = (): Model => {
             epoch: 0,
             snapshot: {
               version: 1,
-              session: { id: sessionId, createdAt: "2026-08-03T00:00:00.000Z", queue: [] },
-              cursor: -1,
+              session: {
+                id: sessionId,
+                createdAt: "2026-08-03T00:00:00.000Z",
+                lifecycle: "active",
+                queue: [],
+              },
+              cursor: "-1",
               runs: [],
               conversation: { leafId: null, entries: [] },
             },
@@ -114,9 +137,9 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
     epoch: 0,
     activeRunId: sessionId,
     event: {
-      _tag: "Conversation",
+      _tag: "ConversationChanged",
       sessionId,
-      cursor: 0,
+      cursor: "0",
       update: {
         previousLeafId: null,
         leafId: "call-entry",
@@ -151,21 +174,17 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
       },
     },
   }),
-  eventFrame(1, "Turn", runEvent(0, { _tag: "TurnStarted", turn: 0 })),
-  eventFrame(2, "ToolCall", runEvent(2, { _tag: "ToolExecutionStarted", turn: 0, call: toolCall })),
-  eventFrame(
-    3,
-    "ToolCall",
-    runEvent(3, { _tag: "ToolExecutionCompleted", turn: 0, call: toolCall, result: toolResult }),
-  ),
-  eventFrame(5, "Turn", runEvent(5, { _tag: "TurnStarted", turn: 1 })),
+  runFrame(1, "running", 0),
+  toolFrame(2, "started"),
+  toolFrame(3, "completed"),
+  runFrame(5, "running", 1),
   Connection.HostDelivery({
     epoch: 0,
     activeRunId: sessionId,
     event: {
-      _tag: "Conversation",
+      _tag: "ConversationChanged",
       sessionId,
-      cursor: 7,
+      cursor: "7",
       update: {
         previousLeafId: "call-entry",
         leafId: "model-response-entry-1",
@@ -201,19 +220,7 @@ const completionFrames: ReadonlyArray<Connection.Incoming> = [
       },
     },
   }),
-  eventFrame(
-    8,
-    "Completed",
-    runEvent(8, {
-      _tag: "RunCompleted",
-      result: {
-        turns: 2,
-        text: "Final cited answer\n\nSources:\n[1] Generalist docs",
-        output: "Final cited answer\n\nSources:\n[1] Generalist docs",
-        session: { sessionId, leafId: "model-response-entry-1" },
-      },
-    }),
-  ),
+  runFrame(8, "succeeded", 2),
 ]
 
 describe("deep-research-agent web update", () => {
@@ -222,22 +229,13 @@ describe("deep-research-agent web update", () => {
     const preview = Connection.PreviewDelivery({
       epoch: 0,
       delivery: {
-        _tag: "PreviewDelivery",
+        _tag: "Preview",
         sessionId,
         runId: sessionId,
-        authorityAttemptFence: 2,
-        event: {
-          _tag: "ModelPreview",
-          runId: sessionId,
-          attemptFence: 2,
-          turn: 0,
-          modelCallId: "model-call-1",
-          modelAttemptId: "model-attempt-1",
-          attempt: 0,
-          generation: 1,
-          sequence: 0,
-          changes: [{ channel: "text", offset: 0, delta: "Provisional answer" }],
-        },
+        attempt: 0,
+        sequence: 0,
+        channel: "final",
+        append: "Provisional answer",
       },
     })
     Story.story(
@@ -330,9 +328,9 @@ describe("deep-research-agent web update", () => {
         }),
       ),
       Story.message(GotChatAction({ action: Chat.ClickedCancel() })),
-      Story.Command.expectExact(Chat.CancelRun({ sessionId, commandId: '["cancel","deep-research-story",-1]' })),
+      Story.Command.expectExact(Chat.CancelRun({ sessionId, commandId: '["cancel","deep-research-story","-1"]' })),
       Story.Command.resolve(
-        Chat.CancelRun({ sessionId, commandId: '["cancel","deep-research-story",-1]' }),
+        Chat.CancelRun({ sessionId, commandId: '["cancel","deep-research-story","-1"]' }),
         Chat.CancelledRun(),
       ),
       Story.model((model) => {
@@ -361,20 +359,12 @@ describe("deep-research-agent web update", () => {
           ],
         }),
       }),
-      Story.message(
-        agentAction(
-          eventFrame(
-            9,
-            "Completed",
-            runEvent(9, {
-              _tag: "RunFailed",
-              error: Errors.AgentExecutionFailure.make({ message: "model unavailable" }),
-            }),
-          ),
-        ),
-      ),
+      Story.message(agentAction(runFrame(9, "failed", 0))),
       Story.model((model) => {
-        expect(model.chat.run).toEqual({ _tag: "Failed", message: "model unavailable" })
+        expect(model.chat.run).toEqual({
+          _tag: "Failed",
+          message: "Run failed; inspect its committed outcome for details.",
+        })
         expect(model.chat.connection).toBe("open")
       }),
     )

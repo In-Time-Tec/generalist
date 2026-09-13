@@ -38,18 +38,15 @@ const request = (socket: Socket.Socket): HttpServerRequest.HttpServerRequest => 
 }
 
 const storage = makeObjectStorage()
-const services = Layer.mergeAll(
-  objectRuntimeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" }, storage).pipe(
-    Layer.provide(ExecutableResolver.layerStatic([])),
-  ),
-  BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
-    Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
-  ),
-  artifactLayer,
-  TestModel.layer([]),
-  Permissions.layerAllowAll,
-  Approvals.layerAutoApprove,
+const runtime = objectRuntimeLayer(
+  { addresses: [], scheduler: { pollInterval: "1 hour" }, schedulerMode: "poll" },
+  storage,
+).pipe(Layer.provide(ExecutableResolver.layerStatic([])))
+const blobStore = BlobStore.layer({ environment: "test", tenant: "artifact" }).pipe(
+  Layer.provide(Layer.merge(BunCrypto.layer, Layer.succeed(ObjectStore, storage.store))),
 )
+const artifacts = artifactLayer.pipe(Layer.provideMerge(runtime), Layer.provideMerge(blobStore))
+const services = Layer.mergeAll(artifacts, TestModel.layer([]), Permissions.layerAllowAll, Approvals.layerAutoApprove)
 
 layer(services)("Artifact WebSocket", (it) => {
   it.effect("accepts human operations and streams the attributed update", () =>

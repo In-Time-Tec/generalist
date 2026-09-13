@@ -30,6 +30,15 @@ const request = (overrides: Partial<CodeExecutor.Request> = {}): CodeExecutor.Re
     signal: new AbortController().signal,
     deadlineMillis: 11_000,
     limits: { cpuMillis: 50, subrequests: 3, outputBytes: 1_024 },
+    budget: {
+      agentRuns: 2,
+      concurrency: 1,
+      toolCalls: 1,
+      tokens: 100,
+      wallClockMillis: 10_000,
+      logBytes: 512,
+      outputBytes: 1_024,
+    },
     capabilities: [{ operation: "callTool", names: ["echo"] }],
     ...overrides,
   }
@@ -79,12 +88,24 @@ it.effect("constructs the canonical request and trusted exact result envelope", 
       outputBytes: 1_024,
       toolCalls: 2,
       agentRuns: 3,
+      concurrency: 2,
+      tokens: 100,
+      logBytes: 512,
       tools: ["echo"],
       steps: ["shape"],
       agents: ["worker"],
     })
     expect(normalized.deadlineMillis).toBe(1_500)
     expect(normalized.limits).toEqual({ cpuMillis: 500, subrequests: 5, outputBytes: 1_024 })
+    expect(normalized.budget).toEqual({
+      agentRuns: 3,
+      concurrency: 2,
+      toolCalls: 2,
+      tokens: 100,
+      wallClockMillis: 500,
+      logBytes: 512,
+      outputBytes: 1_024,
+    })
     expect(normalized.capabilities.find((grant) => grant.operation === "callTool")?.names).toEqual(["echo"])
 
     const executor = CodeExecutor.makeTest(() => Effect.succeed({ value: 2 }))

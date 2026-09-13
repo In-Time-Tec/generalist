@@ -1,6 +1,8 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, pipe, Ref } from "effect"
-import { Errors, ExecutableResolver, RunStore, Runtime } from "../../../../../src/runtime/index.js"
+import { Errors, ExecutableResolver } from "../../../../../src/runtime/index.js"
+import * as Runtime from "../../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../../src/runtime/run/store.js"
 import {
   alternateAssistant,
   alternateAssistantRef,
@@ -79,7 +81,7 @@ layer(
 )("rejects invalid address registrations without admitting a Run", (it) => {
   it.effect("rejects invalid registrations", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const runtime = yield* Runtime.Runtime
       const error = yield* runtime.send(input).pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
@@ -93,7 +95,7 @@ layer(objectLayerFor([{ address: assistantAddress, executable: assistantRef, reg
   (it) => {
     it.effect("rejects missing registrations", () =>
       Effect.gen(function* () {
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const runtime = yield* Runtime.Runtime
         const error = yield* runtime.send(input).pipe(Effect.flip)
         expect(error).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
@@ -116,7 +118,7 @@ layer(
 )("rejects an unsupported address binding without admitting a Run", (it) => {
   it.effect("rejects an unsupported binding", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const runtime = yield* Runtime.Runtime
       const error = yield* runtime.send(input).pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ExecutablePinMissing)
@@ -142,7 +144,7 @@ layer(
 )("rejects an identity mismatch without admitting a Run", (it) => {
   it.effect("rejects an identity mismatch", () =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const runtime = yield* Runtime.Runtime
       const error = yield* runtime.send(input).pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ExecutableIdentityMismatch)

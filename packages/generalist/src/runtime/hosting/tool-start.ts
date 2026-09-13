@@ -18,7 +18,7 @@ import type {
   ToolRunEvent,
   ToolRunHandle,
   ToolStartOptions,
-} from "../service.js"
+} from "../engine.js"
 
 export const Input = Schema.Struct({ input: Schema.Unknown, parentRunId: Schema.optionalKey(Schema.String) })
 

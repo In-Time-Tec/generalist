@@ -7,7 +7,10 @@ import { Agent, DurableDriver, Steering, ToolExecutor } from "../../../src/index
 import { closedTestAgent, testExecutable } from "./identity.js"
 import { DurabilityFailure } from "../../../src/durability/errors.js"
 import { maximumEventBytes } from "../../../src/runtime/execution/payload/index.js"
-import { Address, RunExecutor, Errors, ExecutableResolver, Runtime, RunStore } from "../../../src/runtime/index.js"
+import { Address, Errors, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import {
   assistant,
   assistantAddress,
@@ -44,7 +47,7 @@ const finish = Response.makePart("finish", {
 
 const verifyInbox = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const store = yield* RunStore.RunStore
+  const store = yield* RunStore
   const receipt = yield* admitRun
   const first = Prompt.fromMessages([
     Prompt.makeMessage("user", {
@@ -184,7 +187,7 @@ layer(objectLayer)("Runtime durable steering object contract", (test) => {
   test.effect("cancellation wins while steering is pending", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:steering-cancel",
@@ -238,7 +241,7 @@ const backend = "object" as const
       test.effect(`${backend} completion cannot resurrect cancellation through pending steering`, () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: `steering-cancel-completion:${backend}`,
@@ -277,7 +280,7 @@ const backend = "object" as const
       test.effect(`${backend} bounds direct steering without charging idempotent retries twice`, () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: `steering-bounds:${backend}`,
@@ -343,7 +346,7 @@ const backend = "object" as const
       test.effect(`${backend} rejects a message over the per-event payload bound without mutation`, () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: `steering-payload-bound:${backend}`,
@@ -413,7 +416,7 @@ it.live("persists accepted steering across an object-host close and reopen", () 
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       expect(yield* steer(runtime, runId, "steer:reopen", "survive restart")).toEqual(steeringReceipt)
       const claim = yield* store.claimExecution({
         commandId: "runtime-run-steering-test-ts-claim-6",
@@ -439,7 +442,7 @@ const lifecycleBackend = "object" as const
     test.effect("discards every unconsumed entry on completion, failure, and cancellation", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const settle = (reason: "completed" | "failed" | "cancelled") =>
           Effect.gen(function* () {
             const run = yield* runtime.send({
@@ -516,7 +519,7 @@ it.live("atomically persists steering consumption and model scheduling before ob
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const receipt = yield* admitRun
       runId = receipt.runId
       yield* steer(runtime, runId, "steer:scheduled", "consume atomically")
@@ -542,7 +545,7 @@ it.live("atomically persists steering consumption and model scheduling before ob
   const reopen = provideScoped(
     objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const claim = yield* store.claimExecution({
         commandId: "runtime-run-steering-test-ts-claim-11",
         runId,
@@ -595,8 +598,8 @@ it.live("atomically persists steering consumption and model scheduling before ob
     test.effect("RunExecutor delivers durable steering in the next model operation", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:host-steering",
@@ -682,8 +685,8 @@ it.effect("steering admitted during model streaming does not interrupt it and re
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: "session:streaming-steering",
@@ -789,8 +792,8 @@ const verifyToolBatchSteering = (concurrency: 1 | 2) =>
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: address,
           sessionId: `session:tool-steering-${concurrency}`,

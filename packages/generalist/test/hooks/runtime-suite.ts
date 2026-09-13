@@ -2,7 +2,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Hooks, Permissions } from "../../src/index.js"
-import { ExecutableResolver, Runtime, RunExecutor, RunStore } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { JournalFault } from "../../src/runtime/operation/journal-fault.js"
 import { objectRuntimeLayer } from "../runtime/execution/object.js"
 
@@ -72,8 +75,8 @@ export const register = ({
       const runId = yield* scopedWith(first)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const executor = yield* RunExecutor
+          const store = yield* RunStore
           yield* runtime.register(agent)
           const handle = yield* runtime.start(agent, "input", { idempotencyKey: "terminal-hook" })
           yield* executor.execute(
@@ -99,8 +102,8 @@ export const register = ({
       yield* scopedWith(recovered)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const executor = yield* RunExecutor
+          const store = yield* RunStore
           yield* runtime.register(agent)
           yield* executor.execute(
             yield* store.claimExecution({ runId, ownerId: "terminal-second", commandId: "second" }),
@@ -161,8 +164,8 @@ export const register = ({
       const runId = yield* scopedWith(first)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const executor = yield* RunExecutor
+          const store = yield* RunStore
           yield* runtime.register(agent)
           const handle = yield* runtime.start(agent, "input", { idempotencyKey: "hook-reopen" })
           yield* executor.execute(
@@ -212,8 +215,8 @@ export const register = ({
       yield* scopedWith(recovered)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const executor = yield* RunExecutor
+          const store = yield* RunStore
           yield* runtime.register(agent)
           yield* executor.execute(yield* store.claimExecution({ runId, ownerId: "hook-second", commandId: "second" }))
           expect((yield* runtime.inspect(runId)).status).toBe("succeeded")
@@ -254,8 +257,8 @@ export const register = ({
       yield* scopedWith(layer)(
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const executor = yield* RunExecutor.RunExecutor
-          const store = yield* RunStore.RunStore
+          const executor = yield* RunExecutor
+          const store = yield* RunStore
           yield* runtime.register(agent)
           const handle = yield* runtime.start(agent, "input", { idempotencyKey: "hook-invalid-replace" })
           yield* executor.execute(

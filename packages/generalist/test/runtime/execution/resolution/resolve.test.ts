@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { ExecutionResolution } from "../../../../src/runtime/execution/resolution/resolve.js"
-import { Runtime } from "../../../../src/runtime/service.js"
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import type { RunFailure } from "../../../../src/runtime/run/event.js"
 import { closedTestAgent } from "../../run/identity.js"

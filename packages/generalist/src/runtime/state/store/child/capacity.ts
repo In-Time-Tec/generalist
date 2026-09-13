@@ -245,7 +245,10 @@ export const activeChildCount: {
         !isTerminal(run.status),
     ).length +
     [...state.externalChildPlacements.values()].filter(
-      (placement) => state.runs.get(placement.parentRunId)?.rootRunId === parent.rootRunId && !placement.settled,
+      (placement) =>
+        state.runs.get(placement.parentRunId)?.rootRunId === parent.rootRunId &&
+        placement.readiness === "ready" &&
+        !placement.settled,
     ).length,
 )
 
@@ -464,6 +467,30 @@ export const promoteChildCapacity: {
         childReadinessChangedEvent(childRunId, "ready"),
       )
       next = promoted
+      active++
+    }
+    for (const placement of [...next.externalChildPlacements.values()].toSorted((left, right) =>
+      left.placementId.localeCompare(right.placementId),
+    )) {
+      if (active >= parent.treePolicy.concurrency.agents) break
+      const placementParent = next.runs.get(placement.parentRunId)
+      if (
+        placementParent?.rootRunId !== parent.rootRunId ||
+        placement.readiness !== "queued" ||
+        placement.settled ||
+        placement.cancelRequested ||
+        placementParent.cancellationRequested ||
+        isTerminal(placementParent.status)
+      ) {
+        continue
+      }
+      const placements = new Map(next.externalChildPlacements)
+      placements.set(placement.placementId, { ...placement, readiness: "ready" })
+      ;[, next] = yield* appendLifecycle(
+        { ...next, externalChildPlacements: placements },
+        placement.parentRunId,
+        childReadinessChangedEvent(placement.request.ref.runId, "ready"),
+      )
       active++
     }
     return next

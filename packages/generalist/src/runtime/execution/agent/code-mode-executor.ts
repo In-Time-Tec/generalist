@@ -14,7 +14,7 @@ import {
 } from "../../../core/tools/tool-executor.js"
 import { supportsCancellation } from "../../../core/tools/tool-executor-cancellation.js"
 import { withoutFanOut } from "../../../core/agent/tool/fan-out.js"
-import type { Service } from "../../code-mode.js"
+import type { Service } from "../../code-mode/internal.js"
 
 /** Route Runtime-owned Program tools while preserving the Agent's existing executor behavior. */
 export const make = <

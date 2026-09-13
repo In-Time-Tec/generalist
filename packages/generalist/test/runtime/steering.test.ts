@@ -3,16 +3,10 @@ import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Gate, Hooks, ToolExecutor } from "../../src/index.js"
-import {
-  Address,
-  Errors,
-  ExecutableResolver,
-  Messaging,
-  RunExecutor,
-  Runtime,
-  RunStore,
-  Steering,
-} from "../../src/runtime/index.js"
+import { Address, Errors, ExecutableResolver, Messaging, Steering } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import type { Service as ActiveExecutionsService } from "../../src/runtime/execution/active-executions.js"
 import { make as makeSteeringAdmission } from "../../src/runtime/run/steering.js"
 import { TestModel } from "../../src/testing/index.js"
@@ -99,8 +93,8 @@ const toolPolicy = (policy: "steer" | "session") =>
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         yield* store.createHostSession({ id: `session:${policy}-admission` })
         const run = yield* runtime.send({
           to: address,
@@ -197,8 +191,8 @@ it.effect("steering accepted during a blocking gate continues the run instead of
       services,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const executor = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const executor = yield* RunExecutor
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "start")
         const claim = yield* store.claimExecution({
@@ -278,8 +272,8 @@ it.effect("interrupt journals first, stops an in-flight tool, and creates an Unk
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const run = yield* runtime.send({
           to: address,
           sessionId: "session:interrupt-admission",
@@ -353,8 +347,8 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const run = yield* runtime.send({
           to: address,
           sessionId: "session:reject-admission",
@@ -389,7 +383,7 @@ it.effect("reject fails with RunBusy during active work and journals nothing", (
 
 const completionLaneSelection = Effect.gen(function* () {
   const runtime = yield* Runtime.Runtime
-  const store = yield* RunStore.RunStore
+  const store = yield* RunStore
   yield* store.createHostSession({ id: "session:mixed-completion-lanes" })
   const run = yield* runtime.send({
     to: assistantAddress,
@@ -496,8 +490,8 @@ it.effect("completion continuations retain their lane and pass through onSteer",
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const run = yield* runtime.send({
           to: address,
           sessionId: "session:completion-hook",
@@ -536,7 +530,7 @@ layer(objectLayer)("rollback admission", (test) => {
   test.effect("rewinds to the previous TurnCompleted event before admitting exactly once", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const run = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:rollback-admission",
@@ -663,8 +657,8 @@ it.effect("rollback fences an active tool before the replacement turn runs", () 
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const run = yield* runtime.send({
           to: address,
           sessionId: "session:rollback-active",
@@ -776,8 +770,8 @@ it.effect("rollback retains an unsafe running tool without redispatching replace
       runtimeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const run = yield* runtime.send({
           to: address,
           sessionId: "session:rollback-active",
@@ -828,7 +822,7 @@ layer(objectLayer)("admission retry side effects", (test) => {
   test.effect("interrupts at most once for exact interrupt and rollback retries", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const interrupts = yield* Ref.make(0)
       const active: ActiveExecutionsService = {
         run: (_runId, execution, afterExit = Effect.void) => execution.pipe(Effect.ignore, Effect.andThen(afterExit)),

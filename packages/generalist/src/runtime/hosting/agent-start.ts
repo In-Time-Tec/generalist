@@ -4,7 +4,7 @@ import { InvalidOutput } from "../../core/agent/event.js"
 import { encode as encodeAgentInput } from "../../core/agent/lifecycle/input.js"
 import { generateId } from "../../core/model/telemetry/events.js"
 import { origin as cursorOrigin } from "../cursor.js"
-import { RuntimeUnavailable, UnknownAgent } from "../errors.js"
+import { RuntimeUnavailable, StartInvalid, UnknownAgent } from "../errors.js"
 import { capture, type RegisteredAgents } from "../executable/registered-agent.js"
 import type { RunCancelled, RunEvent, RunFailed } from "../run/event.js"
 import type { Service as RunStore } from "../run/store.js"
@@ -18,7 +18,7 @@ import type {
   StartReceipt,
   RunSendError,
   RunSendOptions,
-} from "../service.js"
+} from "../engine.js"
 import type { SteeringReceipt } from "../run/steering.js"
 import { make as makeBudget } from "../../core/durable/run-budget.js"
 import { formatRRule, nextAt, parseRRule } from "../execution/trigger/schedule.js"
@@ -142,44 +142,58 @@ export const make = (options: {
         createdAt,
       })
     })
-  const start: RuntimeService["start"] = (agent, input, startOptions) =>
+  const startWith =
+    (activate: boolean): RuntimeService["start"] =>
+    (agent, input, startOptions) =>
+      Effect.gen(function* () {
+        const registration = yield* options.agents.getFor(agent)
+        if (Option.isNone(registration)) {
+          return yield* UnknownAgent.make({ agentName: agent.name, runId: `run_${yield* generateId}` })
+        }
+        const initialPrompt = yield* encodeAgentInput(agent.input, input).pipe(
+          Effect.provideContext(registration.value.context),
+        )
+        const identity = yield* generateId
+        const startKey = startOptions?.idempotencyKey ?? `start_${identity}`
+        const sessionId =
+          startOptions?.sessionId ??
+          (startOptions?.idempotencyKey === undefined ? `session_${identity}` : `agent:${agent.name}`)
+        const admission: import("effect").Types.Mutable<StartExecutionInput> = {
+          executable: registration.value.executable,
+          registrations: registration.value.registrations,
+          sessionId,
+          idempotencyKey: startKey,
+          prompt: initialPrompt,
+        }
+        if (startOptions?.treePolicy !== undefined) admission.treePolicy = startOptions.treePolicy
+        if (startOptions?.budget !== undefined) admission.budget = startOptions.budget
+        const receipt = yield* options.admitStart(admission, activate)
+        const events = options.store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
+          Stream.mapEffect((event) => decodeEvent(agent.output, event)),
+          Stream.takeUntil(
+            (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
+          ),
+          Stream.provideContext(registration.value.context),
+        )
+        return {
+          runId: receipt.runId,
+          await: awaitOutput(events),
+          events,
+          send: (message: Prompt.Prompt | string, sendOptions?: RunSendOptions) =>
+            options.send(receipt.runId, message, sendOptions),
+        }
+      })
+  const start = startWith(true)
+  const hold: RuntimeService["hold"] = (agent, input, holdOptions) =>
     Effect.gen(function* () {
-      const registration = yield* options.agents.getFor(agent)
-      if (Option.isNone(registration)) {
-        return yield* UnknownAgent.make({ agentName: agent.name, runId: `run_${yield* generateId}` })
+      if (!Schema.is(Schema.String.check(Schema.isNonEmpty()))(holdOptions?.idempotencyKey)) {
+        return yield* StartInvalid.make({ message: "Held admission requires a non-empty idempotency key" })
       }
-      const initialPrompt = yield* encodeAgentInput(agent.input, input).pipe(
-        Effect.provideContext(registration.value.context),
-      )
-      const identity = yield* generateId
-      const startKey = startOptions?.idempotencyKey ?? `start_${identity}`
-      const sessionId =
-        startOptions?.sessionId ??
-        (startOptions?.idempotencyKey === undefined ? `session_${identity}` : `agent:${agent.name}`)
-      const admission: import("effect").Types.Mutable<StartExecutionInput> = {
-        executable: registration.value.executable,
-        registrations: registration.value.registrations,
-        sessionId,
-        idempotencyKey: startKey,
-        prompt: initialPrompt,
-      }
-      if (startOptions?.treePolicy !== undefined) admission.treePolicy = startOptions.treePolicy
-      if (startOptions?.budget !== undefined) admission.budget = startOptions.budget
-      const receipt = yield* options.admitStart(admission, true)
-      const events = options.store.events({ runId: receipt.runId, cursor: cursorOrigin }).pipe(
-        Stream.mapEffect((event) => decodeEvent(agent.output, event)),
-        Stream.takeUntil(
-          (event) => event._tag === "RunCompleted" || event._tag === "RunFailed" || event._tag === "RunCancelled",
-        ),
-        Stream.provideContext(registration.value.context),
-      )
+      const handle = yield* startWith(false)(agent, input, holdOptions)
       return {
-        runId: receipt.runId,
-        await: awaitOutput(events),
-        events,
-        send: (message: Prompt.Prompt | string, sendOptions?: RunSendOptions) =>
-          options.send(receipt.runId, message, sendOptions),
+        ...handle,
+        activate: (commandId: string) => options.store.activate({ runId: handle.runId, commandId }),
       }
     })
-  return { register, schedule, start, sessionSelection }
+  return { register, schedule, start, hold, sessionSelection }
 }

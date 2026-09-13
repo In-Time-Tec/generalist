@@ -1,7 +1,9 @@
 import { Effect, Predicate, Schema } from "effect"
 import { dual } from "effect/Function"
 import type { Tool } from "effect/unstable/ai"
-import { Runtime, type RunHandle, type StartEvent, type StartOptions } from "../../../runtime/service.js"
+import { Runtime } from "../../../runtime/service.js"
+import type { RunHandle } from "../../../runtime/application.js"
+import type { StartEvent, StartOptions } from "../../../runtime/engine.js"
 import { AgentTypeId, type Agent } from "./definition.js"
 
 export type { RunHandle, StartEvent, StartOptions }
@@ -21,7 +23,7 @@ interface StartFunction {
     agent: InputValue extends InputCodec["Type"]
       ? Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>
       : never,
-  ) => Effect.Effect<RunHandle<OutputCodec["Type"]>, import("../../../runtime/service.js").StartError, Runtime>
+  ) => Effect.Effect<RunHandle<OutputCodec["Type"]>, import("../../../runtime/engine.js").StartError, Runtime>
   <
     Tools extends Record<string, Tool.Any>,
     R,
@@ -33,7 +35,7 @@ interface StartFunction {
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputCodec, OutputCodec>,
     input: InputCodec["Type"],
     options?: StartOptions,
-  ): Effect.Effect<RunHandle<OutputCodec["Type"]>, import("../../../runtime/service.js").StartError, Runtime>
+  ): Effect.Effect<RunHandle<OutputCodec["Type"]>, import("../../../runtime/engine.js").StartError, Runtime>
 }
 
 const isDataFirst = (args: IArguments): boolean => args.length >= 2 && Predicate.hasProperty(args[0], AgentTypeId)

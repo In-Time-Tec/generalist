@@ -1,6 +1,7 @@
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
-import { Errors, Runtime } from "../../../src/runtime/index.js"
+import { Errors } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
 import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 
 layer(objectLayer)("Runtime idempotency", (it) => {

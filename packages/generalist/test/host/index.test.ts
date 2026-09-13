@@ -6,7 +6,9 @@ import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, Approvals, Hooks, Instructions, Permissions } from "generalist"
 import { Host } from "generalist/host"
-import { ExecutableResolver, RunExecutor, RunStore } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { layer as blobStoreLayer } from "../../src/blob-store/index.js"
 import { ObjectStore } from "../../src/durability/object-store.js"
 
@@ -37,8 +39,8 @@ const blobStore = blobStoreLayer({ environment: "test", tenant: "host" }).pipe(
 const runtimeLayer = objectRuntimeLayer({ addresses: [] }, runtimeStorage).pipe(Layer.provide(resolver))
 const completeRun = (runId: string, commandId: string) =>
   Effect.gen(function* () {
-    const executor = yield* RunExecutor.RunExecutor
-    const store = yield* RunStore.RunStore
+    const executor = yield* RunExecutor
+    const store = yield* RunStore
     yield* executor.execute(yield* store.claimExecution({ runId, ownerId: objectWorkerId, commandId }))
   })
 
@@ -59,7 +61,7 @@ const backend = "object" as const
         const limits = { tree: { maxDepth: 3, maxSessions: 8 }, concurrency: { agents: 2, tools: 4 } }
         const host = yield* Host.make({ revision: "local", agents: { [root.name]: root, [child.name]: child }, limits })
         limits.concurrency.agents = 100
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const typedSession = yield* host.sessions.create({ id: "host-profile-typed" })
         const namedSession = yield* host.sessions.create({ id: "host-profile-named" })
         const typed = yield* host.runs.start(typedSession.id, root, "root")
@@ -166,7 +168,7 @@ const backend = "object" as const
           (yield* child.session.snapshot).runs.map((entry) => ({ runId: entry.runId, status: entry.status })),
         ).toEqual([{ runId: child.run.id, status: "succeeded" }])
         const snapshot = yield* child.session.snapshot
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const replay = yield* store
           .hostSessionEvents({ sessionId: child.session.id, cursor: admittedSnapshot.cursor })
           .pipe(Stream.take(snapshot.cursor - admittedSnapshot.cursor), Stream.runCollect)
@@ -185,7 +187,7 @@ const backend = "object" as const
         yield* session.submit("active", { commandId: "active" })
         const before = yield* session.inspect
         const queued = yield* host.runs.start(session.id, agent, "explicit next")
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         expect(
           yield* store.activate({ runId: queued.id, commandId: "cannot-overtake" }).pipe(Effect.flip),
         ).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
@@ -409,7 +411,7 @@ it.effect("replays named Agent edits before resolving a changed or removed fresh
       reviewer: typeof writer | undefined,
       use: (
         host: Host<{ readonly writer: typeof writer; readonly reviewer?: typeof originalReviewer }>,
-      ) => Effect.Effect<A, E, RunExecutor.RunExecutor | RunStore.RunStore>,
+      ) => Effect.Effect<A, E, RunExecutor | RunStore>,
     ) =>
       Effect.scoped(
         Effect.gen(function* () {
@@ -494,9 +496,7 @@ it.effect("recovers the same child conversation and admission after replacing th
     ),
   })
   const withHost = <A, E>(
-    body: (
-      host: Host<{ readonly agent: typeof agent }>,
-    ) => Effect.Effect<A, E, RunStore.RunStore | RunExecutor.RunExecutor>,
+    body: (host: Host<{ readonly agent: typeof agent }>) => Effect.Effect<A, E, RunStore | RunExecutor>,
   ) =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -4,7 +4,9 @@ import { expect, it as testIt, layer } from "@effect/vitest"
 import { Effect, Fiber, Ref, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Agent, ExecutableManifest, Pins, ProgramManifest } from "../../src/index.js"
-import { Errors, ExecutableRegistration, RunStore, RunTree, Runtime, RunWait } from "../../src/runtime/index.js"
+import { Errors, ExecutableRegistration, RunTree, RunWait } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
 import { make as makeTreeCursor } from "../../src/runtime/tree/cursor.js"
 import {
   analystRef,
@@ -77,7 +79,7 @@ testIt("retains a Program registration closure through Agent capabilities", () =
 const blockRootOnChild = (sessionId: string, invocationId: string) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const store = yield* RunStore
     const root = yield* runtime.send({
       to: assistantAddress,
       sessionId,
@@ -118,7 +120,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("inspects exact active Runs and stable mixed terminal outcomes", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:inspection",
@@ -178,7 +180,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("awaits terminal from a checkpoint cursor without losing the transition", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:await",
@@ -204,7 +206,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("watches a tree until its terminal checkpoint cursor is drained", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:watch",
@@ -291,7 +293,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("projects explicit model and tool call identities", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:calls",
@@ -368,7 +370,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("atomically places a concurrent append in the checkpoint or its replay tail", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:checkpoint-race",
@@ -463,7 +465,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("resumes the live stream strictly after a tree cursor", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:live",
@@ -503,7 +505,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("hands a checkpoint to live changes without a snapshot gap", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:checkpoint-live",
@@ -538,7 +540,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("settles a root-blocked watch on an open approval wait at the root", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:blocked:approval",
@@ -622,7 +624,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("keeps a root-blocked watch open when the root completes before its child", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:blocked:root-first",
@@ -661,7 +663,7 @@ layer(objectLayer)("RunTree", (it) => {
   it.effect("requires an explicit open wait and an equal cursor before a root-blocked watch settles", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:blocked:script",

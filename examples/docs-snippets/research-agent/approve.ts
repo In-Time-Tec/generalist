@@ -15,17 +15,13 @@ const program = Effect.gen(function* () {
       }),
     ),
   )
-  if (approval.event._tag !== "ApprovalRequested") {
-    return yield* Effect.die("expected an ApprovalRequested Runtime event")
-  }
-
   yield* client.approvals.resolve({
     runId: approval.runId,
-    token: approval.event.request.approvalId,
-    commandId: `approval:${approval.event.request.approvalId}`,
+    token: approval.approval.id,
+    commandId: `approval:${approval.approval.id}`,
     decision: { _tag: "Approved" },
   })
-  yield* Console.log(`approved ${approval.event.request.capability} for ${approval.runId}`)
+  yield* Console.log(`approved ${approval.approval.tool} for ${approval.runId}`)
 })
 
 const authenticatedLayer = Layer.effect(

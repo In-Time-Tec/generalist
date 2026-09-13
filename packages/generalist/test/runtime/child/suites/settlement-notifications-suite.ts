@@ -1,14 +1,10 @@
 import { objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Random, Stream } from "effect"
-import {
-  AgentDirectory,
-  ChildSettlement,
-  Errors,
-  LocalScheduler,
-  Runtime,
-  RunStore,
-} from "../../../../src/runtime/index.js"
+import { AgentDirectory, ChildSettlement, Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import {
   assistantAddress,
   completedResult,
@@ -68,8 +64,8 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
   suite.effect("writes one stable durable notification and does not duplicate it during reconciliation", () =>
     Effect.gen(function* () {
       const { runtime, parent, child } = yield* admit
-      const store = yield* RunStore.RunStore
-      const scheduler = yield* LocalScheduler.LocalScheduler
+      const store = yield* RunStore
+      const scheduler = yield* LocalScheduler
       const parentClaim = yield* store.claimExecution({
         commandId: "child-settlement-notification-reconciliation-parent-claim",
         runId: parent.runId,
@@ -143,7 +139,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
   suite.effect("observes a completed settlement without delivering it into the next Run", () =>
     Effect.gen(function* () {
       const { runtime, parent, child } = yield* admit
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       yield* store.fail({
         ...(yield* store.claimExecution({
           commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-2",
@@ -178,7 +174,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
   suite.effect("observes a failed settlement without delivering it into the next Run", () =>
     Effect.gen(function* () {
       const { runtime, parent, child } = yield* admit
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       yield* store.fail({
         ...(yield* store.claimExecution({
           commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-4",
@@ -212,7 +208,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
   suite.effect("observes cancellation without model delivery or forwarding", () =>
     Effect.gen(function* () {
       const { runtime, parent, child } = yield* admit
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       yield* runtime.cancel({
         commandId: "runtime-child-suites-settlement-notifications-suite-ts-cancel-3",
         runId: child.runId,
@@ -275,7 +271,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
   suite.effect("publishes failure detail immediately", () =>
     Effect.gen(function* () {
       const { runtime, parent, child } = yield* admit
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       yield* store.fail({
         ...(yield* store.claimExecution({
           commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-7",
@@ -299,7 +295,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
     () =>
       Effect.gen(function* () {
         const { runtime, parent, child } = yield* admit
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const claim = yield* store.claimExecution({
           commandId: "runtime-child-suites-settlement-notifications-suite-ts-claim-8",
           runId: child.runId,
@@ -349,8 +345,8 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
   suite.effect("waits outside the scheduler execution FiberMap", () =>
     Effect.gen(function* () {
       const { runtime, parent, child } = yield* admit
-      const store = yield* RunStore.RunStore
-      const scheduler = yield* LocalScheduler.LocalScheduler
+      const store = yield* RunStore
+      const scheduler = yield* LocalScheduler
       const waiter = yield* runtime
         .awaitChildSettlement({ parentRunId: parent.runId, childRunId: child.runId })
         .pipe(Effect.forkChild({ startImmediately: true }))
@@ -384,7 +380,7 @@ it.effect("object storage preserves exactly one notification across close and re
     yield* scopedWith(object)(
       Effect.gen(function* () {
         const { parent, child } = yield* admit
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         parentRunId = parent.runId
         childRunId = child.runId
         yield* store.complete({
@@ -418,7 +414,7 @@ layer(runtimeLayer)("object settlement observation", (suite) => {
   suite.effect("never binds a settled child into the parent Session's steering inbox", () =>
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
+      const store = yield* RunStore
       const sessionId = `joined-settlement:${yield* Random.nextInt}`
       const parent = yield* runtime.send({
         to: assistantAddress,

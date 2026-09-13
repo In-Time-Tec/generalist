@@ -5,6 +5,7 @@ import type { CallableTaggedStruct } from "foldkit/schema"
 import { AgentCommandError, CommandOperation, Connection, Incoming, SendFailed } from "./connection.js"
 import type { ClientApproval } from "./connection-command.js"
 import { Conversation } from "../../../runtime/session/conversation.js"
+import { ClientCursor } from "../../../server/projection/index.js"
 
 type EmptyFields = Record<never, never>
 
@@ -123,7 +124,7 @@ export const RunState: Schema.Schema<RunState> = Schema.Union([Idle, Running, Aw
 export interface Model {
   readonly sessionId: string | null
   readonly connection: typeof ModelConnection.Type
-  readonly lastSeq: number
+  readonly lastSeq: ClientCursor | null
   readonly connectionEpoch: number
   readonly run: RunState
   readonly entries: ReadonlyArray<ChatEntry>
@@ -137,7 +138,7 @@ export interface Model {
 export const Model: Schema.Schema<Model> = Schema.Struct({
   sessionId: Schema.NullOr(Schema.String),
   connection: ModelConnection,
-  lastSeq: Schema.Finite,
+  lastSeq: Schema.NullOr(ClientCursor),
   connectionEpoch: Schema.Int,
   run: RunState,
   entries: Schema.Array(ChatEntry),
@@ -376,7 +377,7 @@ export type ChatCommand = Command<Action, AgentCommandError, Connection>
 export const initialModel = (sessionId: string | null = null): Model => ({
   sessionId,
   connection: "disconnected",
-  lastSeq: -1,
+  lastSeq: null,
   connectionEpoch: -1,
   run: Idle(),
   entries: [],

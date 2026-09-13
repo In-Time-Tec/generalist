@@ -2,6 +2,8 @@
 
 This example serves a Generalist Host and a small AG-UI SSE route from one Bun server. Its plain-`fetch` client streams a run until the approval interrupt, posts the decision to the Host's approval route, and verifies that the run completes. Runtime state is retained in a real S3-compatible object store.
 
+The authenticated `/ag-ui/status` route returns only the status projected from the AG-UI snapshot. This example's custom executable registrations do not carry a framework deployment revision, so they cannot produce the complete identity required by the standard `ClientRun` view; the example does not invent one or serialize the raw snapshot.
+
 Configure a dedicated general-purpose S3 bucket and credentials that can read, conditionally create, and list objects:
 
 ```bash

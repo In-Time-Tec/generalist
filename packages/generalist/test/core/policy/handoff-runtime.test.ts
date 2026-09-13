@@ -19,6 +19,8 @@ import { layer as deterministicLayer } from "../../../src/ai/provider/determinis
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { withProviderFinish } from "../provider-finish"
 import { allowAllAuthorization } from "../../authorization.js"
+import { HostedRun } from "../../../src/core/agent/lifecycle/run-handle.js"
+import { externalRunInbox } from "../../../src/core/turn/steering-inbox.js"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
 
@@ -35,6 +37,8 @@ const textDelta = (delta: string) => ({ type: "text-delta", id: "text", delta })
 const toolCallPart = (id: string, name: string, params: Readonly<Record<string, Schema.Json>>) =>
   ({ type: "tool-call", id, name, params, providerExecuted: false }) satisfies Response.StreamPartEncoded
 const promptText = (prompt: Prompt.Prompt): string => JSON.stringify(prompt.content)
+const hostedInbox = (runId: string) =>
+  externalRunInbox({ runId, takeSteering: Effect.succeed([]), takeFollowUp: Effect.succeed([]) })
 
 layer(Layer.empty)("Handoff same-run", (it) => {
   ItLayer.make(it, "persists the exact active Agent pin and resumes from it", () => {
@@ -103,10 +107,11 @@ layer(Layer.empty)("Handoff same-run", (it) => {
         journal,
       ),
       Effect.gen(function* () {
-        yield* Agent.stream(supervisorSetup.agent, "start", {
-          executableRef: executable.ref,
-          executableManifest: executable.manifest,
-        }).pipe(Stream.runDrain)
+        yield* HostedRun.stream(
+          supervisorSetup.agent,
+          { prompt: "start", executableRef: executable.ref, executableManifest: executable.manifest },
+          hostedInbox("pinned-supervisor"),
+        ).pipe(Stream.runDrain)
         expect(handoffCheckpoint?.executable?.active).toBe(child.pin)
         expect(handoffCommit?.state).toMatchObject({
           root: "pinned-supervisor",
@@ -116,11 +121,16 @@ layer(Layer.empty)("Handoff same-run", (it) => {
           pendingContinuation: { prompt: Prompt.make("continue") },
         })
         expect(handoffCommit?.state.path).toHaveLength(1)
-        yield* Agent.stream(childAgent, "restart", {
-          executableRef: { ...executable.ref, active: child.pin },
-          executableManifest: executable.manifest,
-          driverCheckpoint: handoffCheckpoint!,
-        }).pipe(Stream.runDrain)
+        yield* HostedRun.stream(
+          childAgent,
+          {
+            prompt: "restart",
+            executableRef: { ...executable.ref, active: child.pin },
+            executableManifest: executable.manifest,
+            driverCheckpoint: handoffCheckpoint!,
+          },
+          hostedInbox("pinned-math"),
+        ).pipe(Stream.runDrain)
       }),
     ] as const
   })

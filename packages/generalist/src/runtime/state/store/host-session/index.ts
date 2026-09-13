@@ -237,9 +237,20 @@ export const make = (input: {
     ),
   controlSession: (request) =>
     input.modifyState(commands.controlSession, [request], (state, [prepared]) => control({ state, input: prepared })),
-  submitSessionInput: (request) =>
+  submitSessionInput: (request, resolveSelection) =>
     input.modifyState(commands.submitSessionInput, [request], (state, [prepared]) =>
-      submit({ state, input: prepared }),
+      Effect.gen(function* () {
+        if (prepared.agent === undefined) return yield* submit({ state, input: prepared })
+        if (prepared.selection !== undefined || resolveSelection === undefined) {
+          return yield* SessionQueueConflict.make({
+            sessionId: prepared.sessionId,
+            reason: "selection",
+            hint: "Provide one Agent name with its admission resolver, or an explicit pinned selection.",
+          })
+        }
+        const selection = yield* resolveSelection(prepared.agent)
+        return yield* submit({ state, input: { ...prepared, selection } })
+      }),
     ),
   updateSessionInput: (request, resolveSelection) =>
     input.modifyState(commands.updateSessionInput, [request], (state, [prepared]) =>

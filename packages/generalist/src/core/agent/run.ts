@@ -6,7 +6,7 @@ import { SessionConflict, type SessionStoreError } from "../context/session.js"
 import { get, type Registry } from "../tools/tool-registry.js"
 import type { CompactionError } from "../turn/compaction.js"
 import type { SkillCatalogError } from "../context/skill-catalog.js"
-import type { Agent, RunOptions } from "./service.js"
+import type { Agent } from "./service.js"
 import { RunError } from "./run/error.js"
 import { withSystem } from "./message.js"
 import { activateSkillFailure, activateSkillSuccess, activateSkillToolName } from "./skill-tool.js"
@@ -40,6 +40,7 @@ import type { RunInbox } from "../turn/steering-inbox.js"
 import { modelCallMiddleware, runStartWithSteering } from "./lifecycle/hooks.js"
 import { recoveredRetry as recoveredGateRetry } from "./gates/prompt.js"
 import { make as makeVerifierRunner } from "./gates/verifier-runner.js"
+import type { HostedRunOptions } from "./lifecycle/hosted/options.js"
 const errorMessage = String
 const { steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <
@@ -51,7 +52,7 @@ const streamInternalImpl = <
   OutputValue,
 >(
   agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
-  suppliedOptions: RunOptions,
+  suppliedOptions: HostedRunOptions,
   structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
   inbox: RunInbox,
 ): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices> => {
@@ -457,7 +458,7 @@ export const streamInternal: {
     StructuredOutputSchema extends ObjectSchema,
     OutputValue,
   >(
-    options: RunOptions,
+    options: HostedRunOptions,
     structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
     inbox: RunInbox,
   ): (
@@ -472,7 +473,7 @@ export const streamInternal: {
     OutputValue,
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>,
-    options: RunOptions,
+    options: HostedRunOptions,
     structured: StructuredRunConfig<StructuredOutputSchema, OutputValue> | undefined,
     inbox: RunInbox,
   ): RunStream<Tools, StructuredOutputSchema, R | PolicyServices | AuthorizationServices>

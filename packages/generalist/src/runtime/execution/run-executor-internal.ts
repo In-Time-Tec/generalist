@@ -13,11 +13,17 @@ import { RunStore, type ExecutionClaim, type Service as RunStoreService } from "
 import { ActiveExecutions } from "./active-executions.js"
 import { compactionOptionsMismatch, undecodableSuspension } from "../run/errors-internal.js"
 import { ExecutableResolver, matchesActiveRunOptions } from "../executable/resolver.js"
-import { make as makeRegisteredAgents, type RegisteredAgents } from "../executable/registered-agent.js"
+import {
+  executionBinding,
+  make as makeRegisteredAgents,
+  registeredProgramResolution,
+  registeredResolution,
+  type RegisteredAgents,
+} from "../executable/registered-agent.js"
 import type { ExecutionContinuation } from "../run/steering.js"
 import { durableEvent, type DurableAgentLoopEvent } from "./agent/event.js"
 import { ProgramChildTerminal, type DeferredProgramChildTerminal } from "../program/child-terminal.js"
-import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode.js"
+import { make as makeCodeMode, withTool as withCodeModeTool } from "../code-mode/internal.js"
 import { hostContext, sessionBinding } from "./context.js"
 import { make as makeOperations } from "../operation/nested-operations.js"
 import { JournalFault } from "../operation/journal-fault.js"
@@ -53,7 +59,7 @@ import { make as makeRegisteredResolution } from "./agent/registered-resolution.
 import type { Service } from "./run-executor.js"
 import { requireRunAvailable } from "../budget/state.js"
 import { prepare as prepareBudget } from "../budget/suspend.js"
-import { Runtime } from "../service.js"
+import { Runtime } from "../engine.js"
 import { make as makeMessaging, Policy as MessagingPolicy } from "../messaging/service.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { withInherited as withInheritedTasks } from "../../tasks/internal.js"
@@ -61,6 +67,7 @@ import { Items as TaskItems } from "../../tasks/item.js"
 import { Descriptor as CapabilityDescriptor } from "../../core/capability/state.js"
 import { BackgroundTools } from "../../core/tools/background/index.js"
 import { FrameworkFailure } from "../../core/tools/tool-executor.js"
+import { issue as issueExecutionScope } from "./scope.js"
 
 const requireOperationBudget = (kind: DriverOperation["kind"], runId: string, store: RunStoreService) =>
   kind === "memory" ? Effect.void : requireRunAvailable(runId)(store)
@@ -136,6 +143,7 @@ const makeFor = (
           completingRetrySafeOperationIds,
         })
         const scopedExecution = Effect.scoped(
+          // oxlint-disable-next-line eslint/complexity -- One claimed attempt exhaustively dispatches Tool, Program, or Agent execution while keeping scope issuance within the claim lifetime.
           Effect.gen(function* () {
             const resolved = yield* ExecutionResolution.resolve(
               registered.resolver,
@@ -150,9 +158,64 @@ const makeFor = (
               return
             }
             if (resolved._tag === "Program") {
-              yield* executeProgram({ claim, claimed, store, resolution: resolved })
+              const programBinding = registeredProgramResolution(resolved)
+              if (Option.isNone(programBinding)) {
+                yield* executeProgram({ claim, claimed, store, resolution: resolved })
+                return
+              }
+              const registration = programBinding.value.registration
+              if (registration.partition === undefined) {
+                return yield* Effect.die("Registered CodeMode Program has no Runtime partition identity")
+              }
+              const issued = yield* issueExecutionScope({
+                binding: {
+                  agents: programBinding.value.agents,
+                  registration,
+                  base: registration.context,
+                  partition: registration.partition,
+                },
+                claim,
+                claimed,
+                store,
+                runtime: Option.getOrUndefined(runtime),
+                cancelChild: ({ claim: cancellationClaim, childRunId, commandId, reason }) =>
+                  store
+                    .cancelScopedChild(
+                      reason === undefined
+                        ? { ...cancellationClaim, childRunId, commandId }
+                        : { ...cancellationClaim, childRunId, commandId, reason },
+                    )
+                    .pipe(Effect.tap(() => active.interrupt(childRunId))),
+              })
+              yield* executeProgram({
+                claim,
+                claimed,
+                store,
+                resolution: resolved,
+                children: issued.scope.children,
+              })
               return
             }
+            const registeredAgent = registeredResolution(resolved.agent)
+            const scopedBinding = executionBinding(resolved.agent)
+            const issuedScope = Option.isSome(scopedBinding)
+              ? yield* issueExecutionScope({
+                  binding: scopedBinding.value,
+                  claim,
+                  claimed,
+                  store,
+                  runtime: Option.getOrUndefined(runtime),
+                  cancelChild: ({ claim: cancellationClaim, childRunId, commandId, reason }) =>
+                    store
+                      .cancelScopedChild(
+                        reason === undefined
+                          ? { ...cancellationClaim, childRunId, commandId }
+                          : { ...cancellationClaim, childRunId, commandId, reason },
+                      )
+                      .pipe(Effect.tap(() => active.interrupt(childRunId))),
+                })
+              : undefined
+            const revisionAgents = Option.isSome(registeredAgent) ? registeredAgent.value.agents : agents
             const activeEntry = claimed.executableManifest.entries.find(
               (entry) => entry._tag === "Agent" && entry.pin === claimed.executableRef.active,
             )
@@ -644,11 +707,17 @@ const makeFor = (
 
             yield* resolved.agent.open((agent, environment) =>
               Effect.gen(function* () {
+                // SAFETY: Runtime.layer statically proves base plus execution-service coverage,
+                // and issueExecutionScope has built and merged that exact revision factory once.
+                // The resolver erases the Agent's invariant service parameters before this point.
+                const completeEnvironment =
+                  issuedScope === undefined ? environment : (issuedScope.environment as typeof environment)
                 const policy = Schema.decodeUnknownOption(Inheritance)(claimed.message.metadata.childInheritancePolicy)
                 const parentName = Schema.decodeUnknownOption(Schema.String)(claimed.message.metadata.parentAgentName)
-                if (Option.isNone(policy) || Option.isNone(parentName)) return yield* runClosed(agent, environment)
-                const parent = yield* agents.get(parentName.value)
-                if (Option.isNone(parent)) return yield* runClosed(agent, environment)
+                if (Option.isNone(policy) || Option.isNone(parentName))
+                  return yield* runClosed(agent, completeEnvironment)
+                const parent = yield* revisionAgents.get(parentName.value)
+                if (Option.isNone(parent)) return yield* runClosed(agent, completeEnvironment)
                 const inheritedPolicy = Schema.is(Schema.Array(CapabilityDescriptor))(policy.value.tools)
                   ? { ...policy.value, tools: trustJournaled(policy.value.tools) }
                   : policy.value
@@ -658,7 +727,7 @@ const makeFor = (
                   policy.value.tasks === "read" && Option.isSome(tasks)
                     ? withInheritedTasks(inherited, tasks.value)
                     : inherited
-                return yield* runClosed(child, environment)
+                return yield* runClosed(child, completeEnvironment)
               }).pipe(Effect.orDie),
             )
           }),

@@ -223,6 +223,58 @@ layer(services)("Server authorization", (it) => {
     )
   }
 
+  it.effect("authorizes ordinary Run reads separately from operator diagnostics", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const agent = Agent.make({ name: "operator-authorization" })
+        const host = yield* Host.make({ revision: "operator-revision", agents: { [agent.name]: agent } })
+        const session = yield* host.sessions.create({ id: "operator-authorization-session" })
+        const run = yield* host.runs.start(session.id, agent, "inspect authorization", {
+          idempotencyKey: "operator-authorization-run",
+        })
+        let allowOperator = false
+        const actions: Array<string> = []
+        const explain = vi.spyOn(host.operator, "explain")
+        yield* Effect.addFinalizer(() => Effect.sync(() => explain.mockRestore()))
+        const app = HttpRouter.toWebHandler(
+          Server.layer({
+            host,
+            auth: Server.authBearer({
+              token: Config.succeed(Redacted.make("test-token")),
+              principal: { id: "controller", tenantId: "test", role: "controller" },
+            }),
+            authorization: {
+              tenantId: "test",
+              authorize: ({ action }) =>
+                Effect.sync(() => {
+                  actions.push(action)
+                  return action !== "operator" || allowOperator
+                }),
+            },
+          }).pipe(Layer.provide(HttpServer.layerServices)),
+          { disableLogger: true },
+        )
+        yield* Effect.addFinalizer(() => Effect.promise(app.dispose))
+        const request = (path: string) =>
+          Effect.promise(() =>
+            app.handler(
+              new Request(`http://generalist.test${path}`, {
+                headers: { authorization: "Bearer test-token" },
+              }),
+            ),
+          )
+
+        expect((yield* request(`/runs/${run.id}`)).status).toBe(200)
+        expect((yield* request(`/runs/${run.id}/explain`)).status).toBe(403)
+        expect(explain).not.toHaveBeenCalled()
+        allowOperator = true
+        expect((yield* request(`/runs/${run.id}/explain`)).status).toBe(200)
+        expect(explain).toHaveBeenCalledOnce()
+        expect(actions).toEqual(["read", "operator", "operator"])
+      }),
+    ),
+  )
+
   it.effect("authorizes child inspection against the parent Run in the path", () =>
     Effect.scoped(
       Effect.gen(function* () {

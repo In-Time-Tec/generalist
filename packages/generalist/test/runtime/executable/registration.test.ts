@@ -1,7 +1,9 @@
 import "./suites/registration-pinned-content-suite.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { RunExecutor, Runtime, RunStore } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { registrationsFor } from "../execution/fixtures.js"
 import { agentMapProgramFixture } from "../program/fixture.js"
 import { objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
@@ -21,8 +23,8 @@ layer(objectRuntimeLayer(options).pipe(Layer.provide(fixture.resolverLayer)))(
     it.effect("gives each Program fan-out child only its required registrations", () =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        const store = yield* RunStore
+        const host = yield* RunExecutor
         const root = yield* runtime.send({
           to: fixture.address,
           sessionId: "object",

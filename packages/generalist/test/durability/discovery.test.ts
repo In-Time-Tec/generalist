@@ -2,10 +2,12 @@ import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Fiber, Layer } from "effect"
 import { inspect, page as readPage } from "../../src/durability/discovery.js"
-import { make } from "../../src/durability/internal/journal.js"
+import { make, type State } from "../../src/durability/internal/journal.js"
+import { diff, encode as encodeRuntimeState } from "../../src/durability/internal/runtime-state.js"
 import { ensure, markerKey, maxMarkerBytes } from "../../src/durability/internal/discovery-marker.js"
 import { bytes as protocolBytes } from "../../src/durability/internal/protocol.js"
 import { ObjectStore, type Service } from "../../src/durability/object-store.js"
+import { emptyState } from "../../src/runtime/state/projection.js"
 import { make as makeSimulator } from "../../src/testing/durability/index.js"
 
 const scope = { environment: "test", tenant: "tenant" }
@@ -13,8 +15,10 @@ const identity = { ...scope, partition: "partition" }
 const marker = "environments/test/v1/tenants/tenant/discovery/partition.json"
 const slot = "environments/test/v1/tenants/tenant/partitions/partition/commits/00000000000000000000.json"
 const command = { id: "first", input: null }
-const evaluate = () =>
-  Effect.succeed({ patches: [{ op: "set" as const, path: ["value"], value: 1 }], receipt: "accepted" })
+const evaluate = (state: State) =>
+  encodeRuntimeState(emptyState({ addressBindings: new Map(), subscriberQueueCapacity: 1 })).pipe(
+    Effect.map((next) => ({ patches: diff(state, next), receipt: "accepted" })),
+  )
 const withStore = <A, E, R>(effect: Effect.Effect<A, E, R>, store: Service) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -72,7 +76,13 @@ describe("tenant partition discovery", () => {
         expect(page.locations).toHaveLength(1)
         for (const location of page.locations) {
           const result = yield* withStore(inspect(location), fresh.store)
-          expect(result).toMatchObject({ status: "committed", head: { sequence: "0", state: { value: 1 } } })
+          expect(result).toEqual({
+            status: "committed",
+            namespace: location,
+            cursor: "0",
+            runCount: 0,
+            sessionCount: 0,
+          })
           found.push(location.partition)
         }
         cursor = page.cursor
@@ -103,7 +113,7 @@ describe("tenant partition discovery", () => {
           expect(inspection.status === "committed").toBe(model.committed)
           const reopened = yield* withStore(make(identity), fresh.store)
           expect(yield* reopened.commit(command, evaluate)).toBe("accepted")
-          expect(yield* reopened.read).toMatchObject({ sequence: "0", state: { value: 1 } })
+          expect(yield* reopened.read).toMatchObject({ sequence: "0" })
         }),
       )
     }
@@ -192,9 +202,9 @@ describe("tenant partition discovery", () => {
         const journal = yield* withStore(make(identity), bucket.store)
         let evaluations = 0
         const failure = yield* journal
-          .commit(command, () => {
+          .commit(command, (state) => {
             evaluations += 1
-            return evaluate()
+            return evaluate(state)
           })
           .pipe(Effect.flip)
         expect(failure.reason).toBe("corruption")

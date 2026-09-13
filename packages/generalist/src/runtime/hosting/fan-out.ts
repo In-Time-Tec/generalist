@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { fanOutIdFor, MAX_FAN_OUT_MEMBERS } from "../child/fan-out-internal.js"
 import { FanOutInvalid, FanOutRemainderUnsupported } from "../errors.js"
 import type { Service as RunStore } from "../run/store.js"
-import type { InitialFanOutInput } from "../service.js"
+import type { InitialFanOutInput } from "../engine.js"
 import { normalizedFanOutMember } from "./message.js"
 
 export const normalizer = (store: RunStore) => (parentRunId: string, input: InitialFanOutInput) =>

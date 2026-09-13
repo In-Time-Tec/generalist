@@ -24,7 +24,9 @@ import { RuntimeState as WireRuntimeState } from "../../../src/durability/intern
 import { Address } from "../../../src/runtime/address.js"
 import { Cursor } from "../../../src/runtime/cursor.js"
 import { AgentExecutionFailure, type RuntimeUnavailable } from "../../../src/runtime/errors.js"
-import { ExecutableResolver, RunStore, Runtime } from "../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
 import { makeTest } from "../../../src/runtime/executable/manifest.js"
 import type { ExecutionCheckpoint } from "../../../src/runtime/execution/state.js"
 import type { ScheduleRecord } from "../../../src/runtime/execution/trigger/schedule.js"
@@ -104,6 +106,7 @@ const operation: OperationRecord = {
   checkpoint,
 }
 const registration = { pin: "pin-codec", codec: "fixture", version: "1", payload: { model: "fixture" } }
+const rewardCommand = { runId, leaf: "leaf-codec", value: 0.75, source: "codec-test" }
 const storedRun = (): StoredRun => ({
   runId,
   status: "needs-resolution",
@@ -268,6 +271,7 @@ const fixture = (): RuntimeState => {
         },
       ],
     ]),
+    rewardCommands: new Map([["reward-codec", rewardCommand]]),
     registrationCatalog: new Map([[registration.pin, { digest: "registration-digest", value: registration }]]),
     operations: new Map([[`${runId}\0operation-codec`, operation]]),
     programStates: new Map([
@@ -707,7 +711,7 @@ describe("canonical runtime state", () => {
         runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const admitted = yield* runtime.send(input)
           const claim = yield* store.claimExecution({
             commandId: "catalog-recovery:claim",
@@ -723,7 +727,7 @@ describe("canonical runtime state", () => {
         runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(yield* runtime.send(input)).toEqual(receipt)
           const beforeRead = resolutions
           expect((yield* store.loadExecution(receipt.runId)).executableManifest).toEqual(assistantRef.manifest)
@@ -742,7 +746,7 @@ describe("canonical runtime state", () => {
         runtimeLayer(),
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(yield* runtime.send(input)).toEqual(receipt)
           const beforeRead = resolutions
           expect((yield* store.loadExecution(receipt.runId)).executableManifest).toEqual(assistantRef.manifest)
@@ -769,10 +773,33 @@ describe("canonical runtime state", () => {
       expect(wire.runs.get(runId)).not.toHaveProperty("executableManifest")
       expect(wire.idempotency.get("admit-codec")!.executable).toEqual(executable.ref)
       expect(wire.addressBindings.get(address)).toEqual(executable.ref)
+      expect(wire.rewardCommands?.get("reward-codec")).toEqual(rewardCommand)
       const recovered = yield* decode(persisted, fresh())
       expect(recovered.runs.get(runId)!.executableManifest).toEqual(executable.manifest)
       expect(recovered.idempotency.get("admit-codec")!.executable).toEqual(executable)
       expect(recovered.addressBindings.get(address)).toEqual(executable)
+    }),
+  )
+
+  it.effect("keeps reward provenance support sparse instead of adopting legacy state", () =>
+    Effect.gen(function* () {
+      const codec = makeCodec()
+      const persisted = freeze(yield* encode(fixture()))
+      const supported = yield* codec.read(persisted, fresh())
+      expect(supported.rewardCommands?.get("reward-codec")).toEqual(rewardCommand)
+      expect(Object.isFrozen(supported.rewardCommands?.get("reward-codec"))).toBe(true)
+
+      const legacy = yield* apply(persisted, [{ op: "remove", path: ["data", "fields", "rewardCommands"] }], "encoding")
+      const legacyCodec = makeCodec()
+      const recovered = yield* legacyCodec.read(legacy, fresh())
+      expect(recovered.rewardCommands).toBeUndefined()
+      expect(yield* encode(recovered)).toEqual(legacy)
+
+      const unrelated = yield* legacyCodec.prepare(legacy, recovered, Schema.Undefined, (state) =>
+        Effect.succeed([undefined, { ...state, nextRunCounter: state.nextRunCounter + 1 }] as const),
+      )
+      const head = yield* apply(legacy, unrelated.patches, "encoding")
+      expect((yield* makeCodec().read(head, fresh())).rewardCommands).toBeUndefined()
     }),
   )
 

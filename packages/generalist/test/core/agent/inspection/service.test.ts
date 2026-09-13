@@ -37,6 +37,8 @@ describe("Agent.Inspector", () => {
       const program = Effect.gen(function* () {
         const inspector = yield* Agent.Inspector
         const handle = yield* Agent.allocateRun(agent, { prompt: "inspect this" })
+        const beforeConsumption = yield* Effect.flip(inspector.snapshot(handle.runId))
+        expect(beforeConsumption.runId).toBe(handle.runId)
         const fiber = yield* handle.events.pipe(Stream.runCollect, Effect.forkScoped)
 
         yield* Deferred.await(started)

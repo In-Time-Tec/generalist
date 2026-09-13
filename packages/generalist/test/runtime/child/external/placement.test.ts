@@ -3,7 +3,9 @@ import { Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "../../../../src/index.js"
 import { identifyRequest } from "../../../../src/runtime/child/external/placement.js"
 import { ExternalChildStore } from "../../../../src/runtime/child/external/store.js"
-import { Address, Message, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, Message } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import type { ExecutionClaim } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
@@ -40,11 +42,10 @@ const externalRoot = (id: string) =>
     return { placementId: `placement:${id}`, ...request, ...(yield* identifyRequest(request)) }
   })
 
-const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | ExternalChildStore, E>) => {
+const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore | ExternalChildStore, E>) => {
   let sequence = 0
-  const provide = <A, Failure>(
-    effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore.RunStore | ExternalChildStore>,
-  ) => provideScoped(layer, effect)
+  const provide = <A, Failure>(effect: Effect.Effect<A, Failure, Runtime.Runtime | RunStore | ExternalChildStore>) =>
+    provideScoped(layer, effect)
   const placement = (claim: ExecutionClaim, placementId: string) =>
     Effect.gen(function* () {
       expect(claim.session).toBeDefined()
@@ -78,7 +79,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
     it.live("admits an independently addressable depth-zero root behind an idempotent activation gate", () =>
       provide(
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const external = yield* ExternalChildStore
           const input = yield* externalRoot(`${name}:gate`)
           expect(yield* external.admitRoot(input)).toMatchObject({
@@ -178,7 +179,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
     it.live("replays exact reservations and rejects divergent or over-capacity reservations without mutation", () =>
       provide(
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
@@ -229,7 +230,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
     it.live("accepts settlement before acknowledgement, exact settlement replay, and cancellation races", () =>
       provide(
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
@@ -293,7 +294,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
     it.live("atomically suspends and resumes only the owned parent wait", () =>
       provide(
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
@@ -343,7 +344,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
     it.live("converges an ownerless cancelling parent after authoritative remote settlement", () =>
       provide(
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
           const claim = yield* store.claimExecution({
@@ -381,7 +382,7 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore.Ru
     it.live("rejects a stale parent claim without reserving a placement", () =>
       provide(
         Effect.gen(function* () {
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           const external = yield* ExternalChildStore
           const parent = yield* root
           const first = yield* store.claimExecution({

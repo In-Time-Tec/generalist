@@ -1,9 +1,10 @@
 import type { Prompt } from "effect/unstable/ai"
 import type { HttpApiClient } from "effect/unstable/httpapi"
 import type { SessionCreateOptions, QueueCommandOptions, QueueEditOptions } from "../host/index.js"
-import type { SessionHistoryInput, SessionRunsInput } from "../runtime/session/page.js"
+import type { SessionHistoryInput } from "../runtime/session/page.js"
 import type { SessionFamilyInput } from "../runtime/session/retained.js"
 import type { api } from "./api.js"
+import type { ClientCursor } from "./projection/index.js"
 
 type RawClient = HttpApiClient.ForApi<typeof api>["sessions"]
 
@@ -25,7 +26,13 @@ export interface SessionClient {
   readonly get: (options: { readonly sessionId: string }) => ReturnType<RawClient["get"]>
   readonly snapshot: (options: { readonly sessionId: string }) => ReturnType<RawClient["snapshot"]>
   readonly history: (options: SessionHistoryInput & { readonly sessionId: string }) => ReturnType<RawClient["history"]>
-  readonly runs: (options: SessionRunsInput & { readonly sessionId: string }) => ReturnType<RawClient["runs"]>
+  readonly runs: (options: {
+    readonly sessionId: string
+    readonly at: ClientCursor
+    readonly before?: ClientCursor
+    readonly rootRunId?: string
+    readonly limit: number
+  }) => ReturnType<RawClient["runs"]>
   readonly entry: (options: { readonly sessionId: string; readonly entryId: string }) => ReturnType<RawClient["entry"]>
   readonly run: (options: { readonly sessionId: string; readonly runId: string }) => ReturnType<RawClient["run"]>
   readonly family: (options: SessionFamilyInput & { readonly sessionId: string }) => ReturnType<RawClient["family"]>

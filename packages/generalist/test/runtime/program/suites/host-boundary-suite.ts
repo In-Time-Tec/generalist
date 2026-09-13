@@ -11,7 +11,10 @@ import {
   ProgramCapabilities,
   CodeExecutor,
 } from "../../../../src/index.js"
-import { Address, RunExecutor, ExecutableResolver, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore, type Service as RunStoreService } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import type { ToolCallInput } from "../../../../src/core/program/capabilities.js"
 import type { StaticExecutable } from "../../../../src/runtime/executable/resolver.js"
 import { registrationsFor } from "../../execution/fixtures.js"
@@ -87,8 +90,8 @@ const makeFixture = (
 const execute = (address: Address.Address) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
-    const host = yield* RunExecutor.RunExecutor
+    const store = yield* RunStore
+    const host = yield* RunExecutor
     const receipt = yield* runtime.send({ to: address, sessionId: address, idempotencyKey: address, prompt: "run" })
     yield* host.execute(
       yield* store.claimExecution({
@@ -118,7 +121,7 @@ describe("durable Program host boundary", () => {
       suite.effect(`rejects ${name} before journal access`, () =>
         Effect.gen(function* () {
           const result = yield* execute(fixture.address)
-          const store = yield* RunStore.RunStore
+          const store = yield* RunStore
           expect(result.outcome).toMatchObject({
             _tag: "Failed",
             error: { _tag: "generalist/core/ProgramSchemaFailure" },
@@ -201,7 +204,7 @@ describe("durable Program host boundary", () => {
   it.effect("interrupts the sandbox and finalizes resources before terminal settlement", () => {
     const lifecycle: Array<string> = []
     let runId = ""
-    let store: RunStore.Service
+    let store: RunStoreService
     let started: Deferred.Deferred<void>
     const statusAtFinalizer = (name: string) =>
       store.inspect(runId).pipe(
@@ -224,8 +227,8 @@ describe("durable Program host boundary", () => {
       Effect.gen(function* () {
         started = yield* Deferred.make<void>()
         const runtime = yield* Runtime.Runtime
-        store = yield* RunStore.RunStore
-        const host = yield* RunExecutor.RunExecutor
+        store = yield* RunStore
+        const host = yield* RunExecutor
         const receipt = yield* runtime.send({
           to: fixture.address,
           sessionId: "cancel",

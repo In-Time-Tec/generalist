@@ -10,8 +10,13 @@ import { digest } from "../../../../src/core/durable/pin.js"
 import { make as makeBudget } from "../../../../src/core/durable/run-budget.js"
 import { encode as encodeHookInput } from "../../../../src/hooks/input.js"
 import { ExecutableManifest } from "../../../../src/runtime/index.js"
+import { HostedRun } from "../../../../src/core/agent/lifecycle/run-handle.js"
+import { externalRunInbox } from "../../../../src/core/turn/steering-inbox.js"
 import { TestModel } from "../../../../src/testing/index.js"
 import { provideScoped } from "../../../runtime/execution/scoped-provide.js"
+
+const hostedInbox = (runId: string) =>
+  externalRunInbox({ runId, takeSteering: Effect.succeed([]), takeFollowUp: Effect.succeed([]) })
 
 const fixture = Effect.fn("test.runEndContinuationFixture")(function* (complete: boolean) {
   const id = "terminal-hook-continuation"
@@ -89,7 +94,9 @@ it.effect("continues at a later explicit turn after a completed retained termina
       if (turnStart !== undefined) Object.assign(options, { turnStart })
       const events = yield* provideScoped(
         Layer.merge(model.layer, Layer.succeed(Hooks.Hooks, state.hooks)),
-        Agent.stream(state.agent, "continue", options).pipe(Stream.runCollect),
+        HostedRun.stream(state.agent, { prompt: "continue", ...options }, hostedInbox(state.id)).pipe(
+          Stream.runCollect,
+        ),
       )
       const continuing = turnStart === 1
       expect(events.at(-1)).toMatchObject({
@@ -111,13 +118,18 @@ it.effect("replays an unresolved terminal hook despite a later explicit turn", (
     const model = yield* TestModel.make([TestModel.text("must not dispatch")])
     const events = yield* provideScoped(
       Layer.merge(model.layer, Layer.succeed(Hooks.Hooks, state.hooks)),
-      Agent.stream(state.agent, "continue", {
-        sessionId: state.id,
-        logicalOperationId: state.id,
-        executableRef: state.executable.ref,
-        driverCheckpoint: state.checkpoint,
-        turnStart: 1,
-      }).pipe(Stream.runCollect),
+      HostedRun.stream(
+        state.agent,
+        {
+          prompt: "continue",
+          sessionId: state.id,
+          logicalOperationId: state.id,
+          executableRef: state.executable.ref,
+          driverCheckpoint: state.checkpoint,
+          turnStart: 1,
+        },
+        hostedInbox(state.id),
+      ).pipe(Stream.runCollect),
     )
     expect(events.at(-1)).toMatchObject({ _tag: "Completed", output: "first output" })
     expect(yield* model.requests).toHaveLength(0)

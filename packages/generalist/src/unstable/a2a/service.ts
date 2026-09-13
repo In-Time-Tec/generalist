@@ -1,5 +1,6 @@
 import type { DefaultRequestHandler } from "@a2a-js/sdk/server"
 import { Runtime } from "../../runtime/service.js"
+import type { RuntimeUnavailable } from "../../runtime/errors.js"
 import { Context, Effect, Layer } from "effect"
 import { make as makeHandler, type Deployment } from "./handler.js"
 
@@ -15,11 +16,11 @@ export interface Service {
 export class A2A extends Context.Service<A2A, Service>()("generalist/unstable/a2a/service/A2A") {}
 
 /** @experimental Provide one explicit A2A deployment over the caller's Runtime. */
-export const layer = (deployment: Deployment): Layer.Layer<A2A, never, Runtime> =>
+export const layer = (deployment: Deployment): Layer.Layer<A2A, RuntimeUnavailable, Runtime> =>
   Layer.effect(
     A2A,
     Effect.gen(function* () {
       const runtime = yield* Runtime
-      return { deployment, handler: makeHandler(runtime, deployment) }
+      return { deployment, handler: yield* makeHandler(runtime, deployment) }
     }),
   )

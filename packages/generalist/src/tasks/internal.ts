@@ -2,6 +2,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect"
 import { Prompt, Tool, Toolkit } from "effect/unstable/ai"
 import type { Any as AnyAgent } from "../core/agent/lifecycle/definition.js"
+import { copyCapabilities } from "../core/agent/lifecycle/hosted/capability-binding.js"
 import { DriverInterpreter } from "../core/durable/driver/interpreter.js"
 import { LoopDriverState } from "../core/durable/loop-driver-state.js"
 import { DriverError, DriverStateInvalid } from "../core/durable/service.js"
@@ -145,7 +146,8 @@ const inherited = (items: TaskItems): string =>
     "</generalist-inherited-tasks>",
   ].join("\n")
 
-export const withInherited = <A extends AnyAgent>(agent: A, items: TaskItems): A => ({
-  ...agent,
-  instructions: agent.instructions === undefined ? inherited(items) : `${agent.instructions}\n\n${inherited(items)}`,
-})
+export const withInherited = <A extends AnyAgent>(agent: A, items: TaskItems): A =>
+  copyCapabilities(agent, {
+    ...agent,
+    instructions: agent.instructions === undefined ? inherited(items) : `${agent.instructions}\n\n${inherited(items)}`,
+  })

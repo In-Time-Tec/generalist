@@ -7,6 +7,7 @@ import { Agent, Approvals, DurableDriver, ExecutableManifest, Hooks, Permissions
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
 import type { DriverCheckpoint } from "../../../src/core/durable/driver/contract.js"
 import { applyInheritance, inheritance } from "../../../src/core/agent/lifecycle/fan-out.js"
+import { bindCapabilities, capabilitiesFor } from "../../../src/core/agent/lifecycle/hosted/capability-binding.js"
 import {
   AttenuationWidened,
   Denied,
@@ -94,6 +95,27 @@ it.effect("accepts only live framework-issued handles", () =>
     expect(
       yield* Effect.flip(applyInheritance(otherAgent, otherAgent, inheritance({ tools: [handle] }))),
     ).toMatchObject({ _tag: "generalist/core/ChildExceedsParent", field: "tools" })
+  }),
+)
+
+it.effect("preserves child capability restrictions when a compatible parent supplies no replacement", () =>
+  Effect.gen(function* () {
+    const handle = yield* grant(fileTool, { scope: fileScope, expires: "1 hour" })
+    const toolkit = Toolkit.make(fileTool)
+    const child = Agent.make({ name: "constrained-child", toolkit })
+    const constrained = yield* applyInheritance(child, child, inheritance({ tools: [handle] }))
+    const original = capabilitiesFor(constrained)
+    expect(original).toHaveLength(1)
+
+    const unboundParent = Agent.make({ name: "unbound-parent", toolkit })
+    const attenuated = yield* applyInheritance(unboundParent, constrained, inheritance())
+    const sameTools = yield* applyInheritance(unboundParent, constrained, inheritance({ tools: "same" }))
+    expect(capabilitiesFor(attenuated)).toEqual(original)
+    expect(capabilitiesFor(sameTools)).toEqual(original)
+
+    const explicitlyRestrictedParent = bindCapabilities(Agent.make({ name: "empty-parent", toolkit }), [])
+    const replaced = yield* applyInheritance(explicitlyRestrictedParent, constrained, inheritance())
+    expect(capabilitiesFor(replaced)).toEqual([])
   }),
 )
 

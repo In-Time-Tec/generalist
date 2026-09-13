@@ -11,7 +11,9 @@ import {
 } from "../../core/tools/nested-operation.js"
 import { ToolContext, type Service as ToolContextService } from "../../core/tools/tool-context.js"
 import { DuplicateAgent } from "../../runtime/errors.js"
-import { Runtime, type ScheduleError, type Service as RuntimeService } from "../../runtime/service.js"
+import type { ScheduleError, Service as RuntimeService } from "../../runtime/engine.js"
+import { Runtime } from "../../runtime/service.js"
+import { engineFor } from "../../runtime/hosting/application.js"
 import { Trajectory, fromJournal, type Trajectory as TrajectoryValue } from "../../trajectory/index.js"
 import {
   agent as consolidationAgent,
@@ -249,7 +251,7 @@ export const declaration = <ProposeR, ProposeE, ApplyR, ApplyE>(
           }
           yield* runLearning({
             input,
-            runtime,
+            runtime: yield* engineFor(runtime),
             operations: operations.value,
             approvals,
             context,
@@ -288,7 +290,7 @@ export function layer<ProposeR, ProposeE, ApplyR, ApplyE>(
       >(configured)
       const configuration = configurationOf(configured.propose)
       if (configuration === undefined) return makeHooks({ declarations: [learning] })
-      const runtime = yield* Runtime
+      const runtime = yield* Effect.flatMap(Runtime, engineFor)
       const memory = yield* Memory
       const models = yield* ModelRegistry
       const hooks = makeHooks({ declarations: [runStartDeclaration(runtime, memory, configuration), learning] })

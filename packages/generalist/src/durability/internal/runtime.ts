@@ -15,7 +15,7 @@ import {
   SynchronizedRef,
   Schema,
 } from "effect"
-import type { LayerOptions, StartExecutionError } from "../../runtime/service.js"
+import type { LayerOptions, StartExecutionError } from "../../runtime/engine.js"
 import type { ScheduleInvalid } from "../../runtime/execution/trigger/schedule.js"
 import { DurabilityFailure } from "../errors.js"
 import { make as makeJournal, type Head, type Options as JournalOptions } from "./journal.js"

@@ -1,6 +1,6 @@
 # HITL over SSE
 
-This example creates a Host Run whose approval request is retained by the real S3-compatible object Runtime, then encodes the resulting `HostEvent` with the wire contract used by `generalist/server`. The source demonstrates the event boundary; it does not start an HTTP listener.
+This example creates a Host Run whose approval request is retained by the real S3-compatible object Runtime, then reads the projected `ClientEvent` through an authenticated in-process SSE handler. It exercises the HTTP event boundary without opening a network listener.
 
 Before running, provide a dedicated general-purpose S3 bucket and credentials that can read, conditionally create, and list objects:
 
@@ -20,4 +20,4 @@ For a custom S3-compatible endpoint, also set `GENERALIST_S3_ENDPOINT` and set `
 bun --cwd examples/hitl-over-sse start
 ```
 
-The command prints the retained Host event tags and encoded wire size. There is no SQL, simulator, or in-memory durability fallback.
+The command prints the encoded SSE size through `ApprovalRequested`. There is no SQL, simulator, or in-memory durability fallback.

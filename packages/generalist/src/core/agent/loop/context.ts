@@ -69,7 +69,7 @@ export interface RunLoopContext<
   OutputValue,
 > {
   readonly agent: Agent<Tools, R, PolicyServices, AuthorizationServices, Schema.Top, Schema.Top>
-  readonly options: import("../service.js").RunOptions
+  readonly options: import("../lifecycle/hosted/options.js").HostedRunOptions
   readonly state: import("../run-state.js").AgentRunState
   readonly chat: Chat.Service
   readonly chain: ReadonlyArray<Middleware>

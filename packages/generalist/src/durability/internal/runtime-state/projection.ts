@@ -1,4 +1,4 @@
-import { Effect, Predicate, Record, Schema, SchemaIssue } from "effect"
+import { Effect, Predicate, Record, Schema, SchemaAST, SchemaIssue } from "effect"
 import { freeze, isImmutable, type Patch, type State } from "../protocol.js"
 import { make as makeSchemaCache, ownership, type DataSchema } from "./cache.js"
 import { fields as stateFields, type CanonicalState } from "./schema.js"
@@ -21,14 +21,22 @@ export const make = ({ originals, diff }: { readonly originals: WeakMap<object, 
     },
   })
   const schema: Schema.Codec<CanonicalState, unknown> = Schema.Struct(fields)
-  const storedFields = Schema.Struct(Record.map(fields, () => Schema.Unknown))
+  const storedFields = Schema.Struct(
+    Record.map(fields, (field) =>
+      SchemaAST.isOptional(field.ast) ? Schema.optionalKey(Schema.Unknown) : Schema.Unknown,
+    ),
+  )
   const Envelope = Schema.Struct({
     version: Schema.Literal(1),
     data: Schema.Struct({ type: Schema.Literal("object"), fields: storedFields }),
   })
   const tables = new Map(
     Object.entries(fields).flatMap(([key, field]) => {
-      const table = metadata.get(field)
+      const table =
+        metadata.get(field) ??
+        (SchemaAST.isOptional(field.ast) && "schema" in field && Schema.isSchema(field.schema)
+          ? metadata.get(field.schema)
+          : undefined)
       return table === undefined ? [] : [[key, table] as const]
     }),
   )

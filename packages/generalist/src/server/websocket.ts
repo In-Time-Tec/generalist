@@ -1,4 +1,4 @@
-import { Cause, Effect, Fiber, Ref, Stream } from "effect"
+import { Cause, Effect, Fiber, Option, Ref, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import type { HostEvent } from "../host/event.js"
@@ -6,6 +6,9 @@ import type { AgentRegistry, Host } from "../host/index.js"
 import type { SessionEventsError } from "../runtime/session/host.js"
 import { decodeCommand, eventCodec } from "./wire.js"
 import { authorize, type Authorization } from "./auth.js"
+import { type ClientAgentIdentity, type ClientServerEvent, clientProjection } from "./projection/index.js"
+
+const { clientToolName, projectClientAgentIdentity, projectClientEvent, projectClientPreview } = clientProjection
 
 const closeForStreamError = (
   writer: (chunk: string | Uint8Array | Socket.CloseEvent) => Effect.Effect<void, Socket.SocketError>,
@@ -50,7 +53,8 @@ export const handle = <Agents extends AgentRegistry>(options: {
     const previewSubscription = yield* Ref.make<
       { readonly runId: string; readonly fiber: Fiber.Fiber<void> } | undefined
     >(undefined)
-    const writeEvent = (event: import("./wire.js").ServerEvent) =>
+    const toolNames = new Map<string, string>()
+    const writeEvent = (event: ClientServerEvent) =>
       eventCodec.encode(event).pipe(
         Effect.flatMap(writer),
         Effect.catchTag("generalist/server/WireCodecFailed", () => close(1011, "wire-encoding-failed")),
@@ -79,6 +83,7 @@ export const handle = <Agents extends AgentRegistry>(options: {
         if (!allowed) return
         const previews = yield* options.host.events.previews(options.sessionId, runId)
         const fiber = yield* previews.pipe(
+          Stream.flatMap((event) => Stream.fromIterable(projectClientPreview(event))),
           Stream.mapEffect((event) =>
             authorize({
               policy: options.authorization,
@@ -100,6 +105,34 @@ export const handle = <Agents extends AgentRegistry>(options: {
     const initial = yield* options.host.sessions.get(options.sessionId)
     if (initial.activeRunId !== undefined) yield* startPreview(initial.activeRunId)
 
+    const writeHostEvent = (event: HostEvent) =>
+      Effect.gen(function* () {
+        let agent: ClientAgentIdentity | undefined
+        let toolName: string | undefined
+        if (event._tag === "RunStarted" || event._tag === "Turn" || event._tag === "Completed") {
+          agent = projectClientAgentIdentity(yield* options.host.runs.inspect(event.runId).pipe(Effect.orDie))
+        } else if (event._tag === "ToolCall") {
+          if (event.event._tag === "ToolExecutionStarted") {
+            toolNames.set(event.event.call.id, event.event.call.name)
+          } else if (event.event._tag === "ToolExecutionCompleted" || event.event._tag === "ToolExecutionWaiting") {
+            toolNames.delete(event.event.call.id)
+          } else {
+            toolName = toolNames.get(event.event.toolCallId)
+            if (toolName === undefined) {
+              const inspection = yield* options.host.runs.inspect(event.runId).pipe(Effect.orDie)
+              if (inspection.activeTools.length === 1) toolName = inspection.activeTools[0]
+              else {
+                const snapshot = yield* options.host.sessions.snapshot(options.sessionId).pipe(Effect.orDie)
+                toolName = clientToolName(snapshot.conversation, event.event.toolCallId)
+              }
+              if (toolName !== undefined) toolNames.set(event.event.toolCallId, toolName)
+            }
+          }
+        }
+        const projected = projectClientEvent(options.sessionId, event, agent, toolName)
+        if (Option.isSome(projected)) yield* writeEvent(projected.value)
+      })
+
     const eventFiber = yield* options.events.pipe(
       Stream.mapEffect((event) =>
         Effect.gen(function* () {
@@ -109,7 +142,7 @@ export const handle = <Agents extends AgentRegistry>(options: {
             action: "observe",
           })
           if (event._tag === "RunStarted" && event.event.parentRunId === undefined) {
-            yield* writeEvent(event)
+            yield* writeHostEvent(event)
             const session = yield* options.host.sessions.get(options.sessionId)
             if (session.activeRunId !== undefined) yield* startPreview(session.activeRunId)
             else yield* stopPreview()
@@ -120,7 +153,7 @@ export const handle = <Agents extends AgentRegistry>(options: {
             const session = yield* options.host.sessions.get(options.sessionId)
             if (session.activeRunId !== undefined) yield* startPreview(session.activeRunId)
           }
-          yield* writeEvent(event)
+          yield* writeHostEvent(event)
         }),
       ),
       Stream.runDrain,

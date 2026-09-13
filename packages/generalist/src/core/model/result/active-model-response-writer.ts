@@ -1,7 +1,9 @@
 import { Effect, Option } from "effect"
 import { Tool } from "effect/unstable/ai"
 import type { Builder, CompletedModelResponse } from "../response/builder.js"
-import type { AttemptIdentity, Service, Snapshot } from "./active-model-response.js"
+import { ActiveModelResponse, type AttemptIdentity, type Service, type Snapshot } from "./active-model-response.js"
+
+const HandleTypeId: unique symbol = Symbol.for("generalist/ActiveModelResponse/Handle")
 
 interface Authority {
   readonly generation: number
@@ -31,8 +33,12 @@ interface WriterState {
   readonly snapshot: Effect.Effect<Option.Option<Snapshot>>
 }
 
+interface Handle extends Service {
+  readonly [HandleTypeId]: typeof HandleTypeId
+}
+
 interface WriterBinding {
-  readonly service: Service
+  readonly service: Handle
   readonly writer: Writer
 }
 
@@ -52,7 +58,7 @@ const hasSemanticContent = (response: CompletedModelResponse<Record<string, Tool
     }
   })
 
-export const make = (): WriterState => {
+const makeState = (): WriterState => {
   const state: State = { generation: 0, current: undefined }
   const owns = (authority: Authority): boolean =>
     authority.generation === state.generation && state.current?.authority === authority
@@ -86,12 +92,22 @@ export const make = (): WriterState => {
   }
 }
 
-export const install = (binding: WriterBinding): void => {
+const install = (binding: WriterBinding): void => {
   writers.set(binding.service, binding.writer)
+}
+
+export const make = (): Service => {
+  const state = makeState()
+  const handle = {
+    [HandleTypeId]: HandleTypeId,
+    snapshot: state.snapshot,
+  } satisfies Handle
+  install({ service: handle, writer: state.writer })
+  return ActiveModelResponse.of(handle)
 }
 
 export const writer = (service: Service): Writer => {
   const value = writers.get(service)
-  if (value === undefined) throw new Error("ActiveModelResponse must be constructed with ActiveModelResponse.make")
+  if (value === undefined) throw new Error("ActiveModelResponse must be constructed by the model runtime")
   return value
 }

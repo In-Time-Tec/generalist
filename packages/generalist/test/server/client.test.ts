@@ -3,7 +3,6 @@ import { Effect, Exit, Fiber, Layer, Schedule, Schema, Scope, Stream } from "eff
 import { HttpClient, HttpClientError, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { Socket } from "effect/unstable/socket"
 import { Server } from "generalist/server"
-import { hostEvent } from "./fixtures.js"
 
 class FakeWebSocket extends EventTarget implements WebSocket {
   readonly CONNECTING = WebSocket.CONNECTING
@@ -56,24 +55,30 @@ const socketAt = (sockets: ReadonlyArray<FakeWebSocket>, index: number): Effect.
 
 const sentText = (value: string | Uint8Array | undefined): string => Schema.decodeUnknownSync(Schema.String)(value)
 
-const previewDelivery = (attemptFence: number, sequence: number, delta: string) =>
-  Server.PreviewDelivery.make({
-    _tag: "PreviewDelivery",
+const committedEvent = (cursor: number | string) =>
+  Server.ClientEvent.make({
+    _tag: "RunChanged",
+    sessionId: "session-1",
+    cursor: String(cursor),
+    run: {
+      runId: "run-1",
+      rootRunId: "run-1",
+      agent: { name: "assistant", revision: "1" },
+      status: "running",
+      cursor: String(cursor),
+      turn: 0,
+    },
+  })
+
+const previewDelivery = (attempt: number, sequence: number, delta: string) =>
+  Server.ClientPreview.make({
+    _tag: "Preview",
     sessionId: "session-1",
     runId: "run-1",
-    authorityAttemptFence: attemptFence,
-    event: {
-      _tag: "ModelPreview",
-      runId: "run-1",
-      attemptFence,
-      turn: 0,
-      modelCallId: `model-call:${attemptFence}`,
-      modelAttemptId: `model-attempt:${attemptFence}`,
-      attempt: 0,
-      generation: 1,
-      sequence,
-      changes: [{ channel: "text", offset: 0, delta }],
-    },
+    attempt,
+    sequence,
+    channel: "final",
+    append: delta,
   })
 
 describe("Server client WebSocket", () => {
@@ -87,8 +92,8 @@ describe("Server client WebSocket", () => {
             request,
             Response.json({
               version: 1,
-              session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
-              cursor: -1,
+              session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", lifecycle: "active", queue: [] },
+              cursor: "-1",
               runs: [],
               conversation: { leafId: null, entries: [] },
             }),
@@ -140,8 +145,13 @@ describe("Server client WebSocket", () => {
                   request,
                   Response.json({
                     version: 1,
-                    session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
-                    cursor: 23,
+                    session: {
+                      id: sessionId,
+                      createdAt: "2026-09-02T00:00:00.000Z",
+                      lifecycle: "active",
+                      queue: [],
+                    },
+                    cursor: "23",
                     runs: [],
                     conversation: { leafId: null, entries: [] },
                   }),
@@ -177,8 +187,8 @@ describe("Server client WebSocket", () => {
           first.open()
 
           const received = yield* connection.events.pipe(Stream.take(1), Stream.runCollect, Effect.forkChild)
-          first.message(yield* Server.eventCodec.encode(hostEvent(7)))
-          expect(Array.from(yield* Fiber.join(received))).toEqual([hostEvent(7)])
+          first.message(yield* Server.eventCodec.encode(committedEvent(7)))
+          expect(Array.from(yield* Fiber.join(received))).toEqual([committedEvent(7)])
           first.close(4000, "lagged:7")
 
           const second = yield* socketAt(sockets, 1)
@@ -210,51 +220,50 @@ describe("Server client WebSocket", () => {
       ),
     )
 
-    test.effect(
-      "deduplicates and rejects regressions without inventing gaps across filtered cursors or accepting old epochs",
-      () =>
-        Effect.scoped(
-          Effect.gen(function* () {
-            sockets.length = 0
-            const client = yield* Server.client({ baseUrl: "https://generalist.test" })
-            const connection = yield* client.events.connect({
-              sessionId: "session-1",
-              eventCapacity: 8,
-              reconnect: Schedule.recurs(1),
-            })
-            expect(connection.snapshot).toMatchObject({
-              version: 1,
-              session: { id: "session-1" },
-              cursor: -1,
-              runs: [],
-            })
-            const first = yield* socketAt(sockets, 0)
-            first.open()
-            const received = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
-            for (const cursor of [7, 7, 3, 12]) first.message(yield* Server.eventCodec.encode(hostEvent(cursor)))
-            expect(yield* Fiber.join(received)).toEqual([hostEvent(7), hostEvent(12)])
-            first.close(1011, "connection-lost")
-            const second = yield* socketAt(sockets, 1)
-            expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=-1")
-            second.open()
-            const resumed = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
-            first.message(yield* Server.eventCodec.encode(hostEvent(99)))
-            second.message(yield* Server.eventCodec.encode(hostEvent(19)))
-            expect(yield* Fiber.join(resumed)).toEqual([
-              {
-                _tag: "ConnectionSnapshot",
-                epoch: 1,
-                snapshot: connection.snapshot,
-              },
-              hostEvent(19),
-            ])
-            const statuses = yield* connection.status.pipe(
-              Stream.takeUntil((status) => status._tag === "Connected" && status.epoch === 1),
-              Stream.runCollect,
-            )
-            expect(statuses).toContainEqual({ _tag: "Connected", epoch: 1 })
-          }),
-        ),
+    test.effect("treats cursors as opaque tokens while deduplicating the current cursor and rejecting old epochs", () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          sockets.length = 0
+          const client = yield* Server.client({ baseUrl: "https://generalist.test" })
+          const connection = yield* client.events.connect({
+            sessionId: "session-1",
+            eventCapacity: 8,
+            reconnect: Schedule.recurs(1),
+          })
+          expect(connection.snapshot).toMatchObject({
+            version: 1,
+            session: { id: "session-1" },
+            cursor: "-1",
+            runs: [],
+          })
+          const first = yield* socketAt(sockets, 0)
+          first.open()
+          const received = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
+          for (const cursor of ["opaque-a", "opaque-a", "opaque-b"])
+            first.message(yield* Server.eventCodec.encode(committedEvent(cursor)))
+          expect(yield* Fiber.join(received)).toEqual([committedEvent("opaque-a"), committedEvent("opaque-b")])
+          first.close(1011, "connection-lost")
+          const second = yield* socketAt(sockets, 1)
+          expect(second.url).toBe("wss://generalist.test/sessions/session-1/ws?cursor=-1")
+          second.open()
+          const resumed = yield* connection.events.pipe(Stream.take(2), Stream.runCollect, Effect.forkChild)
+          first.message(yield* Server.eventCodec.encode(committedEvent(99)))
+          second.message(yield* Server.eventCodec.encode(committedEvent("opaque-c")))
+          expect(yield* Fiber.join(resumed)).toEqual([
+            {
+              _tag: "ConnectionSnapshot",
+              epoch: 1,
+              snapshot: connection.snapshot,
+            },
+            committedEvent("opaque-c"),
+          ])
+          const statuses = yield* connection.status.pipe(
+            Stream.takeUntil((status) => status._tag === "Connected" && status.epoch === 1),
+            Stream.runCollect,
+          )
+          expect(statuses).toContainEqual({ _tag: "Connected", epoch: 1 })
+        }),
+      ),
     )
 
     test.effect("keeps preview delivery outside the committed cursor across reconnect", () =>
@@ -267,7 +276,7 @@ describe("Server client WebSocket", () => {
             eventCapacity: 8,
             reconnect: Schedule.recurs(1),
           })
-          expect(connection.snapshot.cursor).toBe(-1)
+          expect(connection.snapshot.cursor).toBe("-1")
           const first = yield* socketAt(sockets, 0)
           first.open()
           const firstPreview = previewDelivery(3, 0, "first")
@@ -313,8 +322,13 @@ describe("Server client WebSocket", () => {
                 request,
                 Response.json({
                   version: 1,
-                  session: { id: "session-1", createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
-                  cursor: -1,
+                  session: {
+                    id: "session-1",
+                    createdAt: "2026-09-02T00:00:00.000Z",
+                    lifecycle: "active",
+                    queue: [],
+                  },
+                  cursor: "-1",
                   runs: [],
                   conversation: { leafId: null, entries: [] },
                 }),
@@ -382,7 +396,7 @@ describe("Server client WebSocket", () => {
         )
         const closed = yield* socketAt(sockets, 0)
         expect(closed.readyState).toBe(WebSocket.CLOSED)
-        closed.message(yield* Server.eventCodec.encode(hostEvent(100)))
+        closed.message(yield* Server.eventCodec.encode(committedEvent(100)))
         yield* Effect.yieldNow
         expect(sockets).toHaveLength(1)
       }),
@@ -401,8 +415,13 @@ describe("Server client WebSocket", () => {
               request,
               Response.json({
                 version: 1,
-                session: { id: sessionId, createdAt: "2026-09-02T00:00:00.000Z", queue: [] },
-                cursor: -1,
+                session: {
+                  id: sessionId,
+                  createdAt: "2026-09-02T00:00:00.000Z",
+                  lifecycle: "active",
+                  queue: [],
+                },
+                cursor: "-1",
                 runs: [],
                 conversation: { leafId: null, entries: [] },
               }),

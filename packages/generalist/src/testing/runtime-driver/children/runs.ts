@@ -6,7 +6,7 @@ import { make as makeAgent } from "../../../core/agent/service.js"
 import { fanOut as makeFanOut } from "../../../core/agent/tool.js"
 import { make as makeBudget } from "../../../core/durable/run-budget.js"
 import { layerAllowAll } from "../../../core/policy/permissions.js"
-import { Runtime } from "../../../runtime/service.js"
+import { Runtime } from "../../../runtime/engine.js"
 import type { ChildRunsCapability, Options, Services } from "../contract.js"
 
 type Prepare = <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<A, E>

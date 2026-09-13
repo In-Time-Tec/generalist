@@ -695,6 +695,7 @@ it.effect("exposes no ambient host authority across the trusted sandbox seam", (
     AgentProgram.run(program("protocol"), { value: 1 }).pipe(
       runWith((request) => {
         expect(Object.keys(request).toSorted()).toEqual([
+          "budget",
           "capabilities",
           "deadlineMillis",
           "entrypoint",

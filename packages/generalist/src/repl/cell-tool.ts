@@ -13,6 +13,7 @@ import {
 import type { Route } from "../core/tools/tool-placement.js"
 import { CellEvent, CellFailure, CellResult, KernelProtocolViolation, KernelUnavailable } from "./cell.js"
 import { ExecutionFailed, LimitExceeded, type SandboxError, SandboxProvider, SnapshotId } from "../sandbox/service.js"
+import { inheritanceFor } from "../core/tools/tool-context/internal.js"
 
 /** The only name a Generalist REPL host advertises to a model. */
 export const name = "typescript"
@@ -125,12 +126,13 @@ const sandboxFailure = (sessionId: string, cellId: string, failure: SandboxError
 
 const acquireSandbox = (provider: SandboxProvider["Service"], context: Service, sessionId: string) =>
   Effect.gen(function* () {
-    if (context.inheritedSandboxSnapshot === undefined) return yield* provider.acquire({ key: sessionId })
-    const snapshotId = yield* Ref.get(context.inheritedSandboxSnapshot)
+    const inheritedSandboxSnapshot = inheritanceFor(context)?.inheritedSandboxSnapshot
+    if (inheritedSandboxSnapshot === undefined) return yield* provider.acquire({ key: sessionId })
+    const snapshotId = yield* Ref.get(inheritedSandboxSnapshot)
     if (snapshotId === undefined) return yield* provider.acquire({ key: sessionId })
     const source = yield* provider.acquire()
     const sandbox = yield* source.fork(snapshotId, { key: sessionId })
-    yield* Ref.set(context.inheritedSandboxSnapshot, undefined)
+    yield* Ref.set(inheritedSandboxSnapshot, undefined)
     return sandbox
   })
 

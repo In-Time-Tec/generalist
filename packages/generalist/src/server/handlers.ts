@@ -1,17 +1,39 @@
-import { Effect, Layer, Schema, Stream, Types } from "effect"
+import { Effect, Layer, Option, Ref, Result, Schema, Stream, Types } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
 import type { AgentRegistry, Host, RunStartOptions, SessionCreateOptions } from "../host/index.js"
 import type { Cursor } from "../runtime/cursor.js"
+import type { RuntimeInspection } from "../runtime/engine.js"
+import { RuntimeUnavailable } from "../runtime/errors.js"
+import type { SessionRunsInput, SessionRunSummary } from "../runtime/session/page.js"
+import type { HostEvent } from "../host/event.js"
 import { api, type EventStreamItem } from "./api.js"
 import { apiError, hostApiError, InvalidCursor, OperatorDisabled } from "./errors.js"
 import { handle as handleWebSocket } from "./websocket.js"
 import { handle as handleArtifactWebSocket } from "./artifact-websocket.js"
 import { CursorFromString } from "./wire.js"
 import { authorize, CurrentPrincipal, type Authorization, type Resource } from "./auth.js"
+import { type ClientAgentIdentity, type ClientEvent, type ClientRun, clientProjection } from "./projection/index.js"
+
+const {
+  clientToolName,
+  projectClientAgentIdentity,
+  projectClientConversationEntry,
+  projectClientEvent,
+  projectClientHistoryPage,
+  projectClientRun,
+  projectClientRunSummary,
+  projectClientRunsPage,
+  projectClientSession,
+  projectClientSnapshot,
+} = clientProjection
 
 const protect =
   (policy: Authorization) =>
-  <A, E, R>(resource: Resource, action: "read" | "observe" | "mutate", operation: () => Effect.Effect<A, E, R>) =>
+  <A, E, R>(
+    resource: Resource,
+    action: "read" | "observe" | "mutate" | "operator",
+    operation: () => Effect.Effect<A, E, R>,
+  ) =>
     authorize({ policy, resource, action }).pipe(Effect.andThen(Effect.suspend(operation)))
 
 const mapError = (operation: string) => Effect.mapError((error: Error) => apiError({ operation, error }))
@@ -52,16 +74,132 @@ const encodeHeaderValue = (value: string): string => {
  * is present. The query is decoded only when it is the winning source.
  */
 const resolveCursor = (
-  header: Cursor | undefined,
+  header: string | undefined,
   query: string | undefined,
 ): Effect.Effect<Cursor | undefined, InvalidCursor> =>
   Effect.gen(function* () {
-    if (header !== undefined) return header
-    if (query === undefined) return undefined
-    return yield* Schema.decodeEffect(CursorFromString)(query).pipe(
-      Effect.mapError(() => InvalidCursor.make({ cursor: query })),
+    const cursor = header ?? query
+    if (cursor === undefined) return undefined
+    return yield* Schema.decodeEffect(CursorFromString)(cursor).pipe(
+      Effect.mapError(() => InvalidCursor.make({ cursor })),
     )
   })
+
+const decodeSessionRunsInput = (payload: {
+  readonly at: string
+  readonly before?: string
+  readonly rootRunId?: string
+  readonly limit: number
+}): Effect.Effect<SessionRunsInput, InvalidCursor> =>
+  Effect.gen(function* () {
+    const at = yield* resolveCursor(undefined, payload.at)
+    if (at === undefined) return yield* InvalidCursor.make({ cursor: payload.at })
+    const request: Types.Mutable<SessionRunsInput> = { at, limit: payload.limit }
+    if (payload.before !== undefined) {
+      const before = yield* resolveCursor(undefined, payload.before)
+      if (before === undefined) return yield* InvalidCursor.make({ cursor: payload.before })
+      request.before = before
+    }
+    if (payload.rootRunId !== undefined) request.rootRunId = payload.rootRunId
+    return request
+  })
+
+const rootInspection = <Agents extends AgentRegistry>(host: Host<Agents>, source: RuntimeInspection) =>
+  Effect.gen(function* () {
+    let current = source
+    const seen = new Set<string>()
+    while (current.parentRunId !== undefined) {
+      if (seen.has(current.runId)) return yield* RuntimeUnavailable.make({ message: "Run ancestry contains a cycle" })
+      seen.add(current.runId)
+      current = yield* host.runs.inspect(current.parentRunId)
+    }
+    return current
+  })
+
+const projectRunInspection = <Agents extends AgentRegistry>(
+  host: Host<Agents>,
+  source: RuntimeInspection,
+  sessionId?: string,
+): Effect.Effect<ClientRun, Effect.Error<ReturnType<Host<Agents>["runs"]["inspect"]>>> =>
+  Effect.gen(function* () {
+    const root = yield* rootInspection(host, source)
+    const resolvedSessionId = sessionId ?? source.retainedSession?.id ?? root.retainedSession?.id
+    if (resolvedSessionId === undefined)
+      return yield* RuntimeUnavailable.make({ message: "Run has no retained Session identity" })
+    return yield* Effect.try({
+      try: () => projectClientRun(source, { sessionId: resolvedSessionId, rootRunId: root.runId }),
+      catch: () => RuntimeUnavailable.make({ message: "Run has no complete public Agent identity" }),
+    })
+  })
+
+const identityForRun = <Agents extends AgentRegistry>(host: Host<Agents>, runId: string) =>
+  host.runs.inspect(runId).pipe(
+    Effect.flatMap((run) =>
+      Effect.try({
+        try: (): ClientAgentIdentity => projectClientAgentIdentity(run),
+        catch: () => RuntimeUnavailable.make({ message: "Run has no complete public Agent identity" }),
+      }),
+    ),
+  )
+
+const identitiesForRuns = <Agents extends AgentRegistry>(host: Host<Agents>, runIds: ReadonlyArray<string>) =>
+  Effect.forEach(
+    runIds,
+    (runId) => identityForRun(host, runId).pipe(Effect.map((identity) => [runId, identity] as const)),
+    { concurrency: 8 },
+  ).pipe(Effect.map((entries) => new Map(entries)))
+
+const projectRunSummary = <Agents extends AgentRegistry>(host: Host<Agents>, source: SessionRunSummary) =>
+  identityForRun(host, source.runId).pipe(Effect.map((identity) => projectClientRunSummary(source, identity)))
+
+const projectHostEvent = <Agents extends AgentRegistry>(
+  host: Host<Agents>,
+  sessionId: string,
+  source: HostEvent,
+  toolNames: Ref.Ref<ReadonlyMap<string, string>>,
+): Effect.Effect<
+  Option.Option<ClientEvent>,
+  | Effect.Error<ReturnType<Host<Agents>["runs"]["inspect"]>>
+  | Effect.Error<ReturnType<Host<Agents>["sessions"]["snapshot"]>>
+> => {
+  if (source._tag === "ToolCall") {
+    const event = source.event
+    if (event._tag === "ToolExecutionStarted") {
+      return Ref.update(toolNames, (current) => new Map(current).set(event.call.id, event.call.name)).pipe(
+        Effect.as(projectClientEvent(sessionId, source)),
+      )
+    }
+    if (event._tag === "ToolExecutionCompleted" || event._tag === "ToolExecutionWaiting") {
+      return Ref.update(toolNames, (current) => {
+        const next = new Map(current)
+        next.delete(event.call.id)
+        return next
+      }).pipe(Effect.as(projectClientEvent(sessionId, source)))
+    }
+    return Effect.gen(function* () {
+      let toolName = (yield* Ref.get(toolNames)).get(event.toolCallId)
+      if (toolName === undefined) {
+        const inspection = yield* host.runs.inspect(source.runId)
+        if (inspection.activeTools.length === 1) toolName = inspection.activeTools[0]
+        else {
+          const snapshot = yield* host.sessions.snapshot(sessionId)
+          toolName = clientToolName(snapshot.conversation, event.toolCallId)
+        }
+        if (toolName !== undefined) {
+          const resolved = toolName
+          yield* Ref.update(toolNames, (current) => new Map(current).set(event.toolCallId, resolved))
+        }
+      }
+      return projectClientEvent(sessionId, source, undefined, toolName)
+    })
+  }
+  if (source._tag !== "RunStarted" && source._tag !== "Turn" && source._tag !== "Completed") {
+    return Effect.succeed(projectClientEvent(sessionId, source))
+  }
+  return identityForRun(host, source.runId).pipe(
+    Effect.map((identity) => projectClientEvent(sessionId, source, identity)),
+  )
+}
 
 const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: Authorization) =>
   HttpApiBuilder.group(api, "sessions", (handlers) =>
@@ -76,6 +214,7 @@ const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, poli
           if (payload.agent !== undefined) options.agent = payload.agent
           return host.sessions.create(options).pipe(
             Effect.flatMap((session) => session.inspect),
+            Effect.map(projectClientSession),
             mapError("sessions.create"),
           )
         })
@@ -84,6 +223,7 @@ const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, poli
         protect(policy)({ type: "session", id: params.id }, "read", () =>
           host.sessions.get(params.id).pipe(
             Effect.flatMap((session) => session.inspect),
+            Effect.map(projectClientSession),
             mapError("sessions.get"),
           ),
         ),
@@ -110,23 +250,50 @@ const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, poli
         ),
       snapshot: ({ params }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
-          host.sessions.snapshot(params.id).pipe(mapError("sessions.snapshot")),
+          host.sessions.snapshot(params.id).pipe(
+            Effect.flatMap((snapshot) =>
+              identitiesForRuns(
+                host,
+                snapshot.runs.map((run) => run.runId),
+              ).pipe(Effect.map((identities) => projectClientSnapshot(snapshot, identities))),
+            ),
+            mapError("sessions.snapshot"),
+          ),
         ),
       history: ({ params, payload }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
-          host.sessions.history(params.id, payload).pipe(mapError("sessions.history")),
+          host.sessions
+            .history(params.id, payload)
+            .pipe(Effect.map(projectClientHistoryPage), mapError("sessions.history")),
         ),
       runs: ({ params, payload }) =>
-        protect(policy)({ type: "session", id: params.id }, "read", () =>
-          host.sessions.runs(params.id, payload).pipe(mapError("sessions.runs")),
+        decodeSessionRunsInput(payload).pipe(
+          Effect.flatMap((request) =>
+            protect(policy)({ type: "session", id: params.id }, "read", () =>
+              host.sessions.runs(params.id, request).pipe(
+                Effect.flatMap((page) =>
+                  identitiesForRuns(
+                    host,
+                    page.runs.map((run) => run.runId),
+                  ).pipe(Effect.map((identities) => projectClientRunsPage(page, identities))),
+                ),
+                mapError("sessions.runs"),
+              ),
+            ),
+          ),
         ),
       entry: ({ params }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
-          host.sessions.entry(params.id, params.entryId).pipe(mapError("sessions.entry")),
+          host.sessions
+            .entry(params.id, params.entryId)
+            .pipe(Effect.map(projectClientConversationEntry), mapError("sessions.entry")),
         ),
       run: ({ params }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
-          host.sessions.run(params.id, params.runId).pipe(mapError("sessions.run")),
+          host.sessions.run(params.id, params.runId).pipe(
+            Effect.flatMap((run) => projectRunSummary(host, run)),
+            mapError("sessions.run"),
+          ),
         ),
       family: ({ params, payload }) =>
         protect(policy)({ type: "session", id: params.id }, "read", () =>
@@ -146,7 +313,12 @@ const sessionsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, poli
           ),
         ),
       list: () =>
-        protect(policy)({ type: "session" }, "read", () => host.sessions.list().pipe(mapError("sessions.list"))),
+        protect(policy)({ type: "session" }, "read", () =>
+          host.sessions.list().pipe(
+            Effect.map((sessions) => sessions.map(projectClientSession)),
+            mapError("sessions.list"),
+          ),
+        ),
     }),
   )
 
@@ -163,11 +335,26 @@ const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: 
         }),
       list: ({ params }) =>
         protect(policy)({ type: "session", id: params.sessionId }, "read", () =>
-          host.runs.list(params.sessionId).pipe(mapError("runs.list")),
+          host.runs.list(params.sessionId).pipe(
+            Effect.flatMap((runs) =>
+              Effect.forEach(
+                runs,
+                (run) =>
+                  host.runs
+                    .inspect(run.runId)
+                    .pipe(Effect.flatMap((current) => projectRunInspection(host, current, params.sessionId))),
+                { concurrency: 8 },
+              ),
+            ),
+            mapError("runs.list"),
+          ),
         ),
       inspect: ({ params }) =>
         protect(policy)({ type: "run", id: params.id }, "read", () =>
-          host.runs.inspect(params.id).pipe(mapError("runs.inspect")),
+          host.runs.inspect(params.id).pipe(
+            Effect.flatMap((run) => projectRunInspection(host, run)),
+            mapError("runs.inspect"),
+          ),
         ),
       cancel: ({ params, payload }) =>
         protect(policy)({ type: "run", id: params.id }, "mutate", () =>
@@ -200,11 +387,25 @@ const runsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy: 
         ),
       listChildren: ({ params }) =>
         protect(policy)({ type: "run", id: params.id }, "read", () =>
-          host.runs.children(params.id).pipe(mapHostError("runs.listChildren")),
+          host.runs.children(params.id).pipe(
+            Effect.flatMap((children) =>
+              Effect.forEach(
+                children,
+                (child) =>
+                  host.runs.inspect(child.childRunId).pipe(Effect.flatMap((run) => projectRunInspection(host, run))),
+                { concurrency: 8 },
+              ),
+            ),
+            mapHostError("runs.listChildren"),
+          ),
         ),
       inspectChild: ({ params }) =>
         protect(policy)({ type: "run", id: params.id }, "read", () =>
-          host.runs.inspectChild(params.id, params.childId).pipe(mapHostError("runs.inspectChild")),
+          host.runs.inspectChild(params.id, params.childId).pipe(
+            Effect.andThen(host.runs.inspect(params.childId)),
+            Effect.flatMap((run) => projectRunInspection(host, run)),
+            mapHostError("runs.inspectChild"),
+          ),
         ),
     }),
   )
@@ -225,6 +426,7 @@ const toolsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy:
         protect(policy)({ type: "run", id: params.id }, "read", () =>
           host.tools.getByName(params.name, params.id).pipe(
             Effect.flatMap((run) => run.inspect),
+            Effect.flatMap((run) => projectRunInspection(host, run)),
             mapHostError("tools.inspect"),
           ),
         ),
@@ -241,17 +443,22 @@ const eventsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy
               Effect.gen(function* () {
                 const principal = yield* CurrentPrincipal
                 const events = yield* host.events.subscribe(params.id, cursor)
+                const toolNames = yield* Ref.make<ReadonlyMap<string, string>>(new Map())
                 return events.pipe(
                   Stream.mapEffect((event) =>
                     authorize({
                       policy,
                       resource: { type: "session", id: params.id },
                       action: "observe",
-                    }).pipe(Effect.provideService(CurrentPrincipal, principal), Effect.as(event)),
+                    }).pipe(
+                      Effect.provideService(CurrentPrincipal, principal),
+                      Effect.andThen(projectHostEvent(host, params.id, event, toolNames)),
+                    ),
                   ),
-                  Stream.map(
-                    (event): EventStreamItem => ({ id: String(event.cursor), event: event._tag, data: event }),
+                  Stream.filterMap((event) =>
+                    Option.match(event, { onNone: () => Result.fail(undefined), onSome: Result.succeed }),
                   ),
+                  Stream.map((event): EventStreamItem => ({ id: event.cursor, event: event._tag, data: event })),
                   Stream.mapError((error) => apiError({ operation: "events.subscribe", error })),
                 )
               }).pipe(mapError("events.subscribe")),
@@ -260,12 +467,16 @@ const eventsHandlers = <Agents extends AgentRegistry>(host: Host<Agents>, policy
         ),
       )
       .handleRaw("connect", ({ params, query, request }) =>
-        protect(policy)({ type: "session", id: params.id }, "observe", () =>
-          host.events.subscribe(params.id, query.cursor).pipe(
-            mapError("events.connect"),
-            Effect.flatMap((events) =>
-              handleWebSocket({ host, sessionId: params.id, request, events, authorization: policy }).pipe(
-                Effect.orDie,
+        resolveCursor(undefined, query.cursor).pipe(
+          Effect.flatMap((cursor) =>
+            protect(policy)({ type: "session", id: params.id }, "observe", () =>
+              host.events.subscribe(params.id, cursor).pipe(
+                mapError("events.connect"),
+                Effect.flatMap((events) =>
+                  handleWebSocket({ host, sessionId: params.id, request, events, authorization: policy }).pipe(
+                    Effect.orDie,
+                  ),
+                ),
               ),
             ),
           ),
@@ -349,11 +560,11 @@ const operatorHandlers = <Agents extends AgentRegistry>(
   return HttpApiBuilder.group(api, "operator", (handlers) =>
     handlers.handleAll({
       explain: ({ params }) =>
-        protect(policy)({ type: "run", id: params.id }, "read", () =>
+        protect(policy)({ type: "run", id: params.id }, "operator", () =>
           host.operator.explain(params.id).pipe(mapError("operator.explain")),
         ),
       retry: ({ params, payload }) =>
-        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+        protect(policy)({ type: "run", id: params.id }, "operator", () =>
           CurrentPrincipal.pipe(
             Effect.flatMap((principal) =>
               write("retry", host.operator.retry(params.id, principal.id, payload.commandId)),
@@ -362,7 +573,7 @@ const operatorHandlers = <Agents extends AgentRegistry>(
           ),
         ),
       wake: ({ params, payload }) =>
-        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+        protect(policy)({ type: "run", id: params.id }, "operator", () =>
           CurrentPrincipal.pipe(
             Effect.flatMap((principal) =>
               write("wake", host.operator.wake(params.id, principal.id, payload.commandId)),
@@ -371,7 +582,7 @@ const operatorHandlers = <Agents extends AgentRegistry>(
           ),
         ),
       resolveUnknown: ({ params, payload }) =>
-        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+        protect(policy)({ type: "run", id: params.id }, "operator", () =>
           CurrentPrincipal.pipe(
             Effect.flatMap((principal) =>
               write(
@@ -389,7 +600,7 @@ const operatorHandlers = <Agents extends AgentRegistry>(
           ),
         ),
       extendBudget: ({ params, payload }) =>
-        protect(policy)({ type: "run", id: params.id }, "mutate", () =>
+        protect(policy)({ type: "run", id: params.id }, "operator", () =>
           CurrentPrincipal.pipe(
             Effect.flatMap((principal) =>
               write(

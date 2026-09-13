@@ -1,16 +1,20 @@
-import { Schema } from "effect"
+import { Schema, type Types } from "effect"
+import { ExecutionClaim } from "./runtime-state/schema.js"
 import { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import { WaitResolution } from "../../runtime/run/wait.js"
 import { RespondInput as ApprovalResponse } from "../../runtime/operation/approval.js"
 import { ScheduleRecord, ScheduleReceipt } from "../../runtime/execution/trigger/schedule.js"
 import { WakeDisposition } from "../../runtime/execution/trigger/wake.js"
 import { RunOutcome } from "../../runtime/run.js"
+import { Spend } from "../../core/durable/run-budget.js"
 import {
   ExternalRoot,
   ExternalRootSettlement,
   RootAdmission,
   Placement,
   ReserveInput,
+  ScopedCancelInput,
+  ScopedReserveInput,
 } from "../../runtime/child/external/placement.js"
 
 const commandId = Schema.String.check(Schema.isNonEmpty())
@@ -28,6 +32,12 @@ const Signal = Schema.Struct({
   payload: Schema.optionalKey(Schema.Unknown),
 })
 const Cancel = Schema.Struct({ commandId, runId: Schema.String, reason: Schema.optionalKey(Schema.String) })
+const CancelScopedChild = Schema.Struct({
+  ...ExecutionClaim.fields,
+  commandId,
+  childRunId: Schema.String,
+  reason: Schema.optionalKey(Schema.String),
+})
 const CancelSession = Schema.Struct({ commandId, sessionId: Schema.String, reason: Schema.optionalKey(Schema.String) })
 const Wake = Schema.Struct({ commandId, runId: Schema.String, event: WakeEvent })
 const Timeout = Schema.Struct({ commandId, runId: Schema.String, waitId: Schema.String, deadline: Schema.String })
@@ -49,7 +59,12 @@ const ClaimedSchedule = Schema.Struct({
   ownerId: Schema.String,
   leaseExpiresAt: Schema.String,
 })
-const Settlement = Schema.Struct({ placementId: Schema.String, settlementId: Schema.String, outcome: RunOutcome })
+const Settlement = Schema.Struct({
+  placementId: Schema.String,
+  settlementId: Schema.String,
+  outcome: RunOutcome,
+  spend: Schema.optionalKey(Spend),
+})
 const SettlementAcknowledgement = Schema.Struct({ placementId: Schema.String, settlementId: Schema.String })
 const key = (...parts: readonly (string | number)[]) => JSON.stringify(parts)
 
@@ -88,6 +103,23 @@ export const commands = {
     input: Schema.Tuple([Cancel]),
     receipt: Schema.Void,
     identity: ([input]: readonly [typeof Cancel.Type]) => input.commandId,
+  },
+  cancelScopedChild: {
+    tag: "cancelScopedChild",
+    input: Schema.Tuple([CancelScopedChild]),
+    receipt: Schema.Void,
+    identity: ([input]: readonly [typeof CancelScopedChild.Type]) => key(input.runId, input.commandId),
+    digestInput: ([input]: readonly [typeof CancelScopedChild.Type]): readonly [typeof CancelScopedChild.Type] => {
+      const normalized: Types.Mutable<typeof CancelScopedChild.Type> = {
+        runId: input.runId,
+        ownerId: "",
+        attemptFence: 0,
+        commandId: input.commandId,
+        childRunId: input.childRunId,
+      }
+      if (input.reason !== undefined) normalized.reason = input.reason
+      return [normalized]
+    },
   },
   cancelSession: {
     tag: "cancelSession",
@@ -135,6 +167,12 @@ export const externalCommands = {
     receipt: Placement,
     identity: ([input]: readonly [ReserveInput]) => key(input.runId, input.attemptFence, input.placementId),
   },
+  reserveScoped: {
+    tag: "external.reserveScoped",
+    input: Schema.Tuple([ScopedReserveInput]),
+    receipt: Placement,
+    identity: ([input]: readonly [ScopedReserveInput]) => key(input.runId, input.attemptFence, input.placementId),
+  },
   acknowledge: {
     tag: "external.acknowledge",
     input: Schema.Tuple([Schema.String]),
@@ -152,6 +190,30 @@ export const externalCommands = {
     input: Schema.Tuple([Schema.String]),
     receipt: Placement,
     identity: ([id]: readonly [string]) => id,
+  },
+  cancelScoped: {
+    tag: "external.cancelScoped",
+    input: Schema.Tuple([ScopedCancelInput]),
+    receipt: Placement,
+    identity: ([input]: readonly [ScopedCancelInput]) => key(input.runId, input.commandId),
+    digestInput: ([input]: readonly [ScopedCancelInput]): readonly [ScopedCancelInput] => {
+      const normalized: Types.Mutable<ScopedCancelInput> = {
+        runId: input.runId,
+        ownerId: "",
+        attemptFence: 0,
+        session: {
+          sessionId: input.session.sessionId,
+          runId: input.session.runId,
+          ownerId: "",
+          runAttemptFence: 0,
+          epoch: "0",
+        },
+        commandId: input.commandId,
+        placementId: input.placementId,
+      }
+      if (input.reason !== undefined) normalized.reason = input.reason
+      return [normalized]
+    },
   },
   admitRoot: {
     tag: "external.admitRoot",

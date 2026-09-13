@@ -4,17 +4,15 @@ import { Socket } from "effect/unstable/socket"
 import { m } from "foldkit/message"
 import type { CallableTaggedStruct } from "foldkit/schema"
 import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
-import { HostEvent } from "../../../host/event.js"
 import {
   client as serverClient,
   type Connection as ServerConnection,
   type ConnectionStatus,
 } from "../../../server/client.js"
 import { TransportError } from "../../../server/errors.js"
-import { HostSessionSnapshot } from "../../../runtime/session/host.js"
+import { ClientEvent, ClientPreview, ClientSessionSnapshot } from "../../../server/projection/index.js"
 import type { AgentCommand } from "./connection-command.js"
 import { applyConversationUpdate } from "../../../runtime/session/conversation.js"
-import { PreviewDelivery as HostPreviewDelivery } from "../../../host/preview.js"
 import { StatusEpochRegistry } from "./connection-internal.js"
 
 /** @experimental */
@@ -38,17 +36,17 @@ export const ConnectionFailed: CallableTaggedStruct<
 })
 
 /** A committed snapshot establishes a new connection-local delivery epoch. @experimental */
-export const SessionSnapshot = m("SessionSnapshot", { epoch: Schema.Int, snapshot: HostSessionSnapshot })
+export const SessionSnapshot = m("SessionSnapshot", { epoch: Schema.Int, snapshot: ClientSessionSnapshot })
 
-/** One committed Host event delivered within an established snapshot epoch. @experimental */
+/** One committed client event delivered within an established snapshot epoch. @experimental */
 export const HostDelivery = m("HostDelivery", {
   epoch: Schema.Int,
-  event: HostEvent,
+  event: ClientEvent,
   activeRunId: Schema.NullOr(Schema.String),
 })
 
-/** One Host-authorized memory-only preview delivered within an established snapshot epoch. @experimental */
-export const PreviewDelivery = m("PreviewDelivery", { epoch: Schema.Int, delivery: HostPreviewDelivery })
+/** One server-authorized memory-only preview delivered within an established snapshot epoch. @experimental */
+export const PreviewDelivery = m("PreviewDelivery", { epoch: Schema.Int, delivery: ClientPreview })
 
 /** @experimental */
 export type Incoming =
@@ -226,10 +224,10 @@ export const layerWebSocket = (options: {
                   }
                   return Effect.gen(function* () {
                     const currentEpoch = yield* Ref.get(deliveryEpoch)
-                    if (event._tag === "PreviewDelivery") {
+                    if (event._tag === "Preview") {
                       return PreviewDelivery({ epoch: currentEpoch, delivery: event })
                     }
-                    if (event._tag === "Conversation") {
+                    if (event._tag === "ConversationChanged") {
                       const next = applyConversationUpdate({
                         conversation: yield* Ref.get(conversation),
                         update: event.update,
@@ -241,8 +239,8 @@ export const layerWebSocket = (options: {
                         })
                       }
                       yield* Ref.set(conversation, next.value)
-                    } else if (event._tag === "RunStarted" || event._tag === "Completed") {
-                      if (event.event.parentRunId === undefined) {
+                    } else if (event._tag === "RunChanged") {
+                      if (event.run.parentRunId === undefined) {
                         const metadata = yield* client.sessions
                           .get({ sessionId })
                           .pipe(

@@ -171,10 +171,10 @@ describe("deep-research-agent web view", () => {
       Scene.expect(Scene.role("button", { name: "Stop" })).toBeEnabled(),
       Scene.click(Scene.role("button", { name: "Stop" })),
       Scene.Command.expectExact(
-        Chat.CancelRun({ sessionId: "deep-research-scene", commandId: '["cancel","deep-research-scene",-1]' }),
+        Chat.CancelRun({ sessionId: "deep-research-scene", commandId: '["cancel","deep-research-scene",null]' }),
       ),
       Scene.Command.resolve(
-        Chat.CancelRun({ sessionId: "deep-research-scene", commandId: '["cancel","deep-research-scene",-1]' }),
+        Chat.CancelRun({ sessionId: "deep-research-scene", commandId: '["cancel","deep-research-scene",null]' }),
         Chat.CancelledRun(),
       ),
     )

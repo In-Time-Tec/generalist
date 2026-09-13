@@ -11,8 +11,9 @@ import type { ToolOrigin } from "../event.js"
 import type { Any as AnyGate, FailureMode as GateFailureMode } from "../gates/definition.js"
 import type { SandboxService } from "../../../sandbox/service.js"
 import type { HandlersFor } from "../tool/fan-out.js"
-import type { Descriptor as CapabilityDescriptor } from "../../capability/state.js"
 import type { ManagedArtifactTool } from "../../artifact.js"
+import { copyCapabilities } from "./hosted/capability-binding.js"
+import type { AnyOptions as CodeModeOptions } from "../../program/code-mode-declaration.js"
 
 export const AgentTypeId = "generalist/core/Agent"
 
@@ -59,8 +60,7 @@ export interface Agent<
   readonly gates: ReadonlyArray<AnyGate>
   readonly onGateFailure: GateFailureMode
   readonly sandbox?: SandboxService
-  /** @internal Capability descriptors attached only by child inheritance. */
-  readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
+  readonly codeMode?: CodeModeOptions
 }
 
 /**
@@ -99,8 +99,7 @@ export interface Any {
   readonly gates: ReadonlyArray<AnyGate>
   readonly onGateFailure: GateFailureMode
   readonly sandbox?: SandboxService
-  /** @internal Capability descriptors attached only by child inheritance. */
-  readonly capabilities?: ReadonlyArray<CapabilityDescriptor>
+  readonly codeMode?: CodeModeOptions
 }
 
 type ClosedToolServices<Tools extends Record<string, Tool.Any>> = {
@@ -136,7 +135,17 @@ export interface Closed<LayerError = never, LayerRequirements = never> extends A
 }
 
 /** Extract an agent's runtime requirements. */
-export type Requirements<A> = A extends Agent<infer _Tools, infer R> ? R : never
+export type Requirements<A> =
+  A extends Agent<
+    infer _Tools,
+    infer R,
+    infer _PolicyServices,
+    infer _AuthorizationServices,
+    infer _InputSchema,
+    infer _OutputSchema
+  >
+    ? R
+    : never
 
 /** Extract an Agent's decoded input type. */
 export type Input<A> = A extends { readonly input: infer InputCodec extends Schema.Top } ? InputCodec["Type"] : never
@@ -242,7 +251,7 @@ export const close: {
   >(
     agent: Agent<Tools, R, PolicyServices, AuthorizationServices, InputSchema, OutputSchema>,
     environment: Layer.Layer<ClosedServices<Tools, R, InputSchema, OutputSchema>, LayerError, LayerRequirements>,
-  ): Closed<LayerError, LayerRequirements> => ({ ...agent, open: (f) => f(agent, environment) }),
+  ): Closed<LayerError, LayerRequirements> => copyCapabilities(agent, { ...agent, open: (f) => f(agent, environment) }),
 )
 
 /** Add host-owned tools while preserving an Agent's requirements. */
@@ -283,10 +292,10 @@ export const withTools: {
       Object.defineProperty(toolkit.tools, name, { configurable: true, enumerable: true, value: tool, writable: true })
     }
     const staticOrigin = (tool: Tool.Any): ToolDeclaration => ({ tool, origin: { _tag: "Static", agent: agent.name } })
-    return {
+    return copyCapabilities(agent, {
       ...agent,
       toolkit,
       toolDeclarations: [...(agent.toolDeclarations ?? existing.map(staticOrigin)), ...declared.map(staticOrigin)],
-    }
+    })
   },
 )

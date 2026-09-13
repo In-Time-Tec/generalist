@@ -1,4 +1,4 @@
-import { Effect, Equal, Layer, Option } from "effect"
+import { Context, Effect, Equal, Layer, Option } from "effect"
 import { type Placement, identifyRequest, type PageInput } from "./placement.js"
 import { ExternalChildStore, type Service } from "./store.js"
 import { RuntimeUnavailable } from "../../errors.js"
@@ -11,6 +11,56 @@ export interface Options<E = never, R = never> {
   readonly rootCursor?: string
   readonly connect: (partition: string) => Effect.Effect<Option.Option<Layer.Layer<ExternalChildStore, E, R>>, E, R>
 }
+
+/** A HOST-owned, requirement-closed peer router used by the native Runtime. @experimental */
+export interface PeerRoutesService {
+  readonly connect: (
+    partition: string,
+  ) => Effect.Effect<
+    Option.Option<Layer.Layer<ExternalChildStore, RuntimeUnavailable>>,
+    RuntimeUnavailable
+  >
+}
+
+/** Explicit peer authorization for native cross-partition child placement. @experimental */
+export class ExternalChildPeerRoutes extends Context.Service<ExternalChildPeerRoutes, PeerRoutesService>()(
+  "generalist/runtime/child/external/reconciliation/ExternalChildPeerRoutes",
+) {}
+
+const routeUnavailable = (partition: string) =>
+  RuntimeUnavailable.make({ message: `External child peer ${partition} is unavailable` })
+
+/**
+ * Capture a HOST's peer dependencies and translate its private connection failures at the
+ * framework boundary. Returning None remains the authorization decision; a partition string
+ * alone never grants access.
+ * @experimental
+ */
+export const layerPeerRoutes = <E, R>(
+  connect: Options<E, R>["connect"],
+): Layer.Layer<ExternalChildPeerRoutes, never, R> =>
+  Layer.effect(
+    ExternalChildPeerRoutes,
+    Effect.map(Effect.context<R>(), (context) =>
+      ExternalChildPeerRoutes.of({
+        connect: (partition) =>
+          connect(partition).pipe(
+            Effect.provide(context),
+            Effect.mapError(() => routeUnavailable(partition)),
+            Effect.map(
+              Option.map((peer) =>
+                peer.pipe(
+                  Layer.provide(Layer.succeedContext(context)),
+                  Layer.catchCause(() =>
+                    Layer.effect(ExternalChildStore, Effect.fail(routeUnavailable(partition))),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      }),
+    ),
+  )
 
 const deliver = (parent: Service, child: Service, placement: Placement) =>
   Effect.gen(function* () {
@@ -28,8 +78,8 @@ const deliver = (parent: Service, child: Service, placement: Placement) =>
     const current = yield* parent.inspectPlacement(placement.placementId)
     const root = yield* child.inspectRoot(placement.placementId)
     if (!current.settled && root.outcome === undefined) {
-      if (current.cancelRequested) yield* child.cancelRoot(placement.placementId)
-      else yield* child.activateRoot(placement.placementId)
+      if (current.cancelRequested) yield* child.cancelRoot(placement.placementId, current.cancelReason)
+      else if (current.readiness === "ready") yield* child.activateRoot(placement.placementId)
     }
     const settlement = yield* child.rootSettlement(placement.placementId)
     if (Option.isNone(settlement)) return
@@ -40,6 +90,7 @@ const deliver = (parent: Service, child: Service, placement: Placement) =>
       placementId: placement.placementId,
       settlementId: settlement.value.settlementId,
       outcome: settlement.value.outcome,
+      ...(settlement.value.spend === undefined ? undefined : { spend: settlement.value.spend }),
     })
     yield* child.acknowledgeRootSettlement({
       placementId: placement.placementId,

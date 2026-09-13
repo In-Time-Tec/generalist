@@ -3,7 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "../../src/index.js"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
+import { ExecutableResolver } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import {
   consolidate,
   layer as learningLayer,
@@ -136,8 +139,8 @@ it.effect("journals and applies an approved proposal exactly once", () => {
     runtimeLayer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       const propose: Proposer["propose"] = (completed) =>
         Effect.sync(() => {
           proposeCalls += 1
@@ -198,8 +201,8 @@ it.effect("journals a denied proposal reason without applying it", () => {
     runtimeLayer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       const propose: Proposer["propose"] = (completed) =>
         Effect.succeed([{ _tag: "ExportTrajectory", runId: completed.runId, format: "jsonl" }])
       const apply = handlers(() =>
@@ -264,8 +267,8 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
       beforeLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         const propose: Proposer["propose"] = (completed) =>
           Effect.sync(() => {
             proposeCalls += 1
@@ -310,8 +313,8 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
       afterLayer,
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         const propose: Proposer["propose"] = () =>
           Effect.sync(() => {
             recoveredProposeCalls += 1

@@ -2,10 +2,25 @@ import { describe, expect, it } from "@effect/vitest"
 import { EventSchemas } from "@ag-ui/core"
 import { Effect, Schema } from "effect"
 import { Response } from "effect/unstable/ai"
-import { Errors, ExecutableManifest, RunEvent } from "generalist/runtime"
-import { project, projectModelResponse, stateSnapshot } from "../../../src/unstable/ag-ui/projection.js"
+import { Errors, ExecutableManifest, RunEvent, TreePolicy } from "generalist/runtime"
+import type { RuntimeInspection } from "../../../src/runtime/engine.js"
+import {
+  project,
+  projectModelResponse,
+  projectStateSnapshot,
+  stateSnapshot,
+} from "../../../src/unstable/ag-ui/projection.js"
 
-const executableRef = ExecutableManifest.makeTest("assistant", "1").ref
+const executable = ExecutableManifest.makeTest("assistant", "1")
+const executableRef = executable.ref
+const privateMarker = "AGUI_PRIVATE_RECOVERY_MARKER"
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))
+const privateManifest = {
+  ...executable.manifest,
+  entries: executable.manifest.entries.map((entry) =>
+    entry._tag === "Agent" ? { ...entry, manifest: { ...entry.manifest, instructions: privateMarker } } : entry,
+  ),
+}
 
 const base = {
   specVersion: "1" as const,
@@ -59,6 +74,38 @@ const interrupted = (content: RunEvent.CompletedModelResponse["content"]) => ({
     digest: "interrupted-digest",
   },
   content,
+})
+
+const inspection = (overrides: Partial<RuntimeInspection> = {}): RuntimeInspection => ({
+  retainedSession: {
+    id: "thread-1",
+    rootSessionId: "thread-1",
+    parentSessionId: null,
+    parentRunId: null,
+    initialRunId: "run-1",
+    depth: 0,
+  },
+  runId: "run-1",
+  status: "running",
+  executableRef,
+  executableManifest: privateManifest,
+  depth: 0,
+  treePolicy: TreePolicy.defaultTreePolicy,
+  waits: [],
+  lastSequence: 5,
+  durability: "durable",
+  branches: [],
+  revision: "public-revision",
+  waitOpenedAtSequence: {},
+  turn: 1,
+  usage: { inputTokens: 4, outputTokens: 3 },
+  usageFacts: [],
+  activeTools: [],
+  elapsed: 0,
+  budget: { tokens: 12 },
+  gates: [],
+  children: [],
+  ...overrides,
 })
 
 describe("AG-UI event projection", () => {
@@ -213,6 +260,152 @@ describe("AG-UI event projection", () => {
     }),
   )
 
+  it.effect("allowlists event and replay payloads without runtime envelopes", () =>
+    Effect.gen(function* () {
+      const call = Object.assign(
+        Response.makePart("tool-call", {
+          id: "tool-1",
+          name: "search",
+          params: { visible: "query" },
+          providerExecuted: false,
+        }),
+        { metadata: { provider: privateMarker }, attemptFence: 17 },
+      )
+      const result = Object.assign(
+        Response.makePart("tool-result", {
+          id: "tool-1",
+          name: "search",
+          isFailure: false,
+          result: { visible: "tool result" },
+          encodedResult: { visible: "tool result" },
+          providerExecuted: false,
+          preliminary: false,
+        }),
+        { metadata: { provider: privateMarker }, taint: [], privateMarker },
+      )
+      const inputs = [
+        {
+          ...base,
+          _tag: "ToolProgress" as const,
+          turn: 0,
+          toolCallId: "tool-1",
+          message: "visible progress",
+          data: { privateMarker, attemptFence: 17, providerResourceRef: privateMarker },
+          privateMarker,
+        },
+        {
+          ...base,
+          eventId: "run-1:2",
+          sequence: 2,
+          _tag: "RunWaiting" as const,
+          wait: {
+            waitId: "approval-1",
+            reason: {
+              _tag: "Approval" as const,
+              request: {
+                approvalId: "approval-1",
+                operation: "private operation",
+                capability: "private capability",
+                input: { privateMarker, claim: { ownerId: privateMarker, fence: 17 } },
+              },
+            },
+            status: "open" as const,
+            openedAt: "2026-08-03T00:00:01.000Z",
+          },
+          claim: { ownerId: privateMarker, epoch: 3, fence: 17 },
+        },
+        {
+          ...base,
+          eventId: "run-1:3",
+          sequence: 3,
+          _tag: "ToolExecutionCompleted" as const,
+          turn: 0,
+          call,
+          result,
+          providerResourceRef: privateMarker,
+        },
+        {
+          ...base,
+          eventId: "run-1:4",
+          sequence: 4,
+          _tag: "RunCompleted" as const,
+          result: {
+            text: "visible answer",
+            output: { visible: "output" },
+            turns: 1,
+            session: { sessionId: "thread-1", leafId: "entry-1" },
+            privateMarker,
+            attemptFence: 17,
+          },
+          executableManifest: privateManifest,
+        },
+      ]
+      const events = (yield* Effect.forEach(inputs, (event) => project(event, "thread-1"))).flat()
+      expect(events).toEqual([
+        {
+          type: "CUSTOM",
+          name: "generalist.tool.progress",
+          value: { toolCallId: "tool-1", message: "visible progress" },
+        },
+        {
+          type: "RUN_FINISHED",
+          threadId: "thread-1",
+          runId: "run-1",
+          outcome: {
+            type: "interrupt",
+            interrupts: [
+              {
+                id: "approval-1",
+                reason: "Approval",
+                metadata: {
+                  status: "open",
+                  approval: {
+                    approvalId: "approval-1",
+                    tool: "private capability",
+                    summary: "private operation",
+                  },
+                },
+              },
+            ],
+          },
+        },
+        {
+          type: "TOOL_CALL_RESULT",
+          messageId: "run-1:3:result",
+          toolCallId: "tool-1",
+          content: '{"visible":"tool result"}',
+        },
+        {
+          type: "RUN_FINISHED",
+          threadId: "thread-1",
+          runId: "run-1",
+          result: {
+            text: "visible answer",
+            output: { visible: "output" },
+            turns: 1,
+            session: { sessionId: "thread-1", leafId: "entry-1" },
+          },
+          outcome: { type: "success" },
+        },
+      ])
+
+      const modelEvents = yield* projectModelResponse(committed([call, result]).event, [call, result])
+      const bytes = encodeJson([...events, ...modelEvents])
+      for (const forbidden of [
+        privateMarker,
+        "attemptFence",
+        "privateMarker",
+        "executableManifest",
+        "providerResourceRef",
+        "claim",
+        "ownerId",
+        "fence",
+      ]) {
+        expect(bytes).not.toContain(forbidden)
+      }
+    }),
+  )
+
   it.effect("rejects removed transport fragments, malformed Runtime events, and validates snapshots", () =>
     Effect.gen(function* () {
       const removedFragment = {
@@ -233,8 +426,57 @@ describe("AG-UI event projection", () => {
 
       const failure = yield* project({ _tag: "RunCompleted" }, "thread-1").pipe(Effect.flip)
       expect(failure._tag).toBe("generalist/ag-ui/EventInvalid")
-      const snapshot = yield* stateSnapshot({ run: { runId: "run-1" }, cursor: 5 })
-      expect(snapshot).toEqual({ type: "STATE_SNAPSHOT", snapshot: { run: { runId: "run-1" }, cursor: 5 } })
+      const inspected = {
+        ...inspection(),
+        attemptFence: 17,
+        privateMarker,
+        executableManifest: privateManifest,
+        claim: { ownerId: privateMarker, epoch: 3, fence: 17 },
+        providerResourceRef: privateMarker,
+      }
+      const projected = yield* projectStateSnapshot(inspected, "run-root")
+      const snapshot = yield* stateSnapshot(projected)
+      expect(snapshot).toEqual({
+        type: "STATE_SNAPSHOT",
+        snapshot: {
+          version: 1,
+          cursor: "5",
+          run: {
+            runId: "run-1",
+            sessionId: "thread-1",
+            rootRunId: "run-root",
+            agent: { name: "assistant", revision: "public-revision" },
+            status: "running",
+            durability: "durable",
+            depth: 0,
+            turn: 1,
+            lastSequence: 5,
+            budget: { tokens: 12 },
+            usage: { inputTokens: 4, outputTokens: 3 },
+            waits: [],
+          },
+        },
+      })
+      const bytes = encodeJson(snapshot)
+      for (const forbidden of [
+        privateMarker,
+        "attemptFence",
+        "privateMarker",
+        "executableManifest",
+        "claim",
+        "ownerId",
+        "epoch",
+        "fence",
+        "providerResourceRef",
+      ]) {
+        expect(bytes).not.toContain(forbidden)
+      }
+      const snapshotWithPrivateMarker = { ...projected, privateMarker }
+      const unsafe = yield* stateSnapshot(snapshotWithPrivateMarker).pipe(Effect.flip)
+      expect(unsafe).toMatchObject({ _tag: "generalist/ag-ui/EventInvalid", source: "runtime" })
+      const snapshotWithPrivateRunField = { ...projected, run: { ...projected.run, attemptFence: 17 } }
+      const unsafeRun = yield* stateSnapshot(snapshotWithPrivateRunField).pipe(Effect.flip)
+      expect(unsafeRun).toMatchObject({ _tag: "generalist/ag-ui/EventInvalid", source: "runtime" })
     }),
   )
 })

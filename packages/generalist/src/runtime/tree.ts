@@ -1,7 +1,7 @@
 import { Effect, Function, Option, Predicate, Pull, Schedule, Schema, Stream } from "effect"
 import { RunEvent } from "./run/event.js"
 import { CompactionInspection, isTerminal, RawUsageFact, RunInspection, RunOutcome } from "./run.js"
-import { Runtime, type Service as RuntimeService } from "./service.js"
+import { Runtime, type Service as RuntimeService } from "./engine.js"
 import { TreeCursor, type TreeCursor as TreeCursorType } from "./tree/cursor.js"
 export { TreeCursor }
 
@@ -274,7 +274,7 @@ export const checkpoint = (rootRunId: string) => Runtime.use((runtime) => runtim
 
 export const awaitTerminal = (
   rootRunId: string,
-): Effect.Effect<Extract<Inspection, { readonly _tag: "Terminal" }>, import("./service.js").TreeEventsError, Runtime> =>
+): Effect.Effect<Extract<Inspection, { readonly _tag: "Terminal" }>, import("./engine.js").TreeEventsError, Runtime> =>
   Effect.suspend(() =>
     checkpoint(rootRunId).pipe(
       Effect.flatMap((current) =>
@@ -301,7 +301,7 @@ const recoveryWakeups = Stream.fromSchedule(Schedule.spaced("1 second")).pipe(St
 const changes = (runtime: RuntimeService, rootRunId: string) =>
   Stream.merge(runtime.treeChanges(rootRunId), recoveryWakeups)
 
-export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./service.js").TreeEventsError, Runtime> =>
+export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./engine.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
       Effect.gen(function* () {
@@ -312,7 +312,7 @@ export const events = (input: EventsInput): Stream.Stream<TreeEvent, import("./s
             state,
           ): Effect.Effect<
             readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; wait: boolean }>],
-            import("./service.js").TreeEventsError
+            import("./engine.js").TreeEventsError
           > =>
             Effect.gen(function* () {
               if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))
@@ -381,7 +381,7 @@ const isSettled = (inspection: Inspection, settlement: NonNullable<WatchInput["s
   return !inspection.activeRunIds.some((runId) => canProgress(index, runId, memo))
 }
 
-export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./service.js").TreeEventsError, Runtime> =>
+export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./engine.js").TreeEventsError, Runtime> =>
   Stream.unwrap(
     Runtime.use((runtime) =>
       Effect.gen(function* () {
@@ -393,7 +393,7 @@ export const watch = (input: WatchInput): Stream.Stream<TreeEvent, import("./ser
             state,
           ): Effect.Effect<
             readonly [ReadonlyArray<TreeEvent>, Option.Option<{ cursor: TreeCursorType; wait: boolean }>],
-            import("./service.js").TreeEventsError
+            import("./engine.js").TreeEventsError
           > =>
             Effect.gen(function* () {
               if (state.wait) yield* pullChange.pipe(Pull.catchDone(() => Effect.void))

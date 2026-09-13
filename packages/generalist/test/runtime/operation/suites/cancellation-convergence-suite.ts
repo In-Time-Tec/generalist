@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { Errors, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { Errors } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
 import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { assistantAddress, textPrompt } from "../../execution/fixtures.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
@@ -8,11 +10,11 @@ import { objectWorkerId } from "../../execution/object.js"
 
 export interface CancellationConvergenceSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore.RunStore | Extra, StoreError>
+  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
   readonly claim?: (
     runId: string,
     ownerId: string,
-  ) => Effect.Effect<ExecutionClaim, WorkerMutationError, RunStore.RunStore | Extra>
+  ) => Effect.Effect<ExecutionClaim, WorkerMutationError, RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -22,7 +24,7 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
   const describeBackend = options.skip === true ? describe.skip : describe
   const claimExecution = (runId: string, ownerId: string) =>
     options.claim === undefined
-      ? Effect.flatMap(RunStore.RunStore, (store) =>
+      ? Effect.flatMap(RunStore, (store) =>
           store.claimExecution({
             commandId: `runtime-operation-suites-cancellation-convergence-suite-ts-claim-${ownerId}`,
             runId,
@@ -30,14 +32,14 @@ export const cancellationConvergenceSuite = <StoreError, Extra = never>(
           }),
         )
       : options.claim(runId, ownerId)
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore.RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
 
   describeBackend(`${options.name} unknown operation cancellation`, () => {
     const runningOperation = (label: string) =>
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
           sessionId: `session:unknown-cancel:${options.name}:${label}`,

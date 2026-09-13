@@ -6,7 +6,7 @@ import { ActionableTaggedError, errorHint } from "../core/error-hint.js"
 import { CompactionInspection, RawUsageFact, RunId, type RunSnapshot } from "../runtime/run.js"
 import { CompletedModelResponse, type RunEvent } from "../runtime/run/event.js"
 import { collect as collectHistory } from "../runtime/run/history/index.js"
-import type { InspectError, EventsError, Service as RuntimeService, SessionEntryError } from "../runtime/service.js"
+import type { InspectError, EventsError, Service as RuntimeService, SessionEntryError } from "../runtime/engine.js"
 import { Result as GateResult } from "../core/agent/gates/definition.js"
 
 export const ToolCall = Schema.Struct({

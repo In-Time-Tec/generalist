@@ -1,26 +1,32 @@
 ---
 title: "Runtime"
-description: "Admit addressable Runs and activate scoped execution over canonical object state."
+description: "Run typed Agents and manage Sessions through scoped commands and bounded observations."
 ---
 
-The Runtime registers typed Agents by unique name and turns an Agent value plus typed input into an addressable `Run`. The store's journal, cursor, and claim remain the authority for execution and recovery. One object-native engine supplies that authority through S3 or native R2, independently of the compute host.
+The Runtime turns a declared Agent and typed input into a durable Run. Applications use semantic commands and bounded observations; the engine owns registration, claims, persistence, and scheduling. One object-native engine supplies recovery through S3 or native R2, independently of the compute host.
 
 ## Usage
 
 ```ts
-import { Effect, Layer } from "effect"
+import { Crypto, Effect, Layer } from "effect"
 import { Agent } from "generalist"
-import * as Durability from "generalist/durability"
+import { ObjectStore } from "generalist/durability/object-store"
 import { Runtime } from "generalist/runtime"
 
 const agent = Agent.make({ name: "build-explainer" })
 declare const agentServices: Layer.Layer<Agent.Requirements<typeof agent>>
-declare const runtimeLayer: Layer.Layer<Durability.RuntimeServices>
+declare const storage: Layer.Layer<ObjectStore | Crypto.Crypto>
+
+const runtimeLayer = Runtime.layer({
+  agents: { "build-explainer": agent },
+  revision: "build-explainer-v1",
+  services: agentServices,
+  storage,
+  namespace: { environment: "production", tenant: "builds", partition: "default" },
+})
 
 const program = Effect.gen(function* () {
-  yield* Durability.activate
   const runtime = yield* Runtime.Runtime
-  yield* runtime.register(agent)
   const handle = yield* runtime.start(agent, "Explain the failed build", {
     sessionId: "session:42",
     idempotencyKey: "answer:1",
@@ -28,15 +34,16 @@ const program = Effect.gen(function* () {
   return yield* handle.await
 })
 
-const services = Layer.merge(runtimeLayer, agentServices)
-Effect.runPromise(program.pipe(Effect.scoped, Effect.provide(services)))
+Effect.runPromise(program.pipe(Effect.provide(runtimeLayer), Effect.scoped))
 ```
 
-This is a composition fragment: `runtimeLayer` must provide the object transport, explicit namespace, Crypto, and executable resolver described in [object durability](./durable-stores.md). Layer construction is read-only; activation owns execution in the scope.
+This composition fragment needs the model/tool services required by the Agent and an object transport plus Crypto. See [object durability](./durable-stores.md) for S3 and native R2 configuration. Declaring the Layer performs no I/O; acquiring it validates and registers the declarations, acquires execution ownership, and starts the scheduler before publishing Runtime.
 
-`register` captures the Agent's exact service environment once per process. `start` is immediate admission: the activated scoped scheduler can claim the returned Run without an application claim loop. `handle.await` returns the Agent's schema-decoded output, `handle.events` replays then follows the Run, and `inspect` reports authoritative lifecycle state.
+`start` admits work for immediate execution. `hold(agent, input, { idempotencyKey })` instead returns a held handle; only `handle.activate(commandId)` opens its execution gate. Both handles expose the Run ID, schema-decoded `await`, replay-then-live `events`, and `send` for an existing Run's inbox. `schedule` registers a durable recurrence for a declared Agent.
 
-`Runtime.layer({ agents, revision, services, storage, namespace })` is the declaration-driven alternative: it composes registration, activation, and the scheduler into the Layer itself, so the acquired `Runtime.Runtime` is ready without `Durability.activate`. When that incarnation loses execution authority, owned work is interrupted and awaited and scheduler calls fail `RuntimeOwnershipLost`; after the scope closes they fail `RuntimeRetired`.
+The acquired `Runtime.Runtime` is ready without `Durability.activate`. Ownership loss interrupts and awaits owned work; retained commands and observations fail `RuntimeOwnershipLost`, or `RuntimeRetired` after scope closure. The lossy preview stream stops without adding a failure channel. Advanced compute-host adapters retain their explicit activation boundary, but ordinary applications do not register Agents, claim Runs, or construct schedulers.
+
+`inspect` and bounded `list({ limit, status? })` return canonical public Run views. Session admission is grouped under `sessions`, direct-child observations under `children`, and addressed delivery under `messaging`. Operator recovery remains under `operator`. Execution-scoped child mutation is a separate nominal capability supplied to an execution-service factory; knowing another Run ID does not grant that capability.
 
 ## What runs
 
@@ -63,7 +70,7 @@ RI  Agent<Input, Output> + Input + StartOptions
         │ Runtime.start()
 RO  RunHandle<Output> { runId, await, events, send }
         │ Runtime.inspect(runId)
-{ status: "queued" | "running" | ... , lastSequence: 0..n }
+{ status: "pending" | "running" | ... , lastSequence: 0..n }
 ```
 
 ## State machine
@@ -76,7 +83,7 @@ queued ──claim──> running ──suspend──> waiting ──resume─�
 cancelled            └─ commit ─> succeeded | failed | cancelled
 ```
 
-The complete `RunStatus` set is `queued`, `running`, `waiting`, `needs-resolution`, `cancelling`, `succeeded`, `failed`, and `cancelled`. The first canonical terminal event wins.
+This diagram shows engine states. Public inspection projects them to `pending`, `running`, `waiting`, `succeeded`, `failed`, or `cancelled`; it does not expose recovery-only transitions. The first canonical terminal event wins.
 
 ## Failure and recovery
 
@@ -97,9 +104,9 @@ worker/process loss
 
 - `generalist/runtime` is the Worker-safe execution contract. Compose `generalist/durability` with S3 or native R2; Core remains process-local without either. A blocking ask is not a Runtime primitive.
 - `Address` is an opaque routing key bound by a Layer to a pinned executable. `Message` carries Effect AI `Prompt`, idempotency, Session/lane, and correlation fields; Runtime adds no content vocabulary.
-- `register` rejects duplicate Agent names in one Runtime process. `start(agent, input, options)` requires that registration, Schema-encodes the input, and atomically persists the generated executable identity, secret-free reconstruction registrations, and Run. An exact `{ sessionId, idempotencyKey }` retry returns a handle for the same Run ID without admitting a second run.
-- Recovery resolves typed starts by the persisted Agent name against the new process's registered set. A missing name suspends the Run with `UnknownAgent { agentName, runId }` instead of failing it or dispatching work.
-- `admit` is the separate low-level pinned-executable path. It persists only `RunAccepted` and leaves an unclaimable `queued` gate. `activate` races transactionally with `cancel`, appends `RunAttemptStarted` once when activation wins, and is idempotent before or after cancellation. Typed `start` performs immediate admission and activation.
+- Layer acquisition rejects duplicate Agent names and captures each declaration's service environment. `start(agent, input, options)` requires a declared Agent, Schema-encodes the input, and atomically persists its identity and Run. An exact `{ sessionId, idempotencyKey }` retry returns the same Run ID without another admission.
+- Recovery uses the persisted revision and executable identity. An exact retained-revision loader can reconstruct its declarations and services; missing or mismatched definitions fail closed rather than substituting the current Agent revision.
+- A held Run remains unclaimable until its handle activates it. Activation races transactionally with cancellation and retains its original command receipt. The lower-level pinned admission and claim operations stay inside the engine.
 - Optional capability content `{ codec, version, digest }` participates in manifest/executable identity. Missing or drifted codec, version, payload digest, or conflicting duplicate pin fails typed; identical duplicates pass, content-less capabilities remain opaque, and `ExecutableRegistration.narrow` enforces the active executable.
 - Addressed and program execution still use `ExecutableResolver.resolve` with persisted Run identity, manifest, and root registrations. Typed Agent starts instead resolve the captured Agent and services by registered name. Runtime owns input, history, checkpoint, continuation, and durable execution identity.
 - Root admission is FIFO per Session across addresses; only the lane head receives the Session writer claim. Other Sessions and child Sessions run independently, while `respond`, `signal`, and `cancel` bypass the lane.
@@ -107,19 +114,19 @@ worker/process loss
 
 ### Session input queue
 
-- Product-facing Session metadata owns the selected Agent, editable FIFO `queue`, and optional `activeRunId`. `submitSessionInput({ sessionId, commandId, prompt, selection? })` accepts an Effect AI `Prompt`, using the explicit selection or the Session's retained selection. Selections pin executable reference, manifest, registrations, and optional tree policy and budget. Programs are rejected; direct Tool selection is not implemented.
+- `runtime.sessions.create({ sessionId, title? })` and `get(sessionId)` return semantic Session handles. `session.submit(agent, input, { commandId })` validates the declared Agent's typed input without requiring a parent Run or exposing a pinned selection.
 - Idle submission atomically removes the first pending item and admits a fresh Run. Later input remains pending without a Run ID. When the active Run reaches a terminal state, releasing its lane and promoting the next item commit together. This queue does not inject follow-up input into the old Run's inbox.
-- `updateSessionInput({ sessionId, commandId, id, expectedRevision, prompt, selection? })` edits pending input in place and may replace its selection. `removeSessionInput({ sessionId, commandId, id, expectedRevision })` removes it. Stale revisions, including edits racing promotion, fail `SessionQueueConflict` rather than mutating an admitted Run.
-- Queue commands return immutable `{ id, revision }` receipts through canonical command authority. Exact retries return the original receipt after promotion, removal, or fresh-host recovery; changed content under the same command identity conflicts. Current queue membership is a separate read.
+- `session.update({ id, expectedRevision, commandId, agent, value })` edits a pending task; `session.remove({ id, expectedRevision, commandId })` removes it. Stale revisions, including edits racing promotion, fail `SessionQueueConflict` rather than changing an admitted Run.
+- Admission returns immutable `{ sessionId, id, revision }` receipts. Exact retries retain them after promotion, removal, or fresh-host recovery; changed command facts fail `SessionIdempotencyConflict`. Read `session.queue` for current membership, `session.inspect` for its bounded summary, and `session.events(cursor?)` for projected client events.
 - The queue is bounded to 64 pending items and 1 MiB of encoded pending inputs including pins and registrations. Rejected mutations leave canonical state unchanged. Selection and queue recovery use the same object engine as Runs, with fresh namespaces and no compatibility reader for retired durable enqueue state.
-- `runtime.sessionSelection(name)` resolves a registered Agent's pinned selection. [Host Session handles](./host.md#conversational-queue) accept conversational instructions as strings or Effect AI Prompts, without decoding an Agent's typed input Schema. Typed inputs remain the contract of `start` and Host's `runs.startByName`.
+- `session.control("stop" | "close" | "resume", commandId)` controls its admission lifecycle. [Host Session handles](./host.md#conversational-queue) additionally support conversational input; they do not expose the engine's selection construction.
 
 ### Journal, control, and waits
 
 - Every Run has one canonical stream: stable `eventId`, strictly increasing sequence, replay where `sequence > cursor`, then live follow. Bounded subscribers fail typed on lag or unavailable cursors without blocking producers.
 - `acknowledge` advances one Runtime-global durable processed-through point only to `-1` or an existing `TurnCompleted` sequence; equal/older valid points are no-ops, invalid boundaries fail `AckInvalid`, and future points fail `AckBeyondCommitted`. Default is `{ sequence: -1 }`; feed the stored sequence to `events` after restart.
-- `snapshot` atomically pairs inspection and exclusive cursor with terminal-event outcome, raw attempt `usageFacts`, and compaction state. Facts come only from `AttemptCompleted.usage` or `AttemptFailed.providerUsage`; agreeing attempt IDs deduplicate, disagreement is corruption, and Runtime computes no price.
-- `inspect` includes the process-local Inspector snapshot shape: latest zero-based `turn`, aggregate `{ inputTokens, outputTokens }` usage, active tool names, the latest journaled Agent event that retains the process-local event contract, and elapsed wall time since `RunAccepted`. It adds durable lifecycle, budget, child, gate, suspension, branch, and raw `usageFacts` detail. Reference-only model-response events and transcript-free durable turn completions are not exposed as `lastEvent` because they cannot satisfy the process-local event payload.
+- The engine's snapshot atomically pairs state and an exclusive cursor. Its raw usage facts come only from committed provider usage; agreeing attempt IDs deduplicate and disagreements fail as corruption. Those internal snapshots are not public Runtime methods.
+- Public `inspect` returns Agent/revision identity, Session and parent/root IDs, projected status, turn, last sequence, aggregate usage, remaining budget, and bounded waits/children. It omits executable manifests, reconstruction registrations, checkpoints, raw usage facts, and claim authority. Use the separate read-only Inspection Layer when no execution host should be acquired.
 - `RunEvent` is a strict lifecycle/core-model schema. Completed/interrupted model responses store references; `resolveModelResponse` verifies Session parent and digest. Only intentionally dynamic tool values and metadata remain unknown.
 - `send(runId, prompt, options)` admits the unified durable Run inbox with `steer`, `interrupt`, `rollback`, or `reject` policy. Each accepted message appends `Inbox` before delivery and remains pending until consumption commits with the next model operation/checkpoint or terminalization records its disposition. Exact duplicate precedes capacity checks; changed input is `SteeringConflict`, aggregate overload is `Steering.InboxFull`, a message above the 256 KiB per-event payload bound is `Steering.MessageTooLarge`, and no durable request waits for backpressure. `SteeringDrained` is separate telemetry. Durable conversational follow-up uses the Session queue instead of an `enqueue` policy; Core's process-local follow-up lane remains available.
 - Each `(runId, waitId)` row is the sole authority for immutable identity/reason, status, decoded resolution, and timestamps. Open waits preserve model order; each close changes one open row before one event and leaves siblings open. Exact duplicate response is read-only success, a response whose kind does not match the immutable reason is `ResponseKindMismatch` and leaves the wait open, conflict is `ResponseConflict`, and terminal waits never reopen.

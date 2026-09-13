@@ -2,8 +2,8 @@ import type { DurabilityFailure } from "../../durability/errors.js"
 import {
   ActiveModelResponse,
   type Service as ActiveModelResponseService,
-  make as makeActiveModelResponse,
 } from "../../core/model/result/active-model-response.js"
+import { make as makeActiveModelResponse } from "../../core/model/result/active-model-response-writer.js"
 import { Context, Effect, Option, Ref, Schema } from "effect"
 import { AgentExecutionFailure, RunNotFound, RunTerminal, RuntimeUnavailable } from "../errors.js"
 import type { ExecutionClaim, Service as RunStoreService } from "../run/store.js"

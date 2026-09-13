@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect } from "effect"
 import { ActiveModelResponse, ModelTelemetry } from "../src/index"
+import { make as makeActiveModelResponse } from "../src/core/model/result/active-model-response-writer.js"
 
 type FeatureEntry = readonly [subpath: string, load: () => Promise<object>, keys: ReadonlyArray<string>]
 
@@ -36,6 +37,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "FanOut",
       "Fork",
       "HostSession",
+      "Inspection",
       "LocalScheduler",
       "Mailbox",
       "Message",
@@ -54,6 +56,31 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
       "SessionSender",
       "Steering",
       "TreePolicy",
+    ],
+  ],
+  [
+    "runtime/inspection",
+    () => import("../src/runtime/inspection.js"),
+    [
+      "Budget",
+      "Child",
+      "Cursor",
+      "Inspection",
+      "InspectionCorrupt",
+      "InspectionCursorInvalid",
+      "InspectionLimitInvalid",
+      "InspectionUnavailable",
+      "Page",
+      "PageInput",
+      "PartitionInspection",
+      "Run",
+      "RunNotFound",
+      "RunStatus",
+      "Session",
+      "SessionNotFound",
+      "Usage",
+      "Wait",
+      "layer",
     ],
   ],
   [
@@ -83,7 +110,33 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
     () => import("../src/instructions/skills/index.js"),
     ["FileSystemCatalog", "GitHubCatalog", "HttpCatalog", "S3Catalog"],
   ],
-  ["server", () => import("../src/server/index.js"), ["Server"]],
+  [
+    "server",
+    () => import("../src/server/index.js"),
+    [
+      "ClientAgentIdentity",
+      "ClientApprovalSummary",
+      "ClientBudget",
+      "ClientConversation",
+      "ClientConversationEntry",
+      "ClientConversationUpdate",
+      "ClientCursor",
+      "ClientEvent",
+      "ClientMessage",
+      "ClientPreview",
+      "ClientQueueEntry",
+      "ClientRun",
+      "ClientRunSummary",
+      "ClientServerEvent",
+      "ClientSession",
+      "ClientSessionHistoryPage",
+      "ClientSessionRunsPage",
+      "ClientSessionSnapshot",
+      "ClientUsage",
+      "ClientWait",
+      "Server",
+    ],
+  ],
   ["mcp", () => import("../src/unstable/mcp/index.js"), ["MCPClient", "OAuth"]],
   [
     "testing",
@@ -196,35 +249,55 @@ describe("generalist public surface", () => {
     }),
   )
 
-  it("exports only the read-only active response handle", () => {
-    const handle = ActiveModelResponse.make()
+  it("exports only the read-only active response tag", () => {
+    const handle = makeActiveModelResponse()
     expect(ActiveModelResponse.ActiveModelResponse).toBeDefined()
     expect(Effect.isEffect(handle.snapshot)).toBe(true)
     expect("accept" in handle).toBe(false)
-    expect(Object.keys(ActiveModelResponse).toSorted()).toEqual(["ActiveModelResponse", "make"])
+    expect(Object.keys(ActiveModelResponse).toSorted()).toEqual(["ActiveModelResponse"])
   })
 
   it("exports the model telemetry contract", () => {
-    expect(ModelTelemetry.Event).toBeDefined()
-    expect(ModelTelemetry.CallStarted).toBeDefined()
-    expect(ModelTelemetry.AttemptStarted).toBeDefined()
-    expect(ModelTelemetry.AttemptFirstOutput).toBeDefined()
-    expect(ModelTelemetry.AttemptCompleted).toBeDefined()
-    expect(ModelTelemetry.AttemptFailed).toBeDefined()
-    expect(ModelTelemetry.RetryScheduled).toBeDefined()
-    expect(ModelTelemetry.CallCompleted).toBeDefined()
-    expect(ModelTelemetry.CallFailed).toBeDefined()
-    expect(ModelTelemetry.CompactionStarted).toBeDefined()
-    expect(ModelTelemetry.CompactionSkipped).toBeDefined()
-    expect(ModelTelemetry.CompactionApplied).toBeDefined()
-    expect(ModelTelemetry.CompactionFailed).toBeDefined()
-    expect(ModelTelemetry.CallPurpose).toBeDefined()
-    expect(ModelTelemetry.FailureCategory).toBeDefined()
-    expect(ModelTelemetry.FailureClassification).toBeDefined()
-    expect(ModelTelemetry.RetryReason).toBeDefined()
-    expect(ModelTelemetry.FirstOutputKind).toBeDefined()
-    expect(ModelTelemetry.CompactionTrigger).toBeDefined()
-    expect(ModelTelemetry.CompactionKind).toBeDefined()
-    expect(ModelTelemetry.classifyFailureCategory).toBeTypeOf("function")
+    expect(Object.keys(ModelTelemetry).toSorted()).toEqual([
+      "AttemptCompleted",
+      "AttemptFailed",
+      "AttemptFirstOutput",
+      "AttemptStarted",
+      "CallCompleted",
+      "CallFailed",
+      "CallPurpose",
+      "CallStarted",
+      "CompactionApplied",
+      "CompactionCommit",
+      "CompactionFailed",
+      "CompactionKind",
+      "CompactionSkipped",
+      "CompactionStarted",
+      "CompactionTrigger",
+      "CurrentPurpose",
+      "DeliveryBatch",
+      "Event",
+      "FailureCategory",
+      "FailureClassification",
+      "FailureDisposition",
+      "FallbackScheduled",
+      "FirstOutputKind",
+      "InvocationLifecycle",
+      "InvocationLifecycleFailed",
+      "ModelInvocationCompleted",
+      "ModelInvocationFailed",
+      "ModelInvocationMethod",
+      "ModelInvocationStarted",
+      "ProviderUsage",
+      "RetryReason",
+      "RetryScheduled",
+      "Sink",
+      "SinkFailed",
+      "classifyFailureCategory",
+      "generateId",
+      "isInvocationLifecycleFailed",
+      "layerInvocationLifecycleNoop",
+      "layerSinkNoop",
+    ])
   })
 })

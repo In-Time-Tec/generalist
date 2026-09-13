@@ -5,7 +5,10 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, Approvals, Permissions } from "../../../src/index.js"
 import { Descriptor } from "../../../src/core/capability/state.js"
 import { LoopDriverState } from "../../../src/core/durable/loop-driver-state.js"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { Denied, attenuate, grant } from "../../../src/unstable/capability/index.js"
 import { provideScoped } from "../../runtime/execution/scoped-provide.js"
 
@@ -92,8 +95,8 @@ it.effect("serializes capability lineage and recovers a hosted child denial with
       Layer.merge(runtime, Layer.mergeAll(model, authorization, handlers)),
       Effect.gen(function* () {
         const service = yield* Runtime.Runtime
-        const executor = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const executor = yield* RunExecutor
+        const store = yield* RunStore
         yield* service.register(parent)
         const parentRun = yield* service.start(parent, "delegate to the reviewer")
         yield* executor.execute(

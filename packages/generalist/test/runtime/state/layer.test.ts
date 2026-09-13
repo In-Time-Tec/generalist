@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Context, Effect, Exit, Layer, Scope } from "effect"
 import { activate, layer as durabilityLayer } from "generalist/durability"
 import { ObjectStore, type Service as ObjectStoreService } from "generalist/durability/object-store"
-import { LocalScheduler } from "generalist/runtime"
+import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
 import { makeObjectStorage } from "../execution/object.js"
 import { assistantAddress, assistantRef, registrationsFor, resolverLayer } from "../execution/fixtures.js"
 
@@ -33,7 +33,7 @@ describe("activated Runtime retirement", () => {
         Scope.provide(scope),
       )
       yield* activate.pipe(Effect.provide(Context.add(context, Scope.Scope, scope)))
-      const scheduler = Context.get(context, LocalScheduler.LocalScheduler)
+      const scheduler = Context.get(context, LocalScheduler)
       const drain = (fuel: number) => scheduler.drain({ fuel }).pipe(Effect.provide(context))
       yield* drain(1)
       yield* Scope.close(scope, Exit.void)
@@ -46,7 +46,7 @@ describe("activated Runtime retirement", () => {
     Effect.scoped(
       Effect.gen(function* () {
         const context = yield* host(makeObjectStorage().store, "reactivating-worker", "state-layer-reactivated")
-        const scheduler = Context.get(context, LocalScheduler.LocalScheduler)
+        const scheduler = Context.get(context, LocalScheduler)
         const firstDrain = scheduler.drain({ fuel: 1 })
 
         yield* Effect.scoped(activate.pipe(Effect.andThen(firstDrain), Effect.provide(context)))
@@ -73,7 +73,7 @@ describe("activated Runtime retirement", () => {
       const scope = yield* Scope.make()
       const context = yield* host(client.store, "failing-worker", "state-layer-takeover").pipe(Scope.provide(scope))
       yield* activate.pipe(Effect.provide(Context.add(context, Scope.Scope, scope)))
-      const scheduler = Context.get(context, LocalScheduler.LocalScheduler)
+      const scheduler = Context.get(context, LocalScheduler)
       const drain = (fuel: number) => scheduler.drain({ fuel }).pipe(Effect.provide(context))
       yield* drain(1)
 

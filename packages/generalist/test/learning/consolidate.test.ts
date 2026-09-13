@@ -6,7 +6,11 @@ import { EmbeddingModel, LanguageModel, Prompt, Response, Toolkit } from "effect
 import { Agent, Approvals, Memory, Permissions } from "../../src/index.js"
 import { activate } from "../../src/durability/index.js"
 import { SemanticRecall, VectorStore } from "../../src/memory/index.js"
-import { ExecutableResolver, LocalScheduler, Run, RunExecutor, RunStore, Runtime } from "../../src/runtime/index.js"
+import { ExecutableResolver, Run } from "../../src/runtime/index.js"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore, type Service as RunStoreService } from "../../src/runtime/run/store.js"
+import { RunExecutor, type Service as RunExecutorService } from "../../src/runtime/execution/run-executor.js"
+import { LocalScheduler } from "../../src/runtime/execution/local-scheduler.js"
 import { TestModel } from "../../src/testing/index.js"
 import {
   consolidate,
@@ -63,8 +67,8 @@ const activeAgent = (run: Run.RunInspection): string | undefined => {
 }
 
 const execute = (
-  executor: RunExecutor.Service,
-  store: RunStore.Service,
+  executor: RunExecutorService,
+  store: RunStoreService,
   runId: Memory.OperationRef["runId"],
   commandId: string,
 ) => Effect.flatMap(store.claimExecution({ runId, ownerId: objectWorkerId, commandId }), executor.execute)
@@ -84,9 +88,9 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
     runtimeLayer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
-      const scheduler = yield* LocalScheduler.LocalScheduler
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
+      const scheduler = yield* LocalScheduler
       const memoryContext = yield* Layer.build(semanticMemory)
       const memory = Context.get(memoryContext, Memory.Memory)
       const memoryLayer = Layer.succeed(Memory.Memory, memory)
@@ -221,7 +225,7 @@ it.effect("runs once per UTC day with its own budget", () =>
     runtimeLayer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const scheduler = yield* LocalScheduler.LocalScheduler
+      const scheduler = yield* LocalScheduler
       const memoryContext = yield* Layer.build(semanticMemory)
       const memory = Context.get(memoryContext, Memory.Memory)
       const fixture = yield* TestModel.make([TestModel.text("must not run")], { model: "budgeted-consolidation" })

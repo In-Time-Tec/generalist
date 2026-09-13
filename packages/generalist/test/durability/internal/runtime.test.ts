@@ -8,8 +8,11 @@ import { FrameworkFailure } from "../../../src/core/tools/tool-executor.js"
 import { Prompt } from "effect/unstable/ai"
 import { ObjectStore } from "../../../src/durability/object-store.js"
 import { activate, layerRunStore } from "../../../src/durability/index.js"
+import { make as makeJournal } from "../../../src/durability/internal/journal.js"
+import { commands } from "../../../src/durability/internal/runtime-command-admission.js"
+import { diff, encodeCommandValue } from "../../../src/durability/internal/runtime-state.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
-import { sequenceName } from "../../../src/durability/internal/protocol.js"
+import { apply, sequenceName } from "../../../src/durability/internal/protocol.js"
 import { makeRunStore } from "../../../src/runtime/state/store.js"
 import { Address } from "../../../src/runtime/address.js"
 import { Cursor } from "../../../src/runtime/cursor.js"
@@ -149,19 +152,187 @@ describe("object Runtime canonical mutations", () => {
       BunCrypto.layer,
       Effect.gen(function* () {
         const bucket = yield* makeSimulator()
-        const first = yield* open(bucket)
-        const run = yield* first.admitSend(admission("reward"))
-        const command = { commandId: "reward-1", runId: run.runId, leaf: "leaf-1", value: 1, source: "test" }
-        yield* bucket.faults.failNextCreate({ key: slot("1"), phase: "after" })
-        yield* bucket.faults.failNextRead({ key: slot("1") })
-        expect(yield* first.recordReward(command).pipe(Effect.flip)).toMatchObject({ reason: "indeterminate" })
+        const { command, run } = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const first = yield* open(bucket)
+            const initialRun = yield* first.admitSend(admission("reward"))
+            const initialCommand = {
+              commandId: "reward-1",
+              runId: initialRun.runId,
+              leaf: "leaf-1",
+              value: 1,
+              source: "test",
+            }
+            yield* bucket.faults.failNextCreate({ key: slot("1"), phase: "after" })
+            yield* bucket.faults.failNextRead({ key: slot("1") })
+            expect(yield* first.recordReward(initialCommand).pipe(Effect.flip)).toMatchObject({
+              reason: "indeterminate",
+            })
+            return { command: initialCommand, run: initialRun }
+          }),
+        )
         const recovered = yield* open(yield* bucket.connect)
         expect(yield* recovered.recordReward(command)).toBeUndefined()
         const history = yield* recovered.history({ runId: run.runId, cursor: Cursor.make(-1), limit: 100 })
         expect(history.filter((event) => event._tag === "Rewarded")).toHaveLength(1)
-        expect(yield* recovered.recordReward({ ...command, value: 2 }).pipe(Effect.flip)).toMatchObject({
+        for (const changed of [
+          { ...command, leaf: "leaf-2" },
+          { ...command, value: 2 },
+          { ...command, source: "other" },
+        ]) {
+          expect(yield* recovered.recordReward(changed).pipe(Effect.flip)).toMatchObject({
+            reason: "input-conflict",
+          })
+        }
+        const other = yield* recovered.admitSend(admission("reward-other-run"))
+        expect(yield* recovered.recordReward({ ...command, runId: other.runId }).pipe(Effect.flip)).toMatchObject({
           reason: "input-conflict",
         })
+        expect(
+          (yield* recovered.history({ runId: other.runId, cursor: Cursor.make(-1), limit: 100 })).filter(
+            (event) => event._tag === "Rewarded",
+          ),
+        ).toHaveLength(0)
+        const provenance = yield* recovered.lookupRewardCommand(command.commandId)
+        if (provenance === undefined) return yield* Effect.die("Missing canonical reward provenance")
+        expect(provenance).toEqual({ runId: run.runId, leaf: "leaf-1", value: 1, source: "test" })
+        expect(Object.isFrozen(provenance)).toBe(true)
+        expect(Reflect.set(provenance, "value", 99)).toBe(false)
+        expect(yield* recovered.lookupRewardCommand(command.commandId)).toEqual({
+          runId: run.runId,
+          leaf: "leaf-1",
+          value: 1,
+          source: "test",
+        })
+      }),
+    ).pipe(Effect.scoped),
+  )
+
+  it.effect("publishes reward provenance only with the committed event", () =>
+    provideScoped(
+      BunCrypto.layer,
+      Effect.gen(function* () {
+        const bucket = yield* makeSimulator()
+        const store = yield* open(bucket)
+        const run = yield* store.admitSend(admission("reward-atomic"))
+        const command = {
+          commandId: "reward-atomic-1",
+          runId: run.runId,
+          leaf: "leaf-atomic",
+          value: 0.5,
+          source: "test",
+        }
+        yield* store.recordReward(command)
+        command.value = 99
+        expect(yield* store.lookupRewardCommand(command.commandId)).toMatchObject({ value: 0.5 })
+        command.value = 0.5
+        yield* store.recordReward(command)
+        expect(yield* store.lookupRewardCommand(command.commandId)).toEqual({
+          runId: run.runId,
+          leaf: "leaf-atomic",
+          value: 0.5,
+          source: "test",
+        })
+
+        const missing = { ...command, commandId: "reward-missing", runId: "missing-run" }
+        expect(yield* store.recordReward(missing).pipe(Effect.flip)).toMatchObject({
+          _tag: "generalist/runtime/RunNotFound",
+          runId: "missing-run",
+        })
+        expect(yield* store.lookupRewardCommand(missing.commandId)).toBeUndefined()
+
+        const uncommitted = { ...command, commandId: "reward-uncommitted", leaf: "leaf-uncommitted" }
+        yield* bucket.faults.failNextCreate({ key: slot("2"), phase: "before" })
+        expect(yield* store.recordReward(uncommitted).pipe(Effect.flip)).toMatchObject({ reason: "indeterminate" })
+        expect(yield* store.lookupRewardCommand(uncommitted.commandId)).toBeUndefined()
+        expect(yield* bucket.store.read(slot("2"), { maxBytes: 1024 * 1024 })).toBeUndefined()
+
+        const recovered = yield* open(yield* bucket.connect)
+        expect(yield* recovered.lookupRewardCommand(command.commandId)).toEqual({
+          runId: run.runId,
+          leaf: "leaf-atomic",
+          value: 0.5,
+          source: "test",
+        })
+        expect(yield* recovered.lookupRewardCommand(uncommitted.commandId)).toBeUndefined()
+        const rewards = (yield* recovered.history({ runId: run.runId, cursor: Cursor.make(-1), limit: 100 })).filter(
+          (event) => event._tag === "Rewarded",
+        )
+        expect(rewards).toHaveLength(1)
+      }),
+    ).pipe(Effect.scoped),
+  )
+
+  it.effect("replays an old reward receipt but refuses new rewards without canonical provenance", () =>
+    provideScoped(
+      BunCrypto.layer,
+      Effect.gen(function* () {
+        const sourceBucket = yield* makeSimulator()
+        const source = yield* open(sourceBucket)
+        const run = yield* source.admitSend(admission("legacy-reward"))
+        const command = {
+          commandId: "legacy-reward-1",
+          runId: run.runId,
+          leaf: "legacy-leaf",
+          value: 0.25,
+          source: "legacy-test",
+        }
+        yield* source.recordReward(command)
+        const sourceJournal = yield* makeJournal(options).pipe(Effect.provideService(ObjectStore, sourceBucket.store))
+        const sourceHead = yield* sourceJournal.head
+        const legacyState = yield* apply(
+          sourceHead.state,
+          [{ op: "remove", path: ["data", "fields", "rewardCommands"] }],
+          "encoding",
+        )
+
+        const bucket = yield* makeSimulator()
+        const journal = yield* makeJournal(options).pipe(Effect.provideService(ObjectStore, bucket.store))
+        const input = yield* encodeCommandValue([command], commands.recordReward.input)
+        const commandId = `recordReward:${commands.recordReward.identity([command])}`
+        const receipt = yield* encodeCommandValue(undefined, commands.recordReward.receipt)
+        yield* journal.commit(
+          {
+            id: commandId,
+            input: {
+              environment: options.environment,
+              tenant: options.tenant,
+              partition: options.partition,
+              command: commands.recordReward.tag,
+              input,
+            },
+          },
+          () =>
+            Effect.succeed({
+              patches: diff({}, legacyState),
+              receipt: {
+                value: receipt,
+                observations: { commandId, occurredAtMillis: 0, occurredAt: "1970-01-01T00:00:00.000Z" },
+              },
+            }),
+        )
+
+        const legacy = yield* open(yield* bucket.connect)
+        expect(yield* legacy.lookupRewardCommand(command.commandId)).toBeUndefined()
+        expect(yield* legacy.recordReward(command)).toBeUndefined()
+        expect(yield* bucket.store.read(slot("1"), { maxBytes: 1024 * 1024 })).toBeUndefined()
+        expect(yield* legacy.inspect(run.runId)).toMatchObject({ runId: run.runId })
+        expect(
+          (yield* legacy.history({ runId: run.runId, cursor: Cursor.make(-1), limit: 100 })).filter(
+            (event) => event._tag === "Rewarded",
+          ),
+        ).toHaveLength(1)
+
+        yield* legacy.createHostSession({ id: "legacy-readable" })
+        const recovered = yield* open(yield* bucket.connect)
+        expect(yield* recovered.hostSession("legacy-readable")).toMatchObject({ id: "legacy-readable" })
+        const unavailable = yield* recovered
+          .recordReward({ ...command, commandId: "legacy-new-reward" })
+          .pipe(Effect.flip)
+        expect(unavailable).toMatchObject({ _tag: "generalist/runtime/RuntimeUnavailable" })
+        expect(unavailable.message).toContain("Canonical reward-command provenance is missing")
+        expect(yield* recovered.lookupRewardCommand("legacy-new-reward")).toBeUndefined()
+        expect(yield* bucket.store.read(slot("2"), { maxBytes: 1024 * 1024 })).toBeUndefined()
       }),
     ).pipe(Effect.scoped),
   )

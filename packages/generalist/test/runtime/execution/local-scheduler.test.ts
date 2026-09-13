@@ -5,14 +5,11 @@ import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { provideScoped } from "./scoped-provide.js"
 import { Deferred, Effect, Exit, Layer, Ref, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
-import {
-  ChildRuns,
-  ExecutableResolver,
-  RunExecutor,
-  LocalScheduler,
-  Runtime,
-  RunStore,
-} from "../../../src/runtime/index.js"
+import { ChildRuns, ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
+import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
 import {
   assistant,
   assistantAddress,
@@ -75,7 +72,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       Effect.gen(function* () {
         yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
         const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const scheduler = yield* LocalScheduler
         yield* runtime.send({
           to: assistantAddress,
           sessionId: "fixture-cleanup",
@@ -121,8 +118,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("executes admitted roots and children", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const root = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler:object`,
@@ -209,8 +206,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("does not fence an external execution claim", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler-external-claim:object`,
@@ -276,8 +273,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("reconciles an orphaned cancelling tree root last", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const parent = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler-cancel:object`,
@@ -421,8 +418,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("does not reclaim an active local Run", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler-active:object`,
@@ -464,7 +461,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             runtimeLayer(),
             Effect.gen(function* () {
               const runtime = yield* Runtime.Runtime
-              const store = yield* RunStore.RunStore
+              const store = yield* RunStore
               const workerId = objectWorkerId
 
               const owned = yield* runtime.send({
@@ -501,7 +498,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
                 runId: orphaned.runId,
                 reason: "stop",
               })
-              const scheduler = yield* LocalScheduler.LocalScheduler
+              const scheduler = yield* LocalScheduler
               yield* scheduler.tick
               for (const claim of [ownedClaim, orphanedClaim]) {
                 expect((yield* runtime.inspect(claim.runId)).status).toBe("cancelling")
@@ -518,8 +515,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             Effect.gen(function* () {
               const { owned, orphaned, ownedClaim, orphanedClaim } = persisted
               const runtime = yield* Runtime.Runtime
-              const scheduler = yield* LocalScheduler.LocalScheduler
-              const store = yield* RunStore.RunStore
+              const scheduler = yield* LocalScheduler
+              const store = yield* RunStore
               for (const claim of [ownedClaim, orphanedClaim]) {
                 const execution = yield* store.loadExecution(claim.runId)
                 expect(execution.ownerId).toBeUndefined()
@@ -564,8 +561,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("claims the oldest ready Runs beyond the window", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
-          const host = RunExecutor.RunExecutor.of({
+          const store = yield* RunStore
+          const host = RunExecutor.of({
             execute: (claim) =>
               store
                 .complete({
@@ -577,8 +574,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             interrupt: () => Effect.void,
           })
           const scheduler = yield* makeLocalScheduler({ workerId: objectWorkerId, concurrency: 4 }).pipe(
-            Effect.provideService(RunStore.RunStore, store),
-            Effect.provideService(RunExecutor.RunExecutor, host),
+            Effect.provideService(RunStore, store),
+            Effect.provideService(RunExecutor, host),
             Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
           )
           const receipts: Array<{ readonly runId: string }> = []
@@ -635,7 +632,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             const scheduler = yield* makeLocalScheduler({ workerId: objectWorkerId }).pipe(
               Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
             )
-            const store = yield* RunStore.RunStore
+            const store = yield* RunStore
             const runCount = 96
             const receipts: Array<{ readonly runId: string }> = []
             for (let index = 0; index < runCount; index += 1) {
@@ -663,7 +660,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
               readonly method: string
               readonly input: { readonly limit?: number; readonly runId?: string; readonly status?: string }
             }> = []
-            const spy = RunStore.RunStore.of({
+            const spy = RunStore.of({
               ...store,
               list: (input) => {
                 calls.push({ method: "list", input: { ...input } })
@@ -680,7 +677,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             })
             for (let tick = 0; tick < 2; tick += 1) {
               const before = calls.length
-              yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
+              yield* scheduler.tick.pipe(Effect.provideService(RunStore, spy))
               const tickCalls = calls.slice(before)
               // Child settlement is store-authoritative, so scheduler work is only cancellation and ready selection.
               expect(tickCalls.length).toBe(3)
@@ -708,8 +705,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            const store = yield* RunStore.RunStore
+            const scheduler = yield* LocalScheduler
+            const store = yield* RunStore
             const parent = yield* runtime.send({
               to: assistantAddress,
               sessionId: `scheduler-order:object`,
@@ -773,8 +770,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            const store = yield* RunStore.RunStore
+            const scheduler = yield* LocalScheduler
+            const store = yield* RunStore
             const filler = Effect.fn("backlog.filler")(function* (label: string) {
               const receipt = yield* runtime.send({
                 to: assistantAddress,
@@ -845,8 +842,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            const store = yield* RunStore.RunStore
+            const scheduler = yield* LocalScheduler
+            const store = yield* RunStore
             // Approval waits no terminal child can ever answer, so reconciliation never
             // shortens this page and the cursor is the only thing that can reach past it.
             for (let index = 0; index < 34; index += 1) {
@@ -916,8 +913,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("does no child-settlement work while nothing changes", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const receipt = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler-idle:object`,
@@ -935,7 +932,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             result: completedResult("done"),
           })
           const calls: Array<{ readonly method: string; readonly status?: string }> = []
-          const spy = RunStore.RunStore.of({
+          const spy = RunStore.of({
             ...store,
             list: (input) => {
               calls.push({ method: "list", status: String(input.status) })
@@ -954,9 +951,9 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
               return store.snapshot(runId)
             },
           })
-          yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
+          yield* scheduler.tick.pipe(Effect.provideService(RunStore, spy))
           calls.length = 0
-          yield* scheduler.tick.pipe(Effect.provideService(RunStore.RunStore, spy))
+          yield* scheduler.tick.pipe(Effect.provideService(RunStore, spy))
           expect(calls.filter((call) => call.method === "list" && call.status === "waiting")).toHaveLength(0)
           expect(
             calls.filter(
@@ -998,8 +995,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("resumes a waiting parent once its child settles", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const parent = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler-resume:object`,
@@ -1068,8 +1065,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       it.effect("admits a long-running Run without blocking on it", () =>
         Effect.gen(function* () {
           const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
-          const store = yield* RunStore.RunStore
+          const scheduler = yield* LocalScheduler
+          const store = yield* RunStore
           const blocking = yield* runtime.send({
             to: assistantAddress,
             sessionId: `scheduler-nonblocking:object`,
@@ -1157,8 +1154,8 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         it.effect("interrupts an executing Run on cancellation", () =>
           Effect.gen(function* () {
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
-            const store = yield* RunStore.RunStore
+            const scheduler = yield* LocalScheduler
+            const store = yield* RunStore
             const receipt = yield* runtime.send({
               to: assistantAddress,
               sessionId: `scheduler-sweep-interrupt:object`,
@@ -1227,7 +1224,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
           Effect.gen(function* () {
             yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
+            const scheduler = yield* LocalScheduler
             for (let index = 0; index < 6; index += 1) {
               yield* runtime.send({
                 to: assistantAddress,
@@ -1288,7 +1285,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
           Effect.gen(function* () {
             yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
             const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
+            const scheduler = yield* LocalScheduler
             for (let index = 0; index < 6; index += 1) {
               yield* runtime.send({
                 to: assistantAddress,

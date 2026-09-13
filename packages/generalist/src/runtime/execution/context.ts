@@ -6,7 +6,7 @@ import { Operations as OperationsService } from "../../core/tools/nested-operati
 import { type SessionStore as SessionService, SessionDirectory, SessionStoreError } from "../../core/context/session.js"
 import { type Service as ToolExecutorService, ToolExecutor } from "../../core/tools/tool-executor.js"
 import { ChildRuns, Executor as ChildRunsExecutor, make as makeChildRuns } from "../child/runs.js"
-import { Executor as CodeModeExecutor, type Service as CodeModeService } from "../code-mode.js"
+import { Executor as CodeModeExecutor, type Service as CodeModeService } from "../code-mode/internal.js"
 import type { Service as Operations } from "../operation/nested-operations.js"
 import type { Service as RunStoreService } from "../run/store.js"
 import { AgentMessaging } from "../messaging/service.js"

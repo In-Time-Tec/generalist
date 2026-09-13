@@ -3,7 +3,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, RunBudget } from "../../../src/index.js"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../src/runtime/index.js"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { allowAllAuthorization } from "../../authorization.js"
 import { provideScoped } from "../execution/scoped-provide.js"
 
@@ -156,8 +159,8 @@ it.effect("runs typed durable children under the parent and returns their ordere
     layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "research", {
         budget: RunBudget.make({ tokens: 100, children: 4 }),
@@ -268,8 +271,8 @@ it.effect("rejects a child tool set wider than its parent before admission", () 
     layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(parent)
       const handle = yield* runtime.start(parent, "delegate")
       yield* executor.execute(
@@ -298,8 +301,8 @@ it.effect("encodes a durable child failure in collect results without failing th
     fixture.layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(fixture.parent)
       const handle = yield* runtime.start(fixture.parent, "collect failures")
       yield* executor.execute(
@@ -349,8 +352,8 @@ it.effect("fails the durable parent and requests cancellation of siblings in fai
     fixture.layer,
     Effect.gen(function* () {
       const runtime = yield* Runtime.Runtime
-      const executor = yield* RunExecutor.RunExecutor
-      const store = yield* RunStore.RunStore
+      const executor = yield* RunExecutor
+      const store = yield* RunStore
       yield* runtime.register(fixture.parent)
       const handle = yield* runtime.start(fixture.parent, "fail fast")
       yield* executor.execute(

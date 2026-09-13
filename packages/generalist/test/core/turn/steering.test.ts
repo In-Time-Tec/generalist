@@ -21,6 +21,29 @@ describe("Steering", () => {
     ),
   )
 
+  it.effect("fences queues by Run and finalizes both producers with their Scope", () =>
+    Effect.gen(function* () {
+      const scope = yield* Scope.make()
+      const first = yield* Agent.allocateRun(agent, { prompt: "first", sessionId: "shared-session" }).pipe(
+        Scope.provide(scope),
+      )
+      const second = yield* Agent.allocateRun(agent, { prompt: "second", sessionId: "shared-session" }).pipe(
+        Scope.provide(scope),
+      )
+
+      const firstReceipt = yield* first.steer({ prompt: "first-only" })
+      const secondReceipt = yield* second.followUp({ prompt: "second-only" })
+      expect(firstReceipt).toMatchObject({ runId: first.runId, queue: "steering", sequence: 0 })
+      expect(secondReceipt).toMatchObject({ runId: second.runId, queue: "followUp", sequence: 0 })
+
+      yield* Scope.close(scope, Exit.void)
+      const firstClosed = yield* Effect.flip(first.steer({ prompt: "too late" }))
+      const secondClosed = yield* Effect.flip(second.followUp({ prompt: "too late" }))
+      expect(firstClosed).toMatchObject({ runId: first.runId })
+      expect(secondClosed).toMatchObject({ runId: second.runId })
+    }),
+  )
+
   it.effect("fails fast at the finite entry bound without partial admission", () =>
     Effect.scoped(
       Effect.gen(function* () {

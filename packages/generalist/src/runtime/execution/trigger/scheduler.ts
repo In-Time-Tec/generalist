@@ -2,7 +2,7 @@ import { Clock, DateTime, Effect, Schema } from "effect"
 import type { ActivationFailure } from "../../../durability/internal/runtime.js"
 import { RuntimeUnavailable } from "../../errors.js"
 import { RunStore, type Service as RunStoreService } from "../../run/store.js"
-import { Runtime, type Service as RuntimeService } from "../../service.js"
+import { Runtime, type Service as RuntimeService } from "../../engine.js"
 import { nextAt, type ClaimedSchedule } from "./schedule.js"
 
 const timeoutBatch = 64

@@ -10,7 +10,7 @@ import {
   WaitNotOpen,
 } from "../../errors.js"
 import { isTerminal } from "../../run.js"
-import type { CancelInput as CancelCommand } from "../../service.js"
+import type { CancelInput as CancelCommand } from "../../engine.js"
 import type { EmittableAgentLoopEvent } from "../../execution/agent/event.js"
 import type { ExecutionResult } from "../../execution/state.js"
 import type { RunFailure } from "../../run/event.js"
@@ -131,11 +131,15 @@ const settlePendingOutcome = (
     return yield* afterTerminal(next, settled)
   })
 
-const requestExternalChildCancellation = (state: RuntimeState, runId: string): RuntimeState => {
+const requestExternalChildCancellation = (state: RuntimeState, runId: string, reason?: string): RuntimeState => {
   const externalChildPlacements = new Map(state.externalChildPlacements)
   for (const [placementId, placement] of externalChildPlacements) {
     if (placement.parentRunId === runId && !placement.settled && !placement.cancelRequested) {
-      externalChildPlacements.set(placementId, { ...placement, cancelRequested: true })
+      externalChildPlacements.set(placementId, {
+        ...placement,
+        cancelRequested: true,
+        ...(reason === undefined ? undefined : { cancelReason: reason }),
+      })
     }
   }
   return { ...state, externalChildPlacements }
@@ -222,7 +226,7 @@ export const cancel: {
     const run = yield* getRun(state, input.runId)
     const terminal = isTerminal(run.status)
     const needsResolution = run.status === "needs-resolution"
-    let next = requestExternalChildCancellation(state, run.runId)
+    let next = requestExternalChildCancellation(state, run.runId, input.reason ?? run.cancelReason)
     if (!terminal && !run.cancellationRequested) {
       const [, requested] = yield* appendLifecycle(
         next,

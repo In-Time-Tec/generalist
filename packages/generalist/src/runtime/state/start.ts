@@ -1,5 +1,5 @@
 import type { Prompt } from "effect/unstable/ai"
-import type { InitialChildInput, InitialFanOutInput } from "../service.js"
+import type { InitialChildInput, InitialFanOutInput } from "../engine.js"
 import { normalizePrompt } from "./prompt.js"
 import { inheritance } from "../../core/agent/lifecycle/fan-out.js"
 

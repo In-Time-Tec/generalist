@@ -10,7 +10,7 @@ import {
   type AnyToolCall,
   type PendingToolResult,
 } from "./result.js"
-import type { Agent, ClosedServices, ProgressOverflowPolicy, RunOptions } from "../service.js"
+import type { Agent, ClosedServices, ProgressOverflowPolicy } from "../service.js"
 import { RunError } from "../run/error.js"
 import type { AgentRunState } from "../run-state.js"
 import type { HandoffRunState } from "../handoff/state.js"
@@ -26,7 +26,7 @@ import {
 import { cancellableOperation, supportsCancellation } from "../../tools/tool-executor-cancellation.js"
 import { bound } from "../../tools/tool-output.js"
 import { type Registry, get } from "../../tools/tool-registry.js"
-import { ToolContext } from "../../tools/tool-context.js"
+import { ToolContext, type Service as ToolContextService } from "../../tools/tool-context.js"
 import { make as makeActivateSkillOutcome, type ToolState } from "./skill-activation.js"
 import { activateSkillSuccess } from "../skill-tool.js"
 import type { Skill, SkillCatalogError } from "../../context/skill-catalog.js"
@@ -50,6 +50,9 @@ import { managedToolHandlers } from "../../artifact.js"
 import { toolReplayPolicy } from "../../durable/component/replay.js"
 import { BackgroundTools } from "../../tools/background/index.js"
 import { isAdmissionExhausted } from "../../durable/driver/operation-outcome.js"
+import { capabilitiesFor } from "../lifecycle/hosted/capability-binding.js"
+import type { HostedRunOptions } from "../lifecycle/hosted/options.js"
+import { bindInheritance } from "../../tools/tool-context/internal.js"
 
 const provideManagedHandlers = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -82,7 +85,7 @@ const operationKeyFor = (request: Request) =>
 interface ToolExecutionContext<T extends Record<string, Tool.Any>, AgentR, PolicyR, AuthorizationR> {
   readonly runId: RunId
   readonly inbox?: RunInbox
-  readonly options: RunOptions
+  readonly options: HostedRunOptions
   readonly state: AgentRunState
   readonly isSkillActivationCall: (call: AnyToolCall, registry: Registry) => boolean
   readonly agent: Agent<T, AgentR, PolicyR, AuthorizationR, Schema.Top, Schema.Top>
@@ -153,8 +156,45 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
       : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.name))
   const activeCapabilities = () =>
     handoffState === undefined
-      ? Effect.succeed(agent.capabilities)
-      : Ref.get(handoffState).pipe(Effect.map((handoffRun) => handoffRun.active.agent.capabilities))
+      ? Effect.succeed(capabilitiesFor(agent))
+      : Ref.get(handoffState).pipe(Effect.map((handoffRun) => capabilitiesFor(handoffRun.active.agent)))
+  const toolContextFor = (input: {
+    readonly signal: AbortSignal
+    readonly request: Request
+    readonly turn: number
+    readonly call: AnyToolCall
+    readonly operationKey: string
+    readonly emit: ToolContextService["emit"]
+  }): ToolContextService => {
+    let context: ToolContextService = {
+      signal: input.signal,
+      sessionId,
+      runId,
+      agentName: input.request.agentName,
+      turn: input.turn,
+      toolCallId: input.call.id,
+      operationKey: input.operationKey,
+      idempotencyKey: input.operationKey,
+      emit: input.emit,
+    }
+    const invocation = options.invocation
+    const inheritedSandboxSnapshot = invocation?.inheritedSandboxSnapshot
+    if (invocation !== undefined) {
+      context = {
+        ...context,
+        runId: invocation.runId,
+        rootRunId: invocation.rootRunId,
+        attempt: invocation.attempt,
+      }
+      if (invocation.admittedAt !== undefined) context = { ...context, admittedAt: invocation.admittedAt }
+    }
+    const history = Ref.get(lastWirePrompt).pipe(
+      Effect.flatMap((prompt) => (prompt === undefined ? Ref.get(chat.history) : Effect.succeed(prompt))),
+    )
+    const inheritance =
+      inheritedSandboxSnapshot === undefined ? { history, agent } : { history, agent, inheritedSandboxSnapshot }
+    return bindInheritance(ToolContext.of(context), inheritance)
+  }
   const unlessBlocked = <E, R>(reason: string | undefined, execute: () => Effect.Effect<Outcome, E, R>) =>
     reason === undefined ? execute() : Effect.succeed(hookBlockedOutcome("ToolCall", reason))
   const defaultExecute = (request: Request, registry: Registry) => {
@@ -278,25 +318,15 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         const emitSemaphore = yield* Semaphore.make(1)
         const signal = yield* Effect.abortSignal
         const durableOperationKey = yield* operationKeyFor(request)
-        const invocation = options.invocation ?? {}
         const emit = emitProgress(turn, call, progressQueue, droppedProgress, emitSemaphore)
-        const contextBase = {
+        const toolContext = toolContextFor({
           signal,
-          sessionId,
-          runId,
-          agentName: request.agentName,
+          request,
           turn,
-          toolCallId: call.id,
+          call,
           operationKey: durableOperationKey,
-          idempotencyKey: durableOperationKey,
-          ...invocation,
           emit,
-          history: Ref.get(lastWirePrompt).pipe(
-            Effect.flatMap((prompt) => (prompt === undefined ? Ref.get(chat.history) : Effect.succeed(prompt))),
-          ),
-          agent,
-        }
-        const toolContext = ToolContext.of(contextBase)
+        })
         const handoffExecution = handoffFor(request, registry)
         const skillActivation = isSkillActivationCall(call, registry)
         const executionRequest = yield* withParentTasks(request, registry)

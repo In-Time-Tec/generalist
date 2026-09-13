@@ -4,7 +4,7 @@ import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { make as makeAgent } from "../../core/agent/service.js"
 import { Approved, Denied, layerDurable, type DurableRequest } from "../../approvals.js"
 import { layerAllowAll, layerRuleStoreMemory, RuleStore } from "../../core/policy/permissions.js"
-import { Runtime } from "../../runtime/service.js"
+import { Runtime } from "../../runtime/engine.js"
 import type { ApprovalSuspendCapability, Options, Services } from "./contract.js"
 
 type Prepare = <A, E>(effect: Effect.Effect<A, E>) => Effect.Effect<A, E>

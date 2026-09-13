@@ -46,10 +46,21 @@ import {
 import { unusedToolHandlerLayer } from "../tool-handler-layer"
 import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"
+import {
+  CurrentCompactionId,
+  CurrentPurpose,
+  CurrentSummaryCall,
+  type SummaryCallCell,
+} from "../../../src/core/model/telemetry/context"
+import { externalRunInbox } from "../../../src/core/turn/steering-inbox"
+import { HostedRun } from "../../../src/core/agent/lifecycle/run-handle"
 import { withProviderFinish, withProviderFinishContent } from "../provider-finish"
 import { layerModel as deterministicModel } from "../../../src/ai/provider/deterministic"
 import { layerTest as modelCatalogLayerTest } from "../../../src/ai/model-catalog"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "../../../src/runtime/index"
+import { ExecutableResolver } from "../../../src/runtime/index"
+import * as Runtime from "../../../src/runtime/engine.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { pinnedTestExecutable } from "../../runtime/run/identity"
 
 type ModelParams = Parameters<typeof LanguageModel.make>[0]
@@ -64,6 +75,9 @@ type EffectSuccess<Value> = Value extends Effect.Effect<infer Success, unknown, 
 type StreamRequirements<Value> =
   Value extends Stream.Stream<unknown, unknown, infer Requirements> ? Requirements : never
 type IsAssignable<Source, Target> = Source extends Target ? true : false
+
+const hostedInbox = (runId: string) =>
+  externalRunInbox({ runId, takeSteering: Effect.succeed([]), takeFollowUp: Effect.succeed([]) })
 
 void (() => {
   // @ts-expect-error Agent.make only accepts an options object.
@@ -557,8 +571,8 @@ layer(typedStartRuntime)("Agent.start", (it) => {
           idempotencyKey: "typed-start-key",
         },
       )
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
       const claim = yield* store.claimExecution({
         commandId: "typed-start-test:claim",
         runId: handle.runId,
@@ -584,8 +598,8 @@ layer(typedStartRuntime)("Agent.start", (it) => {
         sessionId: "null-start-session",
         idempotencyKey: "null-start-key",
       })
-      const store = yield* RunStore.RunStore
-      const host = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const host = yield* RunExecutor
       const claim = yield* store.claimExecution({
         commandId: "null-start-test:claim",
         runId: handle.runId,
@@ -7590,13 +7604,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         if (suspension._tag !== "generalist/core/AgentSuspended" || checkpoint === undefined) {
           return yield* Effect.die("missing tool-wait suspension")
         }
-        const failure = yield* Agent.stream(agent, "ignored", {
+        const failure = yield* Agent.stream("ignored", {
           history: checkpoint,
           resume: {
             suspension,
             resolutions: [{ waitId: suspension.waits[0]!.waitId, resolution: { _tag: "Denied" } }],
           },
-        }).pipe(Stream.runDrain, Effect.flip)
+        })(agent).pipe(Stream.runDrain, Effect.flip)
 
         expect(failure._tag).toBe("generalist/core/ResumeMismatch")
         expect(executions).toBe(1)
@@ -8829,11 +8843,16 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         },
       }
       const events = yield* Stream.runCollect(
-        Agent.stream(agent, "continue", {
-          logicalOperationId: "operation:restored",
-          executableRef: executable.ref,
-          driverCheckpoint: checkpoint,
-        }),
+        HostedRun.stream(
+          agent,
+          {
+            prompt: "continue",
+            logicalOperationId: "operation:restored",
+            executableRef: executable.ref,
+            driverCheckpoint: checkpoint,
+          },
+          hostedInbox("checkpoint-identity-agent"),
+        ),
       )
       const call = events.find((event) => event._tag === "ModelCallStarted")
       const attempt = events.find((event) => event._tag === "ModelAttemptStarted")
@@ -8880,12 +8899,17 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           onCompleted: () => Effect.void,
           onCheckpoint: () => Effect.void,
         }
-        yield* Agent.stream(agent, "continue", {
-          logicalOperationId: "journal-restart",
-          executableRef: executable.ref,
-          modelCallOrdinalStart: 40,
-          sessionId: "journal-restart",
-        }).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournal, crashingJournal), Effect.exit)
+        yield* HostedRun.stream(
+          agent,
+          {
+            prompt: "continue",
+            logicalOperationId: "journal-restart",
+            executableRef: executable.ref,
+            modelCallOrdinalStart: 40,
+            sessionId: "journal-restart",
+          },
+          hostedInbox("journal-restart"),
+        ).pipe(Stream.runDrain, Effect.provideService(DurableDriver.DriverJournal, crashingJournal), Effect.exit)
         expect(modelCalls).toBe(12)
         expect(pending).toBeDefined()
         expect(pending?.turn).toBe(12)
@@ -8910,12 +8934,17 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
               safeCheckpoint = checkpoint
             }),
         }
-        const events = yield* Agent.stream(agent, "", {
-          logicalOperationId: "journal-restart",
-          executableRef: executable.ref,
-          driverCheckpoint: pending!,
-          sessionId: "journal-restart",
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, resumedJournal))
+        const events = yield* HostedRun.stream(
+          agent,
+          {
+            prompt: "",
+            logicalOperationId: "journal-restart",
+            executableRef: executable.ref,
+            driverCheckpoint: pending!,
+            sessionId: "journal-restart",
+          },
+          hostedInbox("journal-restart"),
+        ).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, resumedJournal))
         expect(scheduled.find((key) => key.includes(":model:"))).toBe(pendingKey)
         const turnStarted = events.find((event) => event._tag === "TurnStarted")
         const call = events.find((event) => event._tag === "ModelCallStarted")
@@ -8950,10 +8979,11 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
             sessionId: "journal-restart",
           }
           if (turnStart !== undefined) Object.assign(recoveryOptions, { turnStart })
-          const recoveredTerminal = yield* Agent.stream(agent, "", recoveryOptions).pipe(
-            Stream.runCollect,
-            Effect.provideService(DurableDriver.DriverJournal, resumedJournal),
-          )
+          const recoveredTerminal = yield* HostedRun.stream(
+            agent,
+            { prompt: "", ...recoveryOptions },
+            hostedInbox("journal-restart"),
+          ).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, resumedJournal))
           expect(recoveredTerminal.at(-1)).toMatchObject({ _tag: "Completed", text: "done" })
           expect(scheduled.slice(beforeTerminalRecovery).some((key) => key.includes(":model:"))).toBe(false)
           expect(modelCalls).toBe(13)
@@ -8968,13 +8998,18 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
           onCompleted: () => Effect.void,
           onCheckpoint: () => Effect.void,
         }
-        const overrideEvents = yield* Agent.stream(agent, "", {
-          logicalOperationId: "journal-restart",
-          executableRef: executable.ref,
-          driverCheckpoint: safeCheckpoint!,
-          sessionId: "journal-restart",
-          turnStart: 13,
-        }).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, overrideJournal))
+        const overrideEvents = yield* HostedRun.stream(
+          agent,
+          {
+            prompt: "",
+            logicalOperationId: "journal-restart",
+            executableRef: executable.ref,
+            driverCheckpoint: safeCheckpoint!,
+            sessionId: "journal-restart",
+            turnStart: 13,
+          },
+          hostedInbox("journal-restart"),
+        ).pipe(Stream.runCollect, Effect.provideService(DurableDriver.DriverJournal, overrideJournal))
         expect(overrideScheduled.every(({ turn }) => turn >= 12)).toBe(true)
         expect(overrideScheduled.find(({ key }) => key.includes(":model:"))?.key).toBe(
           "journal-restart:model:13:53:conversation",
@@ -9117,6 +9152,45 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const attemptedIds = attempted[0]!.map((event) => event.deliveryId)
         expect(attemptedIds).toEqual([...attemptedIds])
         expect(seen.filter((event) => "deliveryId" in event)).toEqual([])
+      }),
+    ] as const
+  })
+
+  ItLayer.make(it, "fails typed when an independent invocation lifecycle rejects before provider entry", () => {
+    let providerCalls = 0
+    const lifecycle = Layer.succeed(
+      ModelTelemetry.InvocationLifecycle,
+      ModelTelemetry.InvocationLifecycle.of({
+        beforeAttempt: () =>
+          Effect.fail(ModelTelemetry.InvocationLifecycleFailed.make({ message: "host writer rejected attempt" })),
+        completeAttempt: () => Effect.void,
+        failAttempt: () => Effect.void,
+      }),
+    )
+    return [
+      Layer.mergeAll(
+        modelLayer(() => {
+          providerCalls += 1
+          return Stream.make(textDelta("not invoked"))
+        }),
+        unusedExecutor,
+        Approvals.layerAutoApprove,
+        ModelMiddleware.layerIdentity,
+        lifecycle,
+      ),
+      Effect.gen(function* () {
+        const failure = yield* Stream.runDrain(
+          Agent.stream(Agent.make({ name: "lifecycle-failure-agent" }), "go"),
+        ).pipe(Effect.flip)
+
+        expect(failure).toMatchObject({
+          _tag: "generalist/core/AgentError",
+          cause: {
+            _tag: "generalist/core/InvocationLifecycleFailed",
+            message: "host writer rejected attempt",
+          },
+        })
+        expect(providerCalls).toBe(0)
       }),
     ] as const
   })
@@ -9721,13 +9795,13 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
     ),
     Effect.gen(function* () {
       const agent = Agent.make({ name: "reset-telemetry-agent" })
-      const outerCell: ModelTelemetry.SummaryCallCell = { current: undefined }
+      const outerCell: SummaryCallCell = { current: undefined }
 
       const events = yield* Stream.runCollect(
         Agent.stream(agent, "nested run inside a summarizer").pipe(
-          Stream.provideService(ModelTelemetry.CurrentPurpose, "compaction-summary"),
-          Stream.provideService(ModelTelemetry.CurrentCompactionId, "outer-compaction"),
-          Stream.provideService(ModelTelemetry.CurrentSummaryCall, outerCell),
+          Stream.provideService(CurrentPurpose, "compaction-summary"),
+          Stream.provideService(CurrentCompactionId, "outer-compaction"),
+          Stream.provideService(CurrentSummaryCall, outerCell),
         ),
       )
 

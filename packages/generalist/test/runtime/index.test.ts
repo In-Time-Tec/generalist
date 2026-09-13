@@ -9,9 +9,9 @@ import {
   RunEvent,
   RunTree,
   Steering,
-  RunExecutor,
   OperationResolution,
 } from "../../src/runtime/index.js"
+import * as RunExecutor from "../../src/runtime/execution/run-executor.js"
 
 const encodedVersion = (manifest: typeof ExecutableManifest.ExecutableManifest.Encoded): "1" => manifest.version
 const acceptResolutionConflict = (_error: Errors.OperationResolutionConflict): void => undefined

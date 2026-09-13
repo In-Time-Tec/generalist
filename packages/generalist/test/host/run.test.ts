@@ -2,7 +2,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Agent, Approvals, Permissions, ToolContext } from "generalist"
 import { Host, WaitInvalid, WaitResult, type HostRun } from "generalist/host"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime, SessionSender } from "generalist/runtime"
+import { ExecutableResolver, SessionSender } from "generalist/runtime"
+import * as Runtime from "../../src/runtime/engine.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { TestModel } from "generalist/testing"
 import { SessionFamilyPage } from "../../src/runtime/session/retained.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
@@ -164,8 +167,8 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
     )
   const execute = (runId: string, commandId: string) =>
     Effect.gen(function* () {
-      const store = yield* RunStore.RunStore
-      const executor = yield* RunExecutor.RunExecutor
+      const store = yield* RunStore
+      const executor = yield* RunExecutor
       yield* executor.execute(yield* store.claimExecution({ runId, commandId, ownerId: objectWorkerId }))
     })
   return Effect.gen(function* () {
@@ -194,7 +197,7 @@ it.effect("reopens a message-completed wait without redispatch and preserves the
       Effect.gen(function* () {
         const host = yield* Host.make({ revision: "local", agents: { [agent.name]: agent, [child.name]: child } })
         const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const store = yield* RunStore
         const parent = yield* host.runs.get(admitted.parentId)
         waitFor = parent.wait
         const before = yield* runtime.history({ runId: parent.id, limit: 100 })

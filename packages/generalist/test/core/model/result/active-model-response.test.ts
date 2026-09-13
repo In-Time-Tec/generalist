@@ -1,8 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Option, Schedule, Stream } from "effect"
 import { AiError, LanguageModel, Response, Tool } from "effect/unstable/ai"
-import { ActiveModelResponse, Agent, ModelResilience } from "../../../../src/index.js"
-import { writer } from "../../../../src/core/model/result/active-model-response-writer.js"
+import { Agent, ModelResilience } from "../../../../src/index.js"
+import {
+  ActiveModelResponse,
+  type Service as ActiveModelResponseService,
+} from "../../../../src/core/model/result/active-model-response.js"
+import {
+  make as makeActiveModelResponse,
+  writer,
+} from "../../../../src/core/model/result/active-model-response-writer.js"
 import { make as makeResponseBuilder } from "../../../../src/core/model/response/builder.js"
 
 const usage = Response.Usage.make({
@@ -26,19 +33,19 @@ const noToolAgent = Agent.make({ name: "active-model-response-agent" })
 
 const provideRun = <A, E, R>(
   stream: Stream.Stream<A, E, R | LanguageModel.LanguageModel>,
-  handle: ActiveModelResponse.Service,
+  handle: ActiveModelResponseService,
   model: Layer.Layer<LanguageModel.LanguageModel>,
   resilience?: Layer.Layer<ModelResilience.ModelResilience, ModelResilience.Misconfigured>,
 ) =>
   stream.pipe(
-    Stream.provideService(ActiveModelResponse.ActiveModelResponse, handle),
+    Stream.provideService(ActiveModelResponse, handle),
     Stream.provide(resilience === undefined ? model : Layer.merge(model, resilience.pipe(Layer.orDie))),
   )
 
 describe("ActiveModelResponse", () => {
   it.effect("retains normalized visible output across terminal interruption without unfinished tool parameters", () =>
     Effect.gen(function* () {
-      const handle = ActiveModelResponse.make()
+      const handle = makeActiveModelResponse()
       const observed = yield* Deferred.make<void>()
       const provider = modelLayer(() =>
         Stream.make(
@@ -89,7 +96,7 @@ describe("ActiveModelResponse", () => {
 
   it.effect("discards an internal pre-output retry before publishing the authoritative attempt", () =>
     Effect.gen(function* () {
-      const handle = ActiveModelResponse.make()
+      const handle = makeActiveModelResponse()
       const observed = yield* Deferred.make<void>()
       const transient = AiError.make({
         module: "ActiveModelResponseTest",
@@ -157,7 +164,7 @@ describe("ActiveModelResponse", () => {
 
   it.effect("clears only after a complete semantic operation commits", () =>
     Effect.gen(function* () {
-      const handle = ActiveModelResponse.make()
+      const handle = makeActiveModelResponse()
       const provider = modelLayer(() =>
         Stream.make(Response.makePart("text-delta", { id: "answer", delta: "complete" }), finish),
       )
@@ -176,7 +183,7 @@ describe("ActiveModelResponse", () => {
 
   it.effect("prevents stale attempts from replacing or clearing a newer response", () =>
     Effect.gen(function* () {
-      const handle = ActiveModelResponse.make()
+      const handle = makeActiveModelResponse()
       const responseWriter = writer(handle)
       const firstBuilder = makeResponseBuilder<Record<string, Tool.Any>>()
       firstBuilder.accept(Response.makePart("text-delta", { id: "answer", delta: "stale" }))

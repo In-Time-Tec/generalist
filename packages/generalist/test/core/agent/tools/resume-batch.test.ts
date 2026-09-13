@@ -2,7 +2,10 @@ import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Hooks, Permissions, ToolExecutor, ToolOutput } from "../../../../src/index.js"
-import { ExecutableResolver, RunExecutor, Runtime, RunStore } from "../../../../src/runtime/index.js"
+import { ExecutableResolver } from "../../../../src/runtime/index.js"
+import * as Runtime from "../../../../src/runtime/engine.js"
+import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { provideScoped } from "../../../runtime/execution/scoped-provide.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
 
@@ -117,8 +120,8 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
       runtimeLayer(objectWorkerId),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run the approval batch", startOptions)
         yield* host.execute(
@@ -139,8 +142,8 @@ const approvalBatchScenario = (input: { readonly label: string; readonly blockFi
       runtimeLayer(`${objectWorkerId}:${input.label}:reopen`),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run the approval batch", startOptions)
         expect(handle.runId).toBe(suspended.runId)
@@ -261,8 +264,8 @@ const resolvedBatchScenario = (input: { readonly label: string }) =>
       runtimeLayer(objectWorkerId),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run the resolved batch", startOptions)
         yield* host.execute(
@@ -281,8 +284,8 @@ const resolvedBatchScenario = (input: { readonly label: string }) =>
       runtimeLayer(`${objectWorkerId}:${input.label}:reopen`),
       Effect.gen(function* () {
         const runtime = yield* Runtime.Runtime
-        const host = yield* RunExecutor.RunExecutor
-        const store = yield* RunStore.RunStore
+        const host = yield* RunExecutor
+        const store = yield* RunStore
         yield* runtime.register(agent)
         const handle = yield* runtime.start(agent, "run the resolved batch", startOptions)
         expect(handle.runId).toBe(suspended.runId)

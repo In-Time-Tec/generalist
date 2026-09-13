@@ -21,7 +21,7 @@ import { RuntimeUnavailable } from "../../../runtime/errors.js"
 import { ExecutableResolver } from "../../../runtime/executable/resolver.js"
 import { Metadata } from "../../../runtime/messaging/message.js"
 import { ResolveOperationInput } from "../../../runtime/operation/resolution.js"
-import { RuntimeInspectionResponse } from "../../../runtime/inspection.js"
+import { RuntimeInspectionResponse } from "../../../runtime/execution/inspection/response.js"
 import {
   Runtime,
   type CancelInput as RuntimeCancelInput,
@@ -29,7 +29,7 @@ import {
   type SendInput as RuntimeSendInput,
   type Service as RuntimeService,
   type SignalInput as RuntimeSignalInput,
-} from "../../../runtime/service.js"
+} from "../../../runtime/engine.js"
 import { TreePolicy } from "../../../runtime/tree/policy.js"
 import { ActorRuntime, layerActorRuntime, type ActorRuntimeOptions, type ActorRuntimeServices } from "./runtime.js"
 import { make as makeServer, type RuntimeActorServer, type RuntimeActorServerFactory } from "./server.js"

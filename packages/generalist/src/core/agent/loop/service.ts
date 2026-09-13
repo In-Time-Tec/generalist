@@ -6,8 +6,8 @@ import {
   CurrentInstrumentation,
   CurrentPurpose,
   CurrentSummaryCall,
-  SinkFailed,
-} from "../../model/telemetry/events.js"
+} from "../../model/telemetry/context.js"
+import { SinkFailed } from "../../model/telemetry/events.js"
 import { PolicyError, type Decision, type TurnOverrides, type Policy } from "../../turn/policy.js"
 import { LanguageModelNotRegistered } from "../../model/registry.js"
 import { ModelResponseContent } from "../../context/session.js"

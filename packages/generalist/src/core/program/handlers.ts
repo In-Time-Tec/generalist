@@ -61,6 +61,7 @@ export interface Invocation<O = unknown, E = ProgramInvocationFailure | ProgramS
 
 /** One decoded Agent invocation, exposing only the prompt every Agent input must produce. */
 export interface AgentInvocation {
+  readonly input: unknown
   readonly prompt: Prompt.RawInput
   readonly authorize: (
     operation: ProgramOperationName,
@@ -95,6 +96,8 @@ export type TypedStep = TypedTool
 /** Host-facing view of one Agent handler, with its decoded input hidden behind {@link AgentInvocation}. */
 export interface AnyAgent {
   readonly selection: string
+  /** @internal Registered Agent name used only by declaration-lowered Runtime children. */
+  readonly agentName?: string
   readonly agent: AgentPin
   readonly inputPin: CapabilityPin
   readonly input: Schema.Codec<unknown, unknown>
@@ -171,6 +174,7 @@ export const agent = <I extends Prompt.RawInput, IE, E>(handler: AgentHandler<I,
     Effect.map(
       decodeInput(handler.input, encoded),
       (input): AgentInvocation => ({
+        input,
         prompt: input,
         authorize: (operation) => handler.authorize({ operation, input }),
         execute: Effect.suspend(() => handler.execute(input)).pipe(

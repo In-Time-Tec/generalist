@@ -1,7 +1,7 @@
 import type { Effect, Layer } from "effect"
 import type { Address } from "../../runtime/address.js"
 import type { ExecutionClaim, RunStore, Service as RunStoreService } from "../../runtime/run/store.js"
-import type { Runtime, Service as RuntimeService } from "../../runtime/service.js"
+import type { Runtime, Service as RuntimeService } from "../../runtime/engine.js"
 import type { Service as RunExecutorService } from "../../runtime/execution/run-executor.js"
 import type { ScheduleDefinition } from "../../runtime/execution/trigger/schedule.js"
 

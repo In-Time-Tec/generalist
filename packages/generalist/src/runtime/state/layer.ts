@@ -9,6 +9,7 @@ import {
   Fiber,
   FiberSet,
   Layer,
+  Option,
   Schema,
   Semaphore,
 } from "effect"
@@ -21,6 +22,8 @@ import {
 } from "../../durability/internal/runtime.js"
 import type { ObjectStore } from "../../durability/object-store.js"
 import { ExternalChildStore } from "../child/external/store.js"
+import { ExternalChildPeerRoutes, reconcilePage } from "../child/external/reconciliation.js"
+import { bind as bindExternalChildRuntime } from "../child/external/runtime.js"
 import { DurabilityFailure } from "../../durability/errors.js"
 import { ScheduleInvalid } from "../execution/trigger/schedule.js"
 import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable, type RuntimeAvailabilityError } from "../errors.js"
@@ -31,11 +34,17 @@ import { LocalScheduler, type Service as SchedulerService } from "../execution/l
 import { make as makeLocalScheduler } from "../execution/local-scheduler-internal.js"
 import { layer as modelPreviewLayer } from "../execution/model-response/preview-internal.js"
 import { RunStore } from "../run/store.js"
-import { Runtime } from "../service.js"
+import { Runtime } from "../engine.js"
+import { Runtime as ApplicationRuntime } from "../service.js"
+import { make as makeApplication } from "../hosting/application.js"
+import { make as guardRuntime } from "../hosting/lifecycle.js"
+import { markRuntimeReady } from "../execution/scope.js"
 import { make as makeRegisteredAgents } from "../executable/registered-agent.js"
 import { layerRegisteredAgents as runtimeLayer } from "../hosting/service.js"
 import { layerRunStore } from "./store.js"
 import { make as makeTriggerScheduler } from "../execution/trigger/scheduler.js"
+import { bind as bindExportRuntime } from "../reward/export.js"
+import { bind as bindArtifactRuntime } from "../artifact/export.js"
 
 interface LeaseNamespace {
   readonly environment: string
@@ -71,6 +80,7 @@ export class RuntimeLifecycle extends Context.Service<RuntimeLifecycle, RuntimeL
 
 export type RuntimeServices =
   | Runtime
+  | ApplicationRuntime
   | RunStore
   | ExternalChildStore
   | RunExecutor
@@ -92,6 +102,8 @@ export const layer = (
       Effect.gen(function* () {
         const ownership = yield* StoreActivation
         const runStore = yield* RunStore
+        const externalChildStore = yield* ExternalChildStore
+        const peerRoutes = yield* Effect.serviceOption(ExternalChildPeerRoutes)
         const executor = yield* RunExecutor
         const active = yield* ActiveExecutions
         const hostRuntime = yield* Runtime
@@ -127,6 +139,18 @@ export const layer = (
         const lifecycle = RuntimeLifecycle.of({
           run: (effect) => current.pipe(Effect.flatMap(({ termination }) => Effect.raceFirst(effect, termination))),
         })
+        bindExportRuntime({ runtime: hostRuntime, journal: hostRuntime, store: runStore, lifecycle })
+        bindArtifactRuntime({ runtime: hostRuntime, store: runStore, lifecycle })
+        const application = makeApplication({
+          engine: guardRuntime({ runtime: hostRuntime, lifecycle }),
+          views: runStore.views,
+          lifecycle,
+        })
+        bindExternalChildRuntime(application, {
+          partition: options.partition,
+          store: externalChildStore,
+          routes: peerRoutes,
+        })
         const prepare = <A, E, R>(command: (scheduler: SchedulerService) => Effect.Effect<A, E, R>) => {
           let prepared: { readonly incarnation: ActiveScheduler; readonly effect: Effect.Effect<A, E, R> } | undefined
           return current.pipe(
@@ -154,6 +178,37 @@ export const layer = (
             ownerId: `trigger:${lease.incarnation}`,
             nextScheduleAt: ownership.nextScheduleAt,
           })
+          let placementCursor: string | undefined
+          let rootCursor: string | undefined
+          let externalFirst = false
+          const reconcileExternal = (fuel: number) =>
+            Option.match(peerRoutes, {
+              onNone: () => Effect.succeed({ processed: 0, hasMore: false }),
+              onSome: (routes) =>
+                reconcilePage({
+                  partition: options.partition,
+                  limit: Math.max(1, Math.floor(fuel / 2)),
+                  ...(placementCursor === undefined ? undefined : { placementCursor }),
+                  ...(rootCursor === undefined ? undefined : { rootCursor }),
+                  connect: routes.connect,
+                }).pipe(
+                  Effect.provideService(ExternalChildStore, externalChildStore),
+                  Effect.mapError(
+                    (error): DurabilityFailure | RuntimeUnavailable =>
+                      Schema.is(DurabilityFailure)(error) || Schema.is(RuntimeUnavailable)(error)
+                        ? error
+                        : RuntimeUnavailable.make({ message: "External child reconciliation failed" }),
+                  ),
+                  Effect.map((result) => {
+                    placementCursor = result.placementCursor
+                    rootCursor = result.rootCursor
+                    return {
+                      processed: Math.min(fuel, result.placements + result.roots),
+                      hasMore: result.placementCursor !== undefined || result.rootCursor !== undefined,
+                    }
+                  }),
+                ),
+            })
           const drainLock = yield* Semaphore.make(1)
           const requests = yield* FiberSet.make<unknown, ActivationFailure>()
           const owned = <A, E extends ActivationFailure, R>(effect: Effect.Effect<A, E, R>) =>
@@ -170,11 +225,20 @@ export const layer = (
               return RuntimeUnavailable.make({ message: "scheduler fuel must be a positive safe integer" })
             }
             triggersFirst = !triggersFirst
-            let triggerFuel = Math.ceil(fuel / 2)
-            if (fuel === 1 && !triggersFirst) triggerFuel = 0
+            externalFirst = !externalFirst
+            const externalFuel = Option.isNone(peerRoutes)
+              ? 0
+              : fuel >= 3
+                ? Math.max(1, Math.floor(fuel / 3))
+                : externalFirst
+                  ? 0
+                  : 1
+            const internalFuel = fuel - externalFuel
+            let triggerFuel = Math.ceil(internalFuel / 2)
+            if (internalFuel === 1 && !triggersFirst) triggerFuel = 0
             const trigger =
               triggerFuel === 0 ? Effect.succeed({ processed: 0, hasMore: false }) : triggers.drain(triggerFuel)
-            const remaining = fuel - triggerFuel
+            const remaining = internalFuel - triggerFuel
             const execute =
               remaining === 0 ? Effect.succeed({ processed: 0, hasMore: false }) : scheduler.drain({ fuel: remaining })
             return owned(
@@ -182,11 +246,19 @@ export const layer = (
                 const triggered = yield* trigger
                 const scheduled = yield* execute
                 yield* scheduler.idle
+                const reconciled =
+                  externalFuel === 0
+                    ? { processed: 0, hasMore: false }
+                    : yield* reconcileExternal(externalFuel)
                 const nextDueAt = yield* ownership.nextDueAt
                 const now = yield* Clock.currentTimeMillis
-                const hasMore = triggered.hasMore || scheduled.hasMore || (nextDueAt !== undefined && nextDueAt <= now)
+                const hasMore =
+                  triggered.hasMore ||
+                  scheduled.hasMore ||
+                  reconciled.hasMore ||
+                  (nextDueAt !== undefined && nextDueAt <= now)
                 const result = {
-                  processed: triggered.processed + scheduled.processed,
+                  processed: triggered.processed + scheduled.processed + reconciled.processed,
                   hasMore,
                 }
                 if (hasMore) return { ...result, nextDueAt: now }
@@ -197,6 +269,7 @@ export const layer = (
           const tick = Effect.gen(function* () {
             yield* triggers.tick
             yield* scheduler.tick
+            if (Option.isSome(peerRoutes)) yield* reconcileExternal(64)
           }).pipe((effect) => drainLock.withPermit(effect), Effect.provideService(RunStore, runStore))
           const incarnation: ActiveScheduler = {
             termination,
@@ -237,6 +310,7 @@ export const layer = (
             lease.monitor,
             Effect.raceFirst(scheduler.failure, FiberSet.join(requests).pipe(Effect.andThen(Effect.never))),
           )
+          yield* markRuntimeReady(application)
           return {
             monitor:
               options.schedulerMode === "external"
@@ -246,6 +320,7 @@ export const layer = (
         }).pipe(Effect.provide(services))
         return Layer.mergeAll(
           layerActivation(acquire),
+          Layer.succeed(ApplicationRuntime, application),
           Layer.succeed(RuntimeLifecycle, lifecycle),
           Layer.succeed(
             LocalScheduler,

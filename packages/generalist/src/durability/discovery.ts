@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { ObjectStore, ObjectStoreFailure, type Service } from "./object-store.js"
+import { ObjectStore } from "./object-store.js"
 import {
   Scope as MarkerScope,
   Identity,
@@ -9,8 +9,9 @@ import {
   markerKey,
   tenantPrefix,
 } from "./internal/discovery-marker.js"
-import { make } from "./internal/journal.js"
 import { Page as ProtocolPage, failure, decode, parse, equalBytes, bytes } from "./internal/protocol.js"
+import { readOnlyRuntimeState } from "./internal/inspection/read-only-runtime.js"
+import type { PartitionInspection } from "../runtime/inspection.js"
 
 /** Authorized tenant scope for read-only partition discovery. @experimental */
 export type Scope = typeof MarkerScope.Type
@@ -133,80 +134,19 @@ export const page = (input: Scope & { readonly cursor?: string }) =>
     return { locations, cursor: encodeURIComponent(next) }
   })
 
-/** Reconstruct a located journal within fixed validation budgets without activating it. @experimental */
+/** Reconstruct a bounded public partition summary without activating it. @experimental */
 export const inspect = (location: Location) =>
   Effect.gen(function* () {
     const identity = yield* decode(Identity, location, "configuration")
-    const store = yield* ObjectStore
-    let remaining = 4096
-    let remainingBytes = 32 * 1024 * 1024
-    const spend = (key: string, amount: number) =>
-      Effect.suspend(() => {
-        remaining -= amount
-        return remaining < 0
-          ? Effect.fail(
-              ObjectStoreFailure.make({
-                operation: "discovery",
-                key,
-                reason: "limit",
-                message: "Discovery validation exceeds 4096 objects and requests",
-              }),
-            )
-          : Effect.void
-      })
-    const bounded: Service = {
-      capabilities: store.capabilities,
-      create: (key) =>
-        Effect.fail(
-          ObjectStoreFailure.make({
-            operation: "discovery",
-            key,
-            reason: "invalid-response",
-            message: "Discovery validation is read-only",
-          }),
-        ),
-      read: (key, options) =>
-        Effect.gen(function* () {
-          yield* spend(key, 1)
-          if (remainingBytes <= 0) {
-            return yield* ObjectStoreFailure.make({
-              operation: "discovery",
-              key,
-              reason: "limit",
-              message: "Discovery validation exceeds 32 MiB",
-            })
-          }
-          const object = yield* store.read(key, { ...options, maxBytes: Math.min(options.maxBytes, remainingBytes) })
-          remainingBytes -= object?.bytes.length ?? 0
-          if (remainingBytes < 0) {
-            return yield* ObjectStoreFailure.make({
-              operation: "discovery",
-              key,
-              reason: "limit",
-              message: "Discovery validation exceeds 32 MiB",
-            })
-          }
-          return object
-        }),
-      list: (prefix, options) =>
-        Effect.gen(function* () {
-          yield* spend(prefix, 1)
-          const result = yield* store.list(prefix, options)
-          if (!Array.isArray(result?.keys)) {
-            return yield* ObjectStoreFailure.make({
-              operation: "discovery",
-              key: prefix,
-              reason: "invalid-response",
-              message: "Invalid discovery validation listing",
-            })
-          }
-          yield* spend(prefix, result.keys.length)
-          return result
-        }),
+    const runtime = yield* readOnlyRuntimeState(identity)
+    if (runtime.state === undefined) {
+      return { status: "uncommitted", namespace: identity } satisfies PartitionInspection
     }
-    const journal = yield* make(identity).pipe(Effect.provideService(ObjectStore, bounded))
-    const head = yield* journal.read
-    return head.sequence === "-1"
-      ? { status: "uncommitted" as const, location: identity }
-      : { status: "committed" as const, location: identity, head }
+    return {
+      status: "committed",
+      namespace: identity,
+      cursor: runtime.sequence,
+      runCount: runtime.state.runs.size,
+      sessionCount: runtime.state.hostSessions.size,
+    } satisfies PartitionInspection
   })
