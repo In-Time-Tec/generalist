@@ -87,12 +87,19 @@ export interface StaticRunOptions {
 }
 
 /** Live Agent Program resources owned by the caller's scope. */
-export interface ProgramResolution {
-  readonly _tag: "Program"
+export interface ProgramResources {
   readonly program: Program<unknown, unknown, unknown, unknown>
   readonly executor: CodeExecutorService
   readonly handlers: Handlers
   readonly services?: Layer.Layer<never>
+}
+
+/** Verified Program identity whose live resources are acquired for the claimed execution scope. */
+export interface ProgramResolution {
+  readonly _tag: "Program"
+  readonly bind: (
+    context: Context.Context<unknown>,
+  ) => Effect.Effect<ProgramResources, ExecutableRegistrationInvalid, Scope.Scope>
   readonly attestation: Attestation
 }
 
@@ -255,11 +262,14 @@ const staticResolution = (entry: StaticExecutable, attestation: Attestation): Re
   if (entry._tag === "Program") {
     return {
       _tag: "Program",
-      program: entry.program,
-      executor: entry.executor,
-      handlers: entry.handlers,
+      bind: () =>
+        Effect.succeed({
+          program: entry.program,
+          executor: entry.executor,
+          handlers: entry.handlers,
+          ...Object.assign({}, entry.services === undefined ? undefined : { services: entry.services }),
+        }),
       attestation,
-      ...Object.assign({}, entry.services === undefined ? undefined : { services: entry.services }),
     }
   }
   return {
@@ -436,11 +446,14 @@ const resolveProgram = (
         : yield* reconstruction.services({ ...authority, registrations })
     return {
       _tag: "Program" as const,
-      program: { pinned: program, input: inputCodec, output: outputCodec },
-      executor,
-      handlers,
+      bind: () =>
+        Effect.succeed({
+          program: { pinned: program, input: inputCodec, output: outputCodec },
+          executor,
+          handlers,
+          ...Object.assign({}, services === undefined ? undefined : { services }),
+        }),
       attestation: verifyAttestation(pinned),
-      ...Object.assign({}, services === undefined ? undefined : { services }),
     }
   })
 

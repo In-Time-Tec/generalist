@@ -2,7 +2,7 @@ import { DateTime, Effect, Layer, Schema, Scope } from "effect"
 import { run } from "../../core/program/agent-program.js"
 import { ProgramSuspended } from "../../core/program/capabilities.js"
 import { ExecutionFailure, ProgramRunner } from "../../core/program/runner.js"
-import type { ProgramResolution } from "../executable/resolver.js"
+import type { ProgramResources } from "../executable/resolver.js"
 import type { ExecutionClaim, ExecutionRecord, Service as RunStore } from "../run/store.js"
 import { failureMessage } from "../run/errors-internal.js"
 import { AgentExecutionFailure, RunTerminal } from "../errors.js"
@@ -15,7 +15,7 @@ export const executeProgram = (input: {
   readonly claim: ExecutionClaim
   readonly claimed: ExecutionRecord
   readonly store: RunStore
-  readonly resolution: ProgramResolution
+  readonly resolution: ProgramResources
   readonly children?: ChildCapabilities<Readonly<Record<string, AnyAgent>>>
 }): Effect.Effect<void, never, Scope.Scope> => {
   const { claim, claimed, resolution, store } = input

@@ -139,15 +139,22 @@ type StepCodecRequirements<S> = S extends {
 }
   ? InputSchema["DecodingServices"] | OutputSchema["EncodingServices"] | FailureSchema["EncodingServices"]
   : never
+type GrantedToolRequirements<C> = [GrantedTool<C>] extends [never]
+  ? never
+  :
+      | Exclude<Tool.HandlerServices<GrantedTool<C>>, ToolContext>
+      | Tool.HandlersFor<{
+          readonly [Name in Tool.Name<GrantedTool<C>>]: Extract<GrantedTool<C>, { readonly name: Name }>
+        }>
+type SelectedAgentRequirements<C> = [GrantedAgent<C>] extends [never]
+  ? never
+  : GrantedAgentRequirements<Extract<GrantedAgent<C>, AnyAgent>>
 
 /** Services inferred from one declaration without widening its handlers or step environments. */
 export type Requirements<C> =
   | (C extends AnyOptions ? CodeExecutor : never)
-  | Exclude<Tool.HandlerServices<GrantedTool<C>>, ToolContext>
-  | Tool.HandlersFor<{
-      readonly [Name in Tool.Name<GrantedTool<C>>]: Extract<GrantedTool<C>, { readonly name: Name }>
-    }>
-  | GrantedAgentRequirements<Extract<GrantedAgent<C>, AnyAgent>>
+  | GrantedToolRequirements<C>
+  | SelectedAgentRequirements<C>
   | StepRequirements<GrantedStep<C>>
   | StepCodecRequirements<GrantedStep<C>>
 

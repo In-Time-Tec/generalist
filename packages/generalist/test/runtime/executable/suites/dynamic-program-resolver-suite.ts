@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Layer, Option, Schema, Scope } from "effect"
+import { Context, Effect, Exit, Layer, Option, Schema, Scope } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import {
   Agent,
@@ -179,16 +179,24 @@ describe("ExecutableResolver.makeDynamic", () => {
       const resolver = yield* resolverFor(reconstruction, first)
 
       for (const executable of [first, second]) {
-        const resolution = yield* resolver
-          .resolve({ runId: "run:dynamic", ...executable, registrations: admittedRegistrations(executable) })
-          .pipe(Effect.scoped)
-        expect(resolution._tag).toBe("Program")
-        if (resolution._tag !== "Program") return
-        expect(resolution.attestation).toEqual({ ref: executable.ref, manifest: executable.manifest })
-        expect(resolution.program.pinned.pin).toBe(executable.ref.active)
-        expect(resolution.handlers.tools.map((binding) => binding.name)).toEqual(["echo"])
-        expect(resolution.handlers.steps.map((binding) => binding.name)).toEqual(["shape"])
-        expect(resolution.handlers.agents.map((binding) => binding.selection)).toEqual(["worker"])
+        const resolution = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const resolved = yield* resolver.resolve({
+              runId: "run:dynamic",
+              ...executable,
+              registrations: admittedRegistrations(executable),
+            })
+            if (resolved._tag !== "Program") return resolved
+            return { resolved, resources: yield* resolved.bind(Context.makeUnsafe<unknown>(new Map())) }
+          }),
+        )
+        if (!("resolved" in resolution)) return
+        const { resolved, resources } = resolution
+        expect(resolved.attestation).toEqual({ ref: executable.ref, manifest: executable.manifest })
+        expect(resources.program.pinned.pin).toBe(executable.ref.active)
+        expect(resources.handlers.tools.map((binding) => binding.name)).toEqual(["echo"])
+        expect(resources.handlers.steps.map((binding) => binding.name)).toEqual(["shape"])
+        expect(resources.handlers.agents.map((binding) => binding.selection)).toEqual(["worker"])
       }
     }),
   )

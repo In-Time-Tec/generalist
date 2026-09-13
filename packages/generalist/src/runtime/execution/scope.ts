@@ -259,7 +259,7 @@ type FencedChildCancellation = (input: {
 /** @internal One issued scope together with its attempt-owned environment and finalizer. */
 export interface IssuedExecutionScope {
   readonly scope: ExecutionScope<Readonly<Record<string, AnyAgent>>>
-  readonly environment: Layer.Layer<unknown>
+  readonly context: Context.Context<unknown>
   readonly retire: Effect.Effect<void>
 }
 
@@ -320,6 +320,7 @@ export const issue = (options: {
       isRetired = true
       return Deferred.succeed(retirement, undefined).pipe(Effect.asVoid)
     })
+    let attemptContext = Context.omit(Scope.Scope)(options.binding.base)
     yield* Effect.addFinalizer(() => retire)
     const assertLive: Effect.Effect<void, ChildCapabilityFailure> = Effect.suspend(() => {
       if (isRetired) return Effect.fail(retiredFailure)
@@ -536,7 +537,7 @@ export const issue = (options: {
         return RuntimeUnavailable.make({ message: `Child ${metadata.childRunId} was not an Agent Run` })
       }
       return Schema.decodeEffect(metadata.registration.source.output)(outcome.result.output).pipe(
-        Effect.provideContext(metadata.registration.context),
+        Effect.provideContext(attemptContext),
         // SAFETY: receipt ownership ties this exact registered Agent output schema to ChildOutput.
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion
         Effect.map((output) => ({ _tag: "Succeeded" as const, output: output as ChildOutput })),
@@ -557,7 +558,7 @@ export const issue = (options: {
             })
           }
           const encoded = yield* encodeAgentInput(selected.value.source.input, input.input).pipe(
-            Effect.provideContext(selected.value.context),
+            Effect.provideContext(attemptContext),
             Effect.mapError((error) => RuntimeUnavailable.make({ message: error.message })),
           )
           yield* assertLive
@@ -919,21 +920,21 @@ export const issue = (options: {
     Object.defineProperty(scope, ExecutionScopeTypeId, { enumerable: false })
     Object.freeze(scope)
     const factory = options.binding.executionServices
-    let environment = Layer.succeedContext(options.binding.base)
     if (factory !== undefined) {
+      const attemptScope = yield* Scope.Scope
       const executionContext = yield* Effect.try({
         try: () => factory(scope),
         catch: (error) => RuntimeUnavailable.make({ message: `Execution services factory failed: ${String(error)}` }),
       }).pipe(
-        Effect.flatMap((executionLayer) => Layer.build(executionLayer)),
+        Effect.flatMap((executionLayer) => Layer.buildWithScope(Layer.fresh(executionLayer), attemptScope)),
         Effect.provideContext(Context.add(Context.omit(Scope.Scope)(options.binding.base), Runtime, boundRuntime)),
         Effect.onError(() => retire),
       )
-      environment = Layer.succeedContext(Context.merge(options.binding.base, executionContext))
+      attemptContext = Context.merge(attemptContext, Context.omit(Scope.Scope)(executionContext))
     }
     return {
       scope,
-      environment,
+      context: attemptContext,
       retire,
     }
   })

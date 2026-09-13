@@ -1,7 +1,7 @@
 import { Context, Effect, Function, Layer, Option, Schema, type Scope } from "effect"
 import type { Tool } from "effect/unstable/ai"
 import { fromLiveAgent } from "../../core/durable/manifest/agent-manifest.js"
-import { digest as pinDigest, makeCapability, makeModel, type CapabilityPin } from "../../core/durable/pin.js"
+import { makeCapability, makeModel, type CapabilityPin } from "../../core/durable/pin.js"
 import {
   close,
   type Agent,
@@ -486,18 +486,10 @@ const captureFrom = (
           const codeMode =
             declaration === undefined
               ? undefined
-              : yield* bindCodeMode({
-                  owner: member,
+              : Object.freeze({
                   declaration: declaration.declaration,
                   identity: declaration.identity,
-                  context,
-                }).pipe(
-                  Effect.mapError((error) =>
-                    ExecutableRegistrationInvalid.make({
-                      message: `CodeMode declaration ${error.field}/${error.reason}${error.name === undefined ? "" : `: ${error.name}`}`,
-                    }),
-                  ),
-                )
+                })
           return registered(
             member,
             graph.implementations.get(member)!,
@@ -638,18 +630,6 @@ const resolveCodeModeProgram = (
       return yield* ExecutableRegistrationInvalid.make({ message: "CodeMode registration closure is missing" })
     }
     yield* validateCodeModeRegistration(registration, input, closure.identity.authority.sandbox)
-    const executorMatches = yield* Effect.sync(() => {
-      try {
-        return pinDigest(closure.executor.identity) === pinDigest(closure.declaration.executor)
-      } catch {
-        return false
-      }
-    })
-    if (!executorMatches) {
-      return yield* ExecutableRegistrationInvalid.make({
-        message: "CodeMode executor identity differs from its registered declaration",
-      })
-    }
     const active = input.manifest.entries.find((entry) => entry.pin === input.ref.active)
     if (active?._tag !== "Program") {
       return yield* ExecutableRegistrationInvalid.make({ message: "CodeMode active executable is not a Program" })
@@ -677,73 +657,104 @@ const resolveCodeModeProgram = (
         })
       }
     }
-    const full = closure.handlers(input.runId)
-    const select = <A>(
-      kind: "tool" | "step",
-      declared: ReadonlyArray<{ readonly name: string; readonly pin: string }>,
-      available: ReadonlyArray<A>,
-      nameOf: (value: A) => string,
-      pinOf: (value: A) => string,
-    ): Effect.Effect<ReadonlyArray<A>, ExecutableRegistrationInvalid> =>
-      Effect.gen(function* () {
-        const byName = new Map(available.map((value) => [nameOf(value), value] as const))
-        const selected: Array<A> = []
-        for (const capability of declared) {
-          const handler = byName.get(capability.name)
-          if (handler === undefined || pinOf(handler) !== capability.pin) {
-            return yield* ExecutableRegistrationInvalid.make({
-              message: `CodeMode Program ${kind} is outside its registered declaration: ${capability.name}`,
-            })
-          }
-          selected.push(handler)
+    const declaredPin = (kind: "tool" | "step", name: string): string | undefined =>
+      (kind === "tool" ? closure.identity.toolPins : closure.identity.stepPins).get(name)
+    for (const kind of ["tool", "step"] as const) {
+      for (const capability of program.manifest.capabilities[`${kind}s`]) {
+        if (declaredPin(kind, capability.name) !== capability.pin) {
+          return yield* ExecutableRegistrationInvalid.make({
+            message: `CodeMode Program ${kind} is outside its registered declaration: ${capability.name}`,
+          })
         }
-        return selected
-      })
-    const tools = yield* select(
-      "tool",
-      program.manifest.capabilities.tools,
-      full.tools,
-      ({ name }) => name,
-      ({ pin }) => pin,
-    )
-    const steps = yield* select(
-      "step",
-      program.manifest.capabilities.steps,
-      full.steps,
-      ({ name }) => name,
-      ({ pin }) => pin,
-    )
-    const agentsBySelection = new Map(full.agents.map((handler) => [handler.selection, handler] as const))
-    const selectedAgents: Array<(typeof full.agents)[number]> = []
+      }
+    }
+    const declaredAgents = new Map(closure.identity.authority.agents.map((entry) => [entry.selection, entry] as const))
     for (const capability of program.manifest.capabilities.agents) {
-      const handler = agentsBySelection.get(capability.selection)
-      if (handler === undefined || handler.agent !== capability.agent || handler.inputPin !== capability.input) {
+      const declared = declaredAgents.get(capability.selection)
+      if (declared === undefined || declared.agent !== capability.agent || declared.input !== capability.input) {
         return yield* ExecutableRegistrationInvalid.make({
           message: `CodeMode Program Agent is outside its registered declaration: ${capability.selection}`,
         })
       }
-      selectedAgents.push(handler)
     }
-    const handlers = yield* Effect.try({
-      try: () => makeProgramHandlers({ tools, steps, agents: selectedAgents }),
-      catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
-    })
-    yield* validateProgramHandlers(program, handlers).pipe(
-      Effect.mapError((error) =>
-        ExecutableRegistrationInvalid.make({
-          message: `CodeMode Program ${error.kind} handler ${error.handlerName} ${error.reason}`,
-        }),
-      ),
-    )
     const resolution: ProgramResolution = {
       _tag: "Program",
-      program: {
-        pinned: program,
-        input: closure.input,
-        output: closure.output,
-      } satisfies Program<unknown, unknown, unknown, unknown>,
-      executor: closure.executor,
-      handlers,
+      bind: (context) =>
+        Effect.gen(function* () {
+          const bound = yield* bindCodeMode({
+            owner: registration.source,
+            declaration: closure.declaration,
+            identity: closure.identity,
+            context,
+          })
+          const full = bound.handlers(input.runId)
+          const select = <A>(
+            kind: "tool" | "step",
+            declared: ReadonlyArray<{ readonly name: string; readonly pin: string }>,
+            available: ReadonlyArray<A>,
+            nameOf: (value: A) => string,
+            pinOf: (value: A) => string,
+          ): Effect.Effect<ReadonlyArray<A>, ExecutableRegistrationInvalid> =>
+            Effect.gen(function* () {
+              const byName = new Map(available.map((value) => [nameOf(value), value] as const))
+              const selected: Array<A> = []
+              for (const capability of declared) {
+                const handler = byName.get(capability.name)
+                if (handler === undefined || pinOf(handler) !== capability.pin) {
+                  return yield* ExecutableRegistrationInvalid.make({
+                    message: `CodeMode Program ${kind} is outside its registered declaration: ${capability.name}`,
+                  })
+                }
+                selected.push(handler)
+              }
+              return selected
+            })
+          const tools = yield* select(
+            "tool",
+            program.manifest.capabilities.tools,
+            full.tools,
+            ({ name }) => name,
+            ({ pin }) => pin,
+          )
+          const steps = yield* select(
+            "step",
+            program.manifest.capabilities.steps,
+            full.steps,
+            ({ name }) => name,
+            ({ pin }) => pin,
+          )
+          const agentsBySelection = new Map(full.agents.map((handler) => [handler.selection, handler] as const))
+          const selectedAgents: Array<(typeof full.agents)[number]> = []
+          for (const capability of program.manifest.capabilities.agents) {
+            const handler = agentsBySelection.get(capability.selection)
+            if (handler === undefined || handler.agent !== capability.agent || handler.inputPin !== capability.input) {
+              return yield* ExecutableRegistrationInvalid.make({
+                message: `CodeMode Program Agent is outside its registered declaration: ${capability.selection}`,
+              })
+            }
+            selectedAgents.push(handler)
+          }
+          const handlers = yield* Effect.try({
+            try: () => makeProgramHandlers({ tools, steps, agents: selectedAgents }),
+            catch: (error) => ExecutableRegistrationInvalid.make({ message: String(error) }),
+          })
+          yield* validateProgramHandlers(program, handlers).pipe(
+            Effect.mapError((error) =>
+              ExecutableRegistrationInvalid.make({
+                message: `CodeMode Program ${error.kind} handler ${error.handlerName} ${error.reason}`,
+              }),
+            ),
+          )
+          return {
+            program: {
+              pinned: program,
+              input: bound.input,
+              output: bound.output,
+            } satisfies Program<unknown, unknown, unknown, unknown>,
+            executor: bound.executor,
+            handlers,
+          }
+        }),
       attestation: { ref: input.ref, manifest: input.manifest },
     }
     programResolutionBindings.set(resolution, { agents, registration })

@@ -155,9 +155,12 @@ const fixture = (options: { readonly calls?: number; readonly background?: "comp
             }
             return Effect.succeed({
               _tag: "Program" as const,
-              program,
-              executor,
-              handlers: ProgramHandlers.make({ tools: [], agents: [], steps: [] }),
+              bind: () =>
+                Effect.succeed({
+                  program,
+                  executor,
+                  handlers: ProgramHandlers.make({ tools: [], agents: [], steps: [] }),
+                }),
               attestation: { ref: input.ref, manifest: input.manifest },
             })
           },

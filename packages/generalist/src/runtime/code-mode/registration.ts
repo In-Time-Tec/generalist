@@ -14,10 +14,6 @@ import {
   ProgramSuspended,
 } from "../../core/program/capabilities.js"
 import { CodeExecutor, type Service as CodeExecutorService } from "../../core/program/code-executor.js"
-import {
-  DeclarationError as CodeModeDeclarationError,
-  type DeclarationError,
-} from "../../core/program/code-mode-declaration.js"
 import type {
   AgentInvocation,
   AnyAgent as ProgramAgent,
@@ -28,10 +24,11 @@ import type {
 } from "../../core/program/handlers.js"
 import { ToolContext } from "../../core/tools/tool-context.js"
 import { executeToolkit } from "../../core/tools/tool-executor.js"
+import { ExecutableRegistrationInvalid } from "../errors.js"
 import type { ValidatedDeclaration } from "./declaration.js"
 
-const identityFailure = (): DeclarationError =>
-  CodeModeDeclarationError.make({ field: "executor", reason: "identity-invalid" })
+const bindingFailure = (message: string): ExecutableRegistrationInvalid =>
+  ExecutableRegistrationInvalid.make({ message })
 
 const schemaIdentity = (schema: Schema.Top): Schema.Json =>
   SchemaRepresentation.toJson(SchemaRepresentation.toRepresentation(schema.ast))
@@ -150,27 +147,38 @@ const closeCodec = <S extends Schema.Top>(
 const schemaError = (message: string): Schema.SchemaError =>
   new Schema.SchemaError(new SchemaIssue.InvalidValue({ message }))
 
-/** @internal Exact live closure retained beside one registered Agent revision. */
+/** @internal Immutable CodeMode declaration retained beside one registered Agent revision. */
 export interface RegisteredCodeMode {
   readonly declaration: ValidatedDeclaration
   readonly identity: DeclarationIdentity
+}
+
+/** @internal Live resources acquired from one exact claimed execution environment. */
+export interface BoundCodeMode {
   readonly executor: CodeExecutorService
   readonly input: Schema.Codec<Prompt.Prompt, typeof Prompt.Prompt.Encoded>
   readonly output: Schema.Codec<unknown, unknown>
   readonly handlers: (runId: string) => Handlers
 }
 
-/** @internal Acquire handlers once from the registration environment without invoking them. */
+/** @internal Acquire CodeMode resources from the exact claimed execution environment. */
 export const bind = (input: {
   readonly owner: AnyAgent
   readonly declaration: ValidatedDeclaration
   readonly identity: DeclarationIdentity
   readonly context: Context.Context<unknown>
-}): Effect.Effect<RegisteredCodeMode, DeclarationError> =>
+}): Effect.Effect<BoundCodeMode, ExecutableRegistrationInvalid> =>
   Effect.gen(function* () {
     const service = Context.getOption(input.context, CodeExecutor)
-    if (Option.isNone(service) || digest(service.value.identity) !== digest(input.declaration.executor)) {
-      return yield* identityFailure()
+    const executorMatches = yield* Effect.sync(() => {
+      try {
+        return Option.isSome(service) && digest(service.value.identity) === digest(input.declaration.executor)
+      } catch {
+        return false
+      }
+    })
+    if (!executorMatches || Option.isNone(service)) {
+      return yield* bindingFailure("CodeMode executor identity differs from its registered declaration")
     }
     const declaredTools = input.declaration.tools.map(({ tool }) => tool)
     const toolkit =
@@ -178,14 +186,14 @@ export const bind = (input: {
         ? undefined
         : yield* Toolkit.make(...declaredTools).pipe(
             Effect.provideContext(input.context),
-            Effect.mapError(() => CodeModeDeclarationError.make({ field: "tools", reason: "identity-invalid" })),
+            Effect.mapError((error) => bindingFailure(`CodeMode Tool handlers cannot be acquired: ${String(error)}`)),
           )
     const authorizer =
       declaredTools.length === 0
         ? undefined
         : yield* setupToolAuthorizer(input.owner).pipe(
             Effect.provideContext(input.context),
-            Effect.mapError(() => CodeModeDeclarationError.make({ field: "tools", reason: "identity-invalid" })),
+            Effect.mapError((error) => bindingFailure(`CodeMode Tool authorizer cannot be acquired: ${String(error)}`)),
           )
     const inputCodec = closeCodec(Prompt.Prompt, input.context)
     const outputCodec = closeCodec(Schema.Unknown, input.context)
@@ -380,8 +388,6 @@ export const bind = (input: {
       })
     }
     return Object.freeze({
-      declaration: input.declaration,
-      identity: input.identity,
       executor: service.value,
       input: inputCodec,
       output: outputCodec,

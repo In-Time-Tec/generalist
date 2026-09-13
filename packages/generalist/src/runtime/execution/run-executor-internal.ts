@@ -160,7 +160,13 @@ const makeFor = (
             if (resolved._tag === "Program") {
               const programBinding = registeredProgramResolution(resolved)
               if (Option.isNone(programBinding)) {
-                yield* executeProgram({ claim, claimed, store, resolution: resolved })
+                const resources = yield* resolved.bind(Context.makeUnsafe<unknown>(new Map())).pipe(
+                  Effect.matchEffect({
+                    onFailure: (error) => deferProgramChildFailure(error).pipe(Effect.as(undefined)),
+                    onSuccess: Effect.succeed,
+                  }),
+                )
+                if (resources !== undefined) yield* executeProgram({ claim, claimed, store, resolution: resources })
                 return
               }
               const registration = programBinding.value.registration
@@ -172,6 +178,12 @@ const makeFor = (
                   agents: programBinding.value.agents,
                   registration,
                   base: registration.context,
+                  ...Object.assign(
+                    {},
+                    registration.executionServices === undefined
+                      ? undefined
+                      : { executionServices: registration.executionServices.factory },
+                  ),
                   partition: registration.partition,
                 },
                 claim,
@@ -187,11 +199,18 @@ const makeFor = (
                     )
                     .pipe(Effect.tap(() => active.interrupt(childRunId))),
               })
+              const resources = yield* resolved.bind(issued.context).pipe(
+                Effect.matchEffect({
+                  onFailure: (error) => deferProgramChildFailure(error).pipe(Effect.as(undefined)),
+                  onSuccess: Effect.succeed,
+                }),
+              )
+              if (resources === undefined) return
               yield* executeProgram({
                 claim,
                 claimed,
                 store,
-                resolution: resolved,
+                resolution: resources,
                 children: issued.scope.children,
               })
               return
@@ -711,7 +730,9 @@ const makeFor = (
                 // and issueExecutionScope has built and merged that exact revision factory once.
                 // The resolver erases the Agent's invariant service parameters before this point.
                 const completeEnvironment =
-                  issuedScope === undefined ? environment : (issuedScope.environment as typeof environment)
+                  issuedScope === undefined
+                    ? environment
+                    : (Layer.succeedContext(issuedScope.context) as typeof environment)
                 const policy = Schema.decodeUnknownOption(Inheritance)(claimed.message.metadata.childInheritancePolicy)
                 const parentName = Schema.decodeUnknownOption(Schema.String)(claimed.message.metadata.parentAgentName)
                 if (Option.isNone(policy) || Option.isNone(parentName))

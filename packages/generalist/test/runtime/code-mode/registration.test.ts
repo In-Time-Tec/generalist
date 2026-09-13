@@ -27,6 +27,16 @@ const allowAll = {
   authorize: () => Effect.succeed({ _tag: "Execute" as const }),
 }
 
+class AttemptToolDependency extends Context.Service<AttemptToolDependency, string>()(
+  "generalist/test/code-mode/AttemptToolDependency",
+) {}
+class AttemptValue extends Context.Service<AttemptValue, string>()("generalist/test/code-mode/AttemptValue") {}
+class AttemptAuthorization extends Context.Service<AttemptAuthorization, string>()(
+  "generalist/test/code-mode/AttemptAuthorization",
+) {}
+class AttemptCodec extends Context.Service<AttemptCodec, string>()("generalist/test/code-mode/AttemptCodec") {}
+class AttemptLifetime extends Context.Service<AttemptLifetime, number>()("generalist/test/code-mode/AttemptLifetime") {}
+
 const revisionBudget = {
   agentRuns: 0,
   concurrency: 1,
@@ -107,7 +117,7 @@ const generatedProgram = (
       sandbox: authority.sandbox,
       input: authority.input,
       output: authority.output,
-      capabilities: { tools: [], agents: [], steps: authority.steps },
+      capabilities: { tools: authority.tools, agents: [], steps: authority.steps },
       budget: authority.budget,
     })
     const executable = makeExecutable({ root: program.pin, entries: [{ _tag: "Program", ...program }] })
@@ -508,20 +518,38 @@ describe("CodeMode registration", () => {
       let executorCalls = 0
       let programRunId = ""
       const operationKeys: Array<string | undefined> = []
+      const authorizationInstances: Array<string> = []
+      const codecInstances: Array<string> = []
+      const dispatchInstances: Array<string> = []
+      const finalizedInstances: Array<number> = []
+      let acquiredInstances = 0
+      const approvedParameters = Schema.Struct({ value: Schema.String }).pipe(
+        Schema.middlewareDecoding((effect) =>
+          AttemptCodec.pipe(
+            Effect.tap((instance) => Effect.sync(() => codecInstances.push(instance))),
+            Effect.andThen(effect),
+          ),
+        ),
+      )
       const approvedTool = Tool.make("approved_tool", {
-        parameters: Schema.Struct({ value: Schema.String }),
+        parameters: approvedParameters,
         success: Schema.String,
-        dependencies: [ToolContext],
+        dependencies: [ToolContext, AttemptAuthorization],
       })
+      const child = Agent.make({ name: "code-mode-approval-child", authorization: allowAll })
       const root = Agent.make({
         name: "code-mode-approval-resume",
         tools: [approvedTool],
         authorization: {
           authorize: ({ call }) =>
             call.name === "approved_tool"
-              ? Effect.sync(() => {
-                  authorizations += 1
-                }).pipe(
+              ? AttemptAuthorization.pipe(
+                  Effect.tap((instance) =>
+                    Effect.sync(() => {
+                      authorizations += 1
+                      authorizationInstances.push(instance)
+                    }),
+                  ),
                   Effect.andThen(Deferred.succeed(approvalRequested, undefined)),
                   Effect.as({ _tag: "Suspend" as const, token: "approval:approved-tool" }),
                 )
@@ -529,7 +557,7 @@ describe("CodeMode registration", () => {
         },
         codeMode: {
           tools: [{ tool: approvedTool, handlerVersion: "approved-tool-v1", replay: "recorded" }],
-          agents: [],
+          agents: [{ agent: child, selection: "child", handlerVersion: "1", replay: "recorded" }],
           steps: [],
           executor: CodeExecutor.testIdentity,
           maxSourceBytes: 4_096,
@@ -580,17 +608,36 @@ describe("CodeMode registration", () => {
           approved_tool: ({ value }) =>
             Effect.gen(function* () {
               dispatches += 1
+              dispatchInstances.push(yield* AttemptAuthorization)
               operationKeys.push((yield* ToolContext).operationKey)
               return value
             }),
         }),
         Layer.succeed(CodeExecutor.CodeExecutor, executor),
       )
+      const executionServices = () => {
+        const instance = ++acquiredInstances
+        return Layer.mergeAll(
+          services,
+          Layer.succeed(AttemptAuthorization, `attempt-${instance}`),
+          Layer.succeed(AttemptCodec, `attempt-${instance}`),
+          Layer.effect(
+            AttemptLifetime,
+            Effect.acquireRelease(Effect.succeed(instance), () =>
+              Effect.sync(() => {
+                finalizedInstances.push(instance)
+              }),
+            ),
+          ),
+        )
+      }
+      const agents = { "code-mode-approval-resume": root, "code-mode-approval-child": child }
       const layer = () =>
         Runtime.layer({
-          agents: { "code-mode-approval-resume": root },
+          agents,
           revision: "code-mode-approval-resume-v1",
-          services,
+          services: model,
+          executionServices,
           storage: Layer.merge(Layer.succeed(ObjectStore, storage.store), BunCrypto.layer),
           namespace: { environment: "test", tenant: "code-mode-approval", partition: "local" },
           scheduler: { pollInterval: "5 millis" },
@@ -618,8 +665,10 @@ describe("CodeMode registration", () => {
           dispatches: 0,
           executorCalls: 1,
         })
+        expect(acquiredInstances).toBeGreaterThan(0)
         return run.runId
       }).pipe(Effect.scoped)
+      expect(finalizedInstances).toHaveLength(acquiredInstances)
 
       const output = yield* Effect.gen(function* () {
         const context = yield* Layer.build(layer())
@@ -647,17 +696,137 @@ describe("CodeMode registration", () => {
         executorCalls: 2,
       })
       expect(operationKeys).toEqual(["approved-operation"])
+      expect(authorizationInstances).toHaveLength(1)
+      expect(dispatchInstances).toHaveLength(1)
+      expect(dispatchInstances[0]).not.toBe(authorizationInstances[0])
+      expect(codecInstances).toContain(authorizationInstances[0])
+      expect(codecInstances).toContain(dispatchInstances[0])
+      expect(finalizedInstances).toHaveLength(acquiredInstances)
     }),
+  )
+
+  it.live("binds the CodeMode executor from the exact execution attempt", () =>
+    Effect.gen(function* () {
+      const echo = Tool.make("attempt_echo", { parameters: Schema.String, success: Schema.String }).addDependency(
+        AttemptToolDependency,
+      )
+      const step = CodeMode.step({
+        name: "attempt_value",
+        handlerVersion: "1",
+        input: Schema.String,
+        output: Schema.String,
+        failure: Schema.Never,
+        replay: "recorded",
+        authorize: () => Effect.succeed(true),
+        execute: () => AttemptValue,
+      })
+      const child = Agent.make({ name: "attempt-bound-child", authorization: allowAll })
+      const root = Agent.make({
+        name: "attempt-bound-code-mode",
+        tools: [echo],
+        authorization: allowAll,
+        codeMode: {
+          tools: [{ tool: echo, handlerVersion: "1", replay: "recorded" }],
+          agents: [{ agent: child, selection: "child", handlerVersion: "1", replay: "recorded" }],
+          steps: [step] as const,
+          executor: CodeExecutor.testIdentity,
+          maxSourceBytes: 1_024,
+          budget: { ...revisionBudget, toolCalls: 2 },
+        },
+      })
+      const revision = "attempt-bound-code-mode-v1"
+      const fixture = yield* generatedProgram(root, revision)
+      let correctExecutorCalls = 0
+      let handlerCalls = 0
+      const correctExecutor = CodeExecutor.makeTest(() =>
+        Effect.gen(function* () {
+          correctExecutorCalls += 1
+          const capabilities = yield* ProgramCapabilities.ProgramCapabilities
+          const tool = yield* capabilities.callTool({
+            operation: "attempt-echo",
+            tool: "attempt_echo",
+            input: "echo",
+          })
+          const step = yield* capabilities.callStep({
+            operation: "attempt-value",
+            step: "attempt_value",
+            input: "read",
+          })
+          return { tool, step }
+        }),
+      )
+      const storage = makeObjectStorage()
+      const agents = { "attempt-bound-code-mode": root, "attempt-bound-child": child }
+      const baseServices = Layer.merge(modelForRevision, Layer.succeed(AttemptToolDependency, "available"))
+      const attemptServices = Layer.mergeAll(
+        Toolkit.make(echo).toLayer({
+          attempt_echo: (value) =>
+            Effect.sync(() => {
+              handlerCalls += 1
+              return `from-${value}`
+            }),
+        }),
+        Layer.succeed(CodeExecutor.CodeExecutor, correctExecutor),
+        Layer.succeed(AttemptValue, "from-attempt"),
+      )
+      const runtimeOptions = {
+        agents,
+        revision,
+        services: baseServices,
+        executionServices: () => attemptServices,
+        storage: Layer.merge(Layer.succeed(ObjectStore, storage.store), BunCrypto.layer),
+        namespace: { environment: "test", tenant: "code-mode-attempt", partition: "local" },
+        scheduler: { pollInterval: "5 millis" },
+      } satisfies Runtime.ExecutionServicesOptions<
+        typeof agents,
+        Layer.Success<typeof baseServices>,
+        never,
+        never,
+        never,
+        never,
+        Layer.Success<typeof attemptServices>,
+        AttemptToolDependency
+      >
+      const context = yield* Layer.build(Runtime.layer(runtimeOptions))
+      const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
+      const admitted = yield* runtime.admit({
+        executable: fixture.executable,
+        registrations: fixture.registrations,
+        sessionId: "code-mode-attempt",
+        idempotencyKey: "code-mode-attempt",
+        prompt: "run attempt-bound fixture",
+      })
+      yield* runtime.activate({ runId: admitted.runId, commandId: "activate-code-mode-attempt" })
+      const output = yield* (yield* runtime.getRun(admitted.runId)).await.pipe(Effect.timeout("5 seconds"))
+      expect(output).toEqual({ tool: "from-echo", step: "from-attempt" })
+      expect({ correctExecutorCalls, handlerCalls }).toEqual({ correctExecutorCalls: 1, handlerCalls: 1 })
+    }).pipe(Effect.scoped),
   )
 
   it.live("rejects an executor service whose identity differs from the declaration", () =>
     Effect.gen(function* () {
+      const echo = Tool.make("mismatch_echo", { parameters: Schema.String, success: Schema.String }).addDependency(
+        AttemptToolDependency,
+      )
+      const step = CodeMode.step({
+        name: "mismatch_step",
+        handlerVersion: "1",
+        input: Schema.String,
+        output: Schema.String,
+        failure: Schema.Never,
+        replay: "recorded",
+        authorize: () => Effect.succeed(true),
+        execute: Effect.succeed,
+      })
+      const child = Agent.make({ name: "mismatch-child", authorization: allowAll })
       const root = Agent.make({
         name: "mismatched-code-mode-executor",
+        tools: [echo],
+        authorization: allowAll,
         codeMode: {
-          tools: [],
-          agents: [],
-          steps: [],
+          tools: [{ tool: echo, handlerVersion: "1", replay: "recorded" }],
+          agents: [{ agent: child, selection: "child", handlerVersion: "1", replay: "recorded" }],
+          steps: [step],
           executor: CodeExecutor.testIdentity,
           maxSourceBytes: 1_024,
           budget: {
@@ -675,8 +844,16 @@ describe("CodeMode registration", () => {
         ...CodeExecutor.testIdentity,
         implementation: { ...CodeExecutor.testIdentity.implementation, version: "mismatch" },
       })
-      const testExecutor = CodeExecutor.makeTest(() => Effect.die("mismatched executor must not run"))
+      let dispatches = 0
+      const testExecutor = CodeExecutor.makeTest(() => Effect.sync(() => ++dispatches))
       const executor = CodeExecutor.CodeExecutor.of({ ...testExecutor, identity })
+      let finalized = 0
+      const mismatchedExecutor = Layer.effect(
+        CodeExecutor.CodeExecutor,
+        Effect.acquireRelease(Effect.succeed(executor), () => Effect.sync(() => finalized++)),
+      )
+      const revision = "mismatched-code-mode-executor-v1"
+      const fixture = yield* generatedProgram(root, revision)
       const model = Layer.effect(
         LanguageModel.LanguageModel,
         LanguageModel.make({
@@ -685,25 +862,45 @@ describe("CodeMode registration", () => {
         }),
       )
       const storage = makeObjectStorage()
-      const acquired = yield* Effect.result(
-        Layer.build(
-          Runtime.layer({
-            agents: { "mismatched-code-mode-executor": root },
-            revision: "mismatched-code-mode-executor-v1",
-            services: Layer.merge(model, Layer.succeed(CodeExecutor.CodeExecutor, executor)),
-            storage: Layer.merge(Layer.succeed(ObjectStore, storage.store), BunCrypto.layer),
-            namespace: { environment: "test", tenant: "code-mode-mismatch", partition: "local" },
-          }),
+      const agents = { "mismatched-code-mode-executor": root, "mismatch-child": child }
+      const baseServices = Layer.mergeAll(
+        model,
+        Toolkit.make(echo).toLayer({ mismatch_echo: Effect.succeed }),
+        Layer.succeed(AttemptToolDependency, "available"),
+        Layer.succeed(
+          CodeExecutor.CodeExecutor,
+          CodeExecutor.makeTest(() => Effect.die("base executor must not run")),
         ),
       )
-      expect(Result.isFailure(acquired)).toBe(true)
-      if (Result.isFailure(acquired)) {
-        expect(acquired.failure).toMatchObject({
-          _tag: "generalist/runtime/RuntimeOptionsInvalid",
-          field: "agents",
-        })
-        expect(acquired.failure.message).toContain("executor/identity-invalid")
-      }
+      const context = yield* Layer.build(
+        Runtime.layer({
+          agents,
+          revision,
+          services: baseServices,
+          executionServices: () => mismatchedExecutor,
+          storage: Layer.merge(Layer.succeed(ObjectStore, storage.store), BunCrypto.layer),
+          namespace: { environment: "test", tenant: "code-mode-mismatch", partition: "local" },
+          scheduler: { pollInterval: "5 millis" },
+        }),
+      )
+      const runtime = yield* engineFor(Context.get(context, Runtime.Runtime))
+      const run = yield* runtime.admit({
+        executable: fixture.executable,
+        registrations: fixture.registrations,
+        sessionId: "code-mode-mismatch",
+        idempotencyKey: "code-mode-mismatch",
+        prompt: "run mismatched executor fixture",
+      })
+      yield* runtime.activate({ runId: run.runId, commandId: "activate-code-mode-mismatch" })
+      const outcome = yield* Effect.result((yield* runtime.getRun(run.runId)).await.pipe(Effect.timeout("5 seconds")))
+      expect(Result.isFailure(outcome)).toBe(true)
+      if (Result.isSuccess(outcome)) return yield* Effect.die("expected mismatched executor failure")
+      expect(outcome.failure._tag).toBe("RunFailed")
+      if (outcome.failure._tag !== "RunFailed") return yield* Effect.die("expected typed RunFailed")
+      expect(outcome.failure.error).toMatchObject({ _tag: "generalist/runtime/ExecutableRegistrationInvalid" })
+      expect(outcome.failure.error.message).toContain("executor identity differs")
+      expect(dispatches).toBe(0)
+      expect(finalized).toBe(1)
     }).pipe(Effect.scoped),
   )
 })

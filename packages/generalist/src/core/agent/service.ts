@@ -141,7 +141,7 @@ type GateRequirement<O> = O extends { readonly gates: ReadonlyArray<infer G> }
     ? never
     : GateRequirements<G>
   : never
-type CodeModeRequirement<O> = O extends { readonly codeMode: infer C } ? CodeModeRequirements<C> : never
+type CodeModeRequirement<O> = CodeModeRequirements<PresentOption<O, "codeMode">>
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> = {
