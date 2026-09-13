@@ -1,4 +1,5 @@
 import { Schema, type Types } from "effect"
+import type { Definition } from "./runtime-command.js"
 import { ExecutionClaim } from "./runtime-state/schema.js"
 import { WakeEvent } from "../../core/agent/tools/wake-event.js"
 import { WaitResolution } from "../../runtime/run/wait.js"
@@ -65,7 +66,9 @@ const Settlement = Schema.Struct({
   outcome: RunOutcome,
   spend: Schema.optionalKey(Spend),
 })
+type Settlement = typeof Settlement.Type
 const SettlementAcknowledgement = Schema.Struct({ placementId: Schema.String, settlementId: Schema.String })
+type SettlementAcknowledgement = typeof SettlementAcknowledgement.Type
 const key = (...parts: readonly (string | number)[]) => JSON.stringify(parts)
 
 /**
@@ -160,7 +163,26 @@ export const commands = {
   },
 } as const
 
-export const externalCommands = {
+type ExternalCommands = {
+  readonly reserve: Definition<readonly [ReserveInput], Placement> & { readonly tag: "external.reserve" }
+  readonly reserveScoped: Definition<readonly [ScopedReserveInput], Placement> & {
+    readonly tag: "external.reserveScoped"
+  }
+  readonly acknowledge: Definition<readonly [string], Placement> & { readonly tag: "external.acknowledge" }
+  readonly settle: Definition<readonly [Settlement], Placement> & { readonly tag: "external.settle" }
+  readonly cancel: Definition<readonly [string], Placement> & { readonly tag: "external.cancel" }
+  readonly cancelScoped: Definition<readonly [ScopedCancelInput], Placement> & { readonly tag: "external.cancelScoped" }
+  readonly admitRoot: Definition<readonly [RootAdmission], ExternalRoot> & { readonly tag: "external.admitRoot" }
+  readonly activateRoot: Definition<readonly [string], ExternalRoot> & { readonly tag: "external.activateRoot" }
+  readonly cancelRoot: Definition<readonly [string, (string | undefined)?], ExternalRoot> & {
+    readonly tag: "external.cancelRoot"
+  }
+  readonly acknowledgeRootSettlement: Definition<readonly [SettlementAcknowledgement], ExternalRootSettlement> & {
+    readonly tag: "external.acknowledgeRootSettlement"
+  }
+}
+
+export const externalCommands: ExternalCommands = {
   reserve: {
     tag: "external.reserve",
     input: Schema.Tuple([ReserveInput]),
@@ -183,7 +205,7 @@ export const externalCommands = {
     tag: "external.settle",
     input: Schema.Tuple([Settlement]),
     receipt: Placement,
-    identity: ([input]: readonly [typeof Settlement.Type]) => key(input.placementId, input.settlementId),
+    identity: ([input]: readonly [Settlement]) => key(input.placementId, input.settlementId),
   },
   cancel: {
     tag: "external.cancel",
@@ -237,6 +259,6 @@ export const externalCommands = {
     tag: "external.acknowledgeRootSettlement",
     input: Schema.Tuple([SettlementAcknowledgement]),
     receipt: ExternalRootSettlement,
-    identity: ([input]: readonly [typeof SettlementAcknowledgement.Type]) => key(input.placementId, input.settlementId),
+    identity: ([input]: readonly [SettlementAcknowledgement]) => key(input.placementId, input.settlementId),
   },
 } as const
