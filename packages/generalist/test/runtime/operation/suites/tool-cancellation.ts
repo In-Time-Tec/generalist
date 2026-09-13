@@ -231,7 +231,9 @@ export const toolCancellationSuite = <StoreError, Extra = never>(
             expect(modelCalls).toBe(1)
           }),
         ).pipe(Effect.provideService(Tracer.Tracer, tracing.tracer))
-        const semanticCancellationSpans = tracing.spans.filter((span) => span.name === "Generalist.semanticCancel")
+        const semanticCancellationSpans = tracing.spans.filter(
+          (span) => span.name === "Generalist.Runtime.semanticCancel",
+        )
         expect(semanticCancellationSpans.map((span) => span.events.map(([name]) => name))).toEqual([
           ["generalist.runtime.semantic_cancel.delivered"],
           ["generalist.runtime.semantic_cancel.delivered", "generalist.runtime.semantic_cancel.acknowledged"],
