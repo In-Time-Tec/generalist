@@ -329,7 +329,14 @@ export const minimumConsumerProfiles = [
       {
         specifier: "generalist/unstable/rivet",
         runtimes: nodeAndBun,
-        exports: ["makeRuntimeActor", "RuntimeActorNamespace", "ActorRuntime", "layerActorRuntime"],
+        exports: [
+          "makeRuntimeActor",
+          "RuntimeActorNamespace",
+          "ActorRuntime",
+          "layerActorRuntime",
+          "RunStore",
+          "RunExecutor",
+        ],
       },
     ],
   },

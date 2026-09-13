@@ -20,3 +20,16 @@ export {
   type ActorRuntimeServices,
   type RuntimeActorContext,
 } from "./runtime.js"
+
+/** @experimental Low-level controls for application-owned Rivet Runtime hosts. */
+export {
+  RunStore,
+  type Service as RunStoreService,
+  type AdmitStartInput,
+  type ExecutionClaim,
+  type ExecutionRecord,
+  type SessionWriteClaim,
+} from "../../../runtime/run/store.js"
+
+/** @experimental Execution controls belonging to the same actor Runtime. */
+export { RunExecutor, type Service as RunExecutorService } from "../../../runtime/execution/run-executor.js"
