@@ -8937,7 +8937,7 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
         const events = yield* HostedRun.stream(
           agent,
           {
-            prompt: "",
+            prompt: "continue",
             logicalOperationId: "journal-restart",
             executableRef: executable.ref,
             driverCheckpoint: pending!,

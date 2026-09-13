@@ -187,6 +187,7 @@ export const make = <T extends Record<string, Tool.Any>, AgentR = never, PolicyR
         attempt: invocation.attempt,
       }
       if (invocation.admittedAt !== undefined) context = { ...context, admittedAt: invocation.admittedAt }
+      if (invocation.executionClaim !== undefined) context = { ...context, executionClaim: invocation.executionClaim }
     }
     const history = Ref.get(lastWirePrompt).pipe(
       Effect.flatMap((prompt) => (prompt === undefined ? Ref.get(chat.history) : Effect.succeed(prompt))),

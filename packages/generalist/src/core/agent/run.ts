@@ -14,7 +14,7 @@ import { checkpointFromHistory } from "./suspension.js"
 import type { AnyToolCall, PendingToolResult } from "./tools/result.js"
 import { type AgentRunState, make as makeProviderOutputState } from "./model-turn/provider-output-state.js"
 import { make as makeModelTurn } from "./model-turn/index.js"
-import { replayModelMessages } from "./session/history.js"
+import { conversationOnly, replayModelMessages } from "./session/history.js"
 import { AgentPin } from "../durable/pin.js"
 import { make as makeToolExecution } from "./tools/execution.js"
 import { make as makeSkillActivation } from "./tools/skill-activation.js"
@@ -41,6 +41,7 @@ import { modelCallMiddleware, runStartWithSteering } from "./lifecycle/hooks.js"
 import { recoveredRetry as recoveredGateRetry } from "./gates/prompt.js"
 import { make as makeVerifierRunner } from "./gates/verifier-runner.js"
 import type { HostedRunOptions } from "./lifecycle/hosted/options.js"
+import { promptDigest } from "./prompt-identity.js"
 const errorMessage = String
 const { steeringDrainedEvent } = RunSupport
 const streamInternalImpl = <
@@ -365,6 +366,19 @@ const streamInternalImpl = <
           }).pipe(withInterpreter)
         }
         if (gateRetry !== undefined) return Effect.succeed(gateRetry.prompt)
+        if (options.driverCheckpoint !== undefined && !continuingTranscript && Option.isSome(activeSession)) {
+          return Effect.gen(function* () {
+            const supplied = conversationOnly(baseInitialPrompt).content
+            const fullHistory = yield* Ref.get(chat.history)
+            const history = conversationOnly(fullHistory).content
+            const persisted = supplied.length === 0 ? [] : history.slice(-supplied.length)
+            if (supplied.length > 0 && promptDigest(persisted) === promptDigest(supplied)) {
+              yield* Ref.set(chat.history, Prompt.fromMessages(fullHistory.content.slice(0, -supplied.length)))
+              return baseInitialPrompt
+            }
+            return yield* recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
+          })
+        }
         if (!continuingTranscript) {
           return recallInitialPrompt(baseInitialPrompt).pipe(withInterpreter)
         }
