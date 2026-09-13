@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import {
@@ -10,7 +11,6 @@ import {
   CodeExecutor,
 } from "../../../src/index.js"
 import { Address, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { pinnedTestAgent } from "../run/identity.js"
@@ -238,7 +238,7 @@ export const agentMapProgramFixture = () => {
 }
 
 export const executeProgramFixture = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* Runtime
   const store = yield* RunStore
   const host = yield* RunExecutor
   const receipt = yield* runtime.send({

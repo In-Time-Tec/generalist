@@ -1,3 +1,4 @@
+import { type LayerOptions, Runtime } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Config, Deferred, Effect, Fiber, Layer, Option, Redacted, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
@@ -5,12 +6,10 @@ import { HttpClient, HttpClientResponse } from "effect/unstable/http"
 import { Agent, Session, ToolContext, ToolExecutor } from "../../../../src/index.js"
 import { layer } from "../../../../src/ai/provider/openrouter.js"
 import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
-import { RunStore } from "../../../../src/runtime/run/store.js"
+import { RunStore, type ExecutionClaim, type WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../../../src/runtime/execution/active-executions.js"
 import { make as makeRunExecutor } from "../../../../src/runtime/execution/run-executor-internal.js"
-import type { ExecutionClaim, WorkerMutationError } from "../../../../src/runtime/run/store.js"
 import { assistant, assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { closedTestAgent, testExecutable } from "../../run/identity.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
@@ -20,8 +19,8 @@ import { allowAllAuthorization } from "../../../authorization.js"
 export interface OperationRecoverySuiteOptions<StoreError, Extra = never> {
   readonly name: string
   readonly makeLayer: (
-    options: Runtime.LayerOptions,
-  ) => Layer.Layer<Runtime.Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
+    options: LayerOptions,
+  ) => Layer.Layer<Runtime | RunStore | RunExecutor | Extra, StoreError, ExecutableResolver.ExecutableResolver>
   readonly claim?: (
     runId: string,
     ownerId: string,
@@ -109,7 +108,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
       return provideScoped(
         options.makeLayer({ addresses: [], scheduler: { pollInterval: "1 hour" } }).pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const host = yield* RunExecutor
           const receipt = yield* runtime.startExecution({
@@ -211,7 +210,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
           })
           .pipe(Layer.provide(resolverLayer)),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const host = yield* RunExecutor
           const receipt = yield* runtime.send({
@@ -297,7 +296,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             ),
           ),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const receipt = yield* runtime.startExecution({
             executable: assistantRef,
@@ -449,7 +448,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.send({
@@ -583,7 +582,7 @@ export const operationRecoverySuite = <StoreError, Extra = never>(
             })
             .pipe(Layer.provide(resolverLayer)),
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const host = yield* RunExecutor
             const receipt = yield* runtime.send({

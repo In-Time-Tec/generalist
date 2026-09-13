@@ -1,9 +1,9 @@
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each test owns its scoped in-memory RuleStore Layer. */
+import { Runtime as RuntimeRuntime, type Service } from "../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect } from "effect"
 import { PermissionError, RuleStore, layerRuleStoreMemory, type Rule } from "../../../src/core/policy/permissions.js"
 import { Approvals } from "../../../src/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { assistantAddress, objectLayer, openWait, suspension, textPrompt } from "../execution/fixtures.js"
 import { objectWorkerId } from "../execution/object.js"
@@ -15,7 +15,7 @@ const token = (runId: string, suffix = "approval:test"): string =>
 
 const startRun = (key: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* RuntimeRuntime
     const receipt = yield* runtime.send({
       to: assistantAddress,
       sessionId: `session:approval-resolution:${key}`,
@@ -42,14 +42,14 @@ const suspendOnApproval = (runId: string, waitToken: string) =>
 
 const openWaits = (runId: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* RuntimeRuntime
     return (yield* runtime.inspect(runId)).waits.map((wait) => wait.waitId)
   })
 
 layer(objectLayer)("Durable approval resolution", (it) => {
   it.effect("persists a remembered rule only after the Runtime accepts the resolution", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RuleStore
       const runId = yield* startRun("remember-success")
       const approval = token(runId)
@@ -175,7 +175,7 @@ layer(objectLayer)("Durable approval resolution", (it) => {
 
   it.effect("does not close the Runtime wait when the remember write fails", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const runId = yield* startRun("remember-failure")
       const approval = token(runId)
       yield* suspendOnApproval(runId, approval)
@@ -201,7 +201,7 @@ layer(objectLayer)("Durable approval resolution", (it) => {
 
   it.effect("rejects an illegal operator approval before writing a rule", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RuleStore
       const runId = yield* startRun("operator-illegal")
       const approval = token(runId)
@@ -224,7 +224,7 @@ layer(objectLayer)("Durable approval resolution", (it) => {
 
   it.effect("persists the operator remember rule before closing the wait", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RuleStore
       const runId = yield* startRun("operator-success")
       const approval = token(runId)
@@ -244,8 +244,8 @@ layer(objectLayer)("Durable approval resolution", (it) => {
 
   it.effect("does not consult recovery for approved or denied decisions without a remember rule", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const scripted: Runtime.Service = {
+      const runtime = yield* RuntimeRuntime
+      const scripted: Service = {
         ...runtime,
         operator: {
           ...runtime.operator,
@@ -256,10 +256,10 @@ layer(objectLayer)("Durable approval resolution", (it) => {
 
       yield* Approvals.resolve(token("run:scripted"), Approvals.Approved(), {
         commandId: "approve:scripted",
-      }).pipe(Effect.provideService(Runtime.Runtime, scripted))
+      }).pipe(Effect.provideService(RuntimeRuntime, scripted))
       yield* Approvals.resolve(token("run:scripted"), Approvals.Denied(), {
         commandId: "deny:scripted",
-      }).pipe(Effect.provideService(Runtime.Runtime, scripted))
+      }).pipe(Effect.provideService(RuntimeRuntime, scripted))
     }).pipe(Effect.provide(layerRuleStoreMemory())),
   )
 })

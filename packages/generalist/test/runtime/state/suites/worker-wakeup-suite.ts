@@ -1,8 +1,8 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import { Agent } from "../../../../src/index.js"
 import { objectRuntimeLayer } from "../../execution/object.js"
@@ -49,7 +49,7 @@ it.effect("reclaims durable work after a missed wake across object-host reconstr
     const receipt = yield* provideScoped(
       first,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         return yield* runtime.send({
           to: assistantAddress,
           sessionId: "session:worker-wakeup-recovery",
@@ -61,7 +61,7 @@ it.effect("reclaims durable work after a missed wake across object-host reconstr
     yield* provideScoped(
       second,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const scheduler = yield* LocalScheduler
         yield* scheduler.tick
         yield* scheduler.idle

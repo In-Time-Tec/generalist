@@ -1,7 +1,7 @@
+import { type FanOutInput, Runtime as RuntimeRuntime } from "../../../../../src/runtime/engine.js"
 import { expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { Errors, RunTree } from "../../../../../src/runtime/index.js"
-import * as Runtime from "../../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../../execution/object.js"
 import {
@@ -18,14 +18,14 @@ import {
 const admit = (
   key: string,
   options?: {
-    readonly join?: Runtime.FanOutInput["join"]
-    readonly remainder?: Runtime.FanOutInput["remainder"]
+    readonly join?: FanOutInput["join"]
+    readonly remainder?: FanOutInput["remainder"]
     readonly concurrency?: number
     readonly count?: number
   },
 ) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* RuntimeRuntime
     const parent = yield* runtime.send({
       to: assistantAddress,
       sessionId: `fan-out:${key}`,
@@ -33,7 +33,7 @@ const admit = (
       prompt: "parent",
     })
     const count = options?.count ?? 3
-    const input: Runtime.FanOutInput = {
+    const input: FanOutInput = {
       parentRunId: parent.runId,
       idempotencyKey: key,
       members: Array.from({ length: count }, (_, ordinal) => ({
@@ -436,14 +436,14 @@ layer(objectLayer)("Runtime fan-out", (it) => {
 
   it.effect("rejects invalid admission and unprovable termination", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "invalid",
         idempotencyKey: "parent",
         prompt: "parent",
       })
-      const base: Runtime.FanOutInput = {
+      const base: FanOutInput = {
         parentRunId: parent.runId,
         idempotencyKey: "invalid",
         members: [{ key: "one", selection: "researcher", prompt: "one" }],
@@ -465,7 +465,7 @@ layer(objectLayer)("Runtime fan-out", (it) => {
 
   it.effect("rejects an undeclared member atomically", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "fan-out:missing-selection",
@@ -513,7 +513,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
     const storage = makeObjectStorage()
     const admitted = yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: "object:fan-out",
@@ -521,7 +521,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
           prompt: "parent",
           treePolicy: { maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } },
         })
-        const input: Runtime.FanOutInput = {
+        const input: FanOutInput = {
           parentRunId: parent.runId,
           idempotencyKey: "reviews",
           members: [0, 1, 2].map((ordinal) => ({
@@ -556,7 +556,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
 
     yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const before = yield* runtime.inspectFanOut(admitted.fanOutId)
         expect(before.members.map((member) => member.status)).toEqual(["running", "pending", "pending"])
@@ -600,7 +600,7 @@ standalone.live("persists and resumes bounded fan-out across object storage reop
 
     yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const second = yield* store.claimExecution({
           commandId: "runtime-sql-store-fan-out-service-test-ts-claim-2",
@@ -649,7 +649,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
     const storage = makeObjectStorage()
     const admitted = yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         const parent = yield* runtime.send({
           to: assistantAddress,
@@ -657,7 +657,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
           idempotencyKey: "parent",
           prompt: "parent",
         })
-        const fanOutInput: Runtime.FanOutInput = {
+        const fanOutInput: FanOutInput = {
           parentRunId: parent.runId,
           idempotencyKey: "reviews",
           members: [{ key: "review", selection: "researcher", prompt: "review" }],
@@ -691,7 +691,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
     )
     const settled = yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         expect((yield* runtime.inspect(admitted.parentRunId)).status).toBe("waiting")
         const childClaim = yield* store.claimExecution({
@@ -716,7 +716,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
     )
     yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const snapshot = yield* runtime.inspect(settled.parentRunId)
         expect(snapshot.status).toBe("succeeded")
         const terminal = (yield* RunTree.checkpoint(settled.parentRunId)).inspection
@@ -733,7 +733,7 @@ standalone.live("recovers a pending object storage root outcome and settles it a
 layer(objectLayer)("rejects an undeclared object storage fan-out member without side effects", (it) => {
   it.effect("rejects an undeclared object storage fan-out member without side effects", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "object:fan-out-missing",
@@ -763,7 +763,7 @@ layer(objectLayer)("rejects an undeclared object storage fan-out member without 
 layer(objectLayer)("rejects object storage fan-out terminate remainder before admission", (it) => {
   it.effect("rejects object storage fan-out terminate remainder before admission", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const parent = yield* runtime.send({
         to: assistantAddress,
         sessionId: "object:fan-out-terminate",
@@ -792,7 +792,7 @@ standalone.live("atomically reconciles object storage parent cancellation across
     const storage = makeObjectStorage()
     yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const parent = yield* runtime.send({
           to: assistantAddress,
           sessionId: "object:fan-out-cancel",
@@ -830,7 +830,7 @@ standalone.live("atomically reconciles object storage parent cancellation across
 layer(objectLayer)("keeps object storage fan-out cancellation pending for a claimed member", (it) => {
   it.effect("keeps object storage fan-out cancellation pending for a claimed member", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,
@@ -868,7 +868,7 @@ layer(objectLayer)("keeps object storage fan-out cancellation pending for a clai
 layer(objectLayer)("rejects object storage fan-out admission after the parent is terminal", (it) => {
   it.effect("rejects object storage fan-out admission after the parent is terminal", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* RuntimeRuntime
       const store = yield* RunStore
       const parent = yield* runtime.send({
         to: assistantAddress,

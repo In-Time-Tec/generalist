@@ -1,8 +1,8 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { Response } from "effect/unstable/ai"
 import { Pins, Session } from "../../../../src/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore, type Service as RunStoreService } from "../../../../src/runtime/run/store.js"
 import { assistantAddress, objectLayer, textPrompt } from "../fixtures.js"
 import { objectWorkerId } from "../object.js"
@@ -93,7 +93,7 @@ const sessionProjection = (store: RunStoreService, sessionId: string) =>
 layer(objectLayer)("atomic model response memory commit", (suite) => {
   suite.effect("rejects a divergent outbox and appends one exact event across retries", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       yield* runtime.createSession({ id: "session:model-commit-memory" })
       const receipt = yield* runtime.send({
         to: assistantAddress,
@@ -203,7 +203,7 @@ const scopedWith =
 it.live("rejects mutated completed model response references and Session storage", () =>
   scopedWith(objectLayer)(
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const receipt = yield* runtime.send({
         to: assistantAddress,
         sessionId: "session:model-response-hydration-corruption",

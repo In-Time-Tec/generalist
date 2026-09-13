@@ -1,3 +1,4 @@
+import { Runtime, type Service } from "../../src/runtime/engine.js"
 import "./suites/tree-follow-suite.js"
 import "./suites/run-tree-codec-suite.js"
 import { expect, it as testIt, layer } from "@effect/vitest"
@@ -5,7 +6,6 @@ import { Effect, Fiber, Ref, Schedule, Schema, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { Agent, ExecutableManifest, Pins, ProgramManifest } from "../../src/index.js"
 import { Errors, ExecutableRegistration, RunTree, RunWait } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { make as makeTreeCursor } from "../../src/runtime/tree/cursor.js"
 import {
@@ -78,7 +78,7 @@ testIt("retains a Program registration closure through Agent capabilities", () =
 
 const blockRootOnChild = (sessionId: string, invocationId: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const root = yield* runtime.send({
       to: assistantAddress,
@@ -119,7 +119,7 @@ const watchBlocked = (rootRunId: string) =>
 layer(objectLayer)("RunTree", (it) => {
   it.effect("inspects exact active Runs and stable mixed terminal outcomes", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -179,7 +179,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("awaits terminal from a checkpoint cursor without losing the transition", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -205,7 +205,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("watches a tree until its terminal checkpoint cursor is drained", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -236,7 +236,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("reads an arbitrary-depth tree in one deterministic projection", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:recursive",
@@ -292,7 +292,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("projects explicit model and tool call identities", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -333,7 +333,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("paginates finite history and resumes an empty tail", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:pages",
@@ -355,7 +355,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("returns identical pages for duplicate replay reads", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const root = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:duplicate-replay",
@@ -369,7 +369,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("atomically places a concurrent append in the checkpoint or its replay tail", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -406,7 +406,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("rejects malformed, wrong-root, future, and invalid-limit cursors", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const first = yield* runtime.send({
         to: assistantAddress,
         sessionId: "tree:cursor:first",
@@ -464,7 +464,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("resumes the live stream strictly after a tree cursor", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -504,7 +504,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("hands a checkpoint to live changes without a snapshot gap", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -539,7 +539,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("settles a root-blocked watch on an open approval wait at the root", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -623,7 +623,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("keeps a root-blocked watch open when the root completes before its child", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -662,7 +662,7 @@ layer(objectLayer)("RunTree", (it) => {
 
   it.effect("requires an explicit open wait and an equal cursor before a root-blocked watch settles", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const root = yield* runtime.send({
         to: assistantAddress,
@@ -737,7 +737,7 @@ layer(objectLayer)("RunTree", (it) => {
       ]
       const reads = yield* Ref.make(0)
       const inspects = yield* Ref.make(0)
-      const scripted: Runtime.Service = {
+      const scripted: Service = {
         ...runtime,
         treeChanges: () =>
           Stream.concat(
@@ -755,7 +755,7 @@ layer(objectLayer)("RunTree", (it) => {
       }
       const watching = yield* RunTree.watch({ rootRunId: root.runId, settlement: "root-blocked" }).pipe(
         Stream.runCollect,
-        Effect.provideService(Runtime.Runtime, scripted),
+        Effect.provideService(Runtime, scripted),
         Effect.forkChild({ startImmediately: true }),
       )
       yield* TestClock.adjust("3 millis")

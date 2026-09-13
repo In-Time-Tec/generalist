@@ -1,6 +1,6 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import type { ExecutableRef } from "../../../src/runtime/executable/manifest.js"
 import { assistantAddress, assistantRef, resolverLayer, registrationsFor, textPrompt } from "../execution/fixtures.js"
@@ -38,7 +38,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     const crashAfterStart = yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -94,7 +94,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     const crashAfterObserve = yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -150,7 +150,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     const committed = yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,
@@ -210,7 +210,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
     yield* withObject(storage)(
       Effect.gen(function* () {
         const driver = yield* RunStore
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const duplicate = yield* runtime.send({
           to: assistantAddress,
           sessionId: "session:tracer:commit",
@@ -240,7 +240,7 @@ it.live("phase-0 tracer: non-idempotent counter with crash boundaries", () =>
 
     yield* withObject(storage)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const driver = yield* RunStore
         const receipt = yield* runtime.send({
           to: assistantAddress,

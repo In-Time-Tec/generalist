@@ -236,8 +236,10 @@ export const cancel: {
       )
       next = requested
     }
-    if (!terminal) next = markOperationCancellations(next, run.runId)
-    if (!terminal) next = yield* reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
+    if (!terminal) {
+      next = markOperationCancellations(next, run.runId)
+      next = yield* reconcileProgramCancellation(next, run.runId, input.reason ?? run.cancelReason)
+    }
     next = yield* cancelDescendants(next, run, input.reason)
     if (cancellationStopsBeforeFinalize(run, terminal)) return next
     const current = next.runs.get(run.runId)

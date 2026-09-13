@@ -1,6 +1,5 @@
 import { Effect } from "effect"
 import type { JournalReader } from "../../trajectory/index.js"
-import type { DagRuntime } from "../../unstable/rl-export/index.js"
 import {
   RewardConflict,
   RewardRunNotFound,
@@ -8,14 +7,19 @@ import {
   RewardStorageFailed,
   type RewardWriteError,
   type RewardWriter,
-} from "../../unstable/rl-export/reward-writer.js"
+  type ExportRuntime,
+} from "./writer.js"
 import type { RuntimeLifecycleService } from "../state/layer.js"
 import type { Service as RunStore } from "../run/store.js"
+import type { Service as ApplicationRuntime } from "../application.js"
+import type { Service as EngineRuntime } from "../engine.js"
 
-const bindings = new WeakMap<object, DagRuntime>()
+type RuntimeOwner = ApplicationRuntime | EngineRuntime
+
+const bindings = new WeakMap<RuntimeOwner, ExportRuntime>()
 
 export const bind = (input: {
-  readonly runtime: object
+  readonly runtime: RuntimeOwner
   readonly journal: JournalReader
   readonly store: RunStore
   readonly lifecycle: RuntimeLifecycleService
@@ -62,26 +66,27 @@ export const bind = (input: {
                           message: "Canonical reward-command provenance could not be read",
                         }),
                   ),
-                  Effect.flatMap((existing): Effect.Effect<never, RewardConflict | RewardRuntimeUnavailable> =>
-                    existing === undefined
-                      ? Effect.fail(
-                          RewardRuntimeUnavailable.make({
-                            commandId: command.commandId,
-                            message: "Canonical reward-command provenance is unavailable",
-                          }),
-                        )
-                      : Effect.fail(
-                          RewardConflict.make({
-                            commandId: command.commandId,
-                            existing,
-                            received: {
-                              runId: command.runId,
-                              leaf: command.leaf,
-                              value: command.value,
-                              source: command.source,
-                            },
-                          }),
-                        ),
+                  Effect.flatMap(
+                    (existing): Effect.Effect<never, RewardConflict | RewardRuntimeUnavailable> =>
+                      existing === undefined
+                        ? Effect.fail(
+                            RewardRuntimeUnavailable.make({
+                              commandId: command.commandId,
+                              message: "Canonical reward-command provenance is unavailable",
+                            }),
+                          )
+                        : Effect.fail(
+                            RewardConflict.make({
+                              commandId: command.commandId,
+                              existing,
+                              received: {
+                                runId: command.runId,
+                                leaf: command.leaf,
+                                value: command.value,
+                                source: command.source,
+                              },
+                            }),
+                          ),
                   ),
                 )
               }
@@ -116,9 +121,12 @@ export const bind = (input: {
   )
 }
 
-export const get = (runtime: object): DagRuntime | undefined => bindings.get(runtime)
+export const get = (runtime: RuntimeOwner): ExportRuntime | undefined => bindings.get(runtime)
 
-export const copy = <Runtime extends object>(input: { readonly source: object; readonly target: Runtime }): Runtime => {
+export const copy = <Runtime extends RuntimeOwner>(input: {
+  readonly source: RuntimeOwner
+  readonly target: Runtime
+}): Runtime => {
   const capability = bindings.get(input.source)
   if (capability !== undefined) bindings.set(input.target, capability)
   return input.target

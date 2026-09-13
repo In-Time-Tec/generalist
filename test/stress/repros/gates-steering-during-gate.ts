@@ -19,7 +19,10 @@ import { BunCrypto, BunFileSystem, BunPath } from "@effect/platform-bun"
 import { Cause, Config, Console, Deferred, Effect, Exit, Fiber, FileSystem, Layer, Option, Schema } from "effect"
 import type { LanguageModel } from "effect/unstable/ai"
 import { Agent, Gate } from "generalist"
-import { ExecutableResolver, RunExecutor, RunStore, Runtime } from "generalist/runtime"
+import { ExecutableResolver } from "generalist/runtime"
+import { Runtime } from "../../../packages/generalist/src/runtime/engine.js"
+import { RunExecutor } from "../../../packages/generalist/src/runtime/execution/run-executor.js"
+import { RunStore } from "../../../packages/generalist/src/runtime/run/store.js"
 import { activate, layer as runtimeLayer } from "generalist/durability"
 import { layer as fsLayer } from "generalist/durability/fs"
 import { TestModel } from "generalist/testing"
@@ -82,9 +85,9 @@ const scenario = (runIndex: number) =>
     const workerId = `repro-worker-${runIndex}`
     const app = makeApp(root, workerId, fixture.layer)
     return yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
-      const store = yield* RunStore.RunStore
-      const executor = yield* RunExecutor.RunExecutor
+      const runtime = yield* Runtime
+      const store = yield* RunStore
+      const executor = yield* RunExecutor
       yield* runtime.register(agent)
       const handle = yield* runtime.start(agent, "start")
       const claim = yield* store.claimExecution({

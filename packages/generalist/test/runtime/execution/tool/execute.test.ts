@@ -1,3 +1,4 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
 import { Tool } from "effect/unstable/ai"
@@ -10,7 +11,6 @@ import {
   type ToolResolution,
   layerStatic,
 } from "../../../../src/runtime/executable/resolver.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../object.js"
@@ -49,7 +49,7 @@ const fixture = (executor: Executor, authorizer?: ToolResolution["authorizer"]) 
   return () => objectRuntimeLayer({ addresses: [] }, storage).pipe(Layer.provide(layerStatic([resolution])))
 }
 const start = (commandId: string) =>
-  Runtime.Runtime.use((runtime) =>
+  Runtime.use((runtime) =>
     runtime.startExecution({
       executable,
       registrations,
@@ -84,7 +84,7 @@ it.effect("retains a ToolWait across fresh hosts without redispatching a never-r
       return receipt.runId
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       yield* runtime.respond({
         runId,
         waitId: "checks-wait",
@@ -129,7 +129,7 @@ it.effect("recovers an interrupted unknown Tool only after an authoritative oper
       return { runId: receipt.runId, operationId: operation.operationId }
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       yield* execute(identity.runId, "recover")
       expect((yield* runtime.inspect(identity.runId)).status).toBe("needs-resolution")
       expect(calls).toBe(0)
@@ -222,7 +222,7 @@ it.effect("retains approval across fresh hosts and runs only after the exact app
       return receipt.runId
     }).pipe((effect) => provideScoped(fresh(), effect))
     yield* Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       expect((yield* runtime.inspect(runId)).waits[0]).toMatchObject({ reason: { _tag: "Approval" } })
       yield* runtime.respondApproval({
         runId,
@@ -260,7 +260,7 @@ it.effect("persists progress and delivers semantic cancellation to the exact Too
     })
     yield* Effect.gen(function* () {
       const receipt = yield* start("cancel-running")
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const host = yield* RunExecutor
       const fiber = yield* execute(receipt.runId, "cancel-start").pipe(Effect.forkChild)

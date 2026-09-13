@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.66.0
+
+- Make scoped Runtime acquisition own readiness, admission fencing, replacement recovery, and retirement across process and actor hosts.
+- Add execution-scoped capability services, declarative Code Mode registration, durable child placement, and bounded public Runtime projections.
+- Internalize context, memory provenance, handoff, reward, and Artifact ownership behind their responsible Runtime and Host boundaries.
+- Preserve exact storage-issued execution claims through Agent tools, checkpoint recovery, and compaction recovery so resumed work cannot synthesize authority.
+- Repair durable admission accounting, fallible Agent closure environments, fixed account-auth protocol ownership, and public Skill and learning contracts.
+
 ## 0.65.8
 
 - Reject wait responses whose kind does not match the wait reason with typed `ResponseKindMismatch`, leaving the wait open for repair (#502).

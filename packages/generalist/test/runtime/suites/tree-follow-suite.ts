@@ -1,9 +1,9 @@
+import { Runtime, type Service } from "../../../src/runtime/engine.js"
 import { expect, it as testIt, layer } from "@effect/vitest"
 import { provideScoped } from "../execution/scoped-provide.js"
 import { Deferred, Effect, Fiber, Layer, Ref, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { RunTree } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import {
   assistantAddress,
@@ -18,7 +18,7 @@ import { make as makeSimulator } from "../../../src/testing/durability/index.js"
 
 const startRoot = (sessionId: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     return yield* runtime.send({
       to: assistantAddress,
       sessionId,
@@ -29,7 +29,7 @@ const startRoot = (sessionId: string) =>
 
 const immediateDescendantDelivery = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const root = yield* startRoot("tree-follow:immediate")
     const child = yield* runtime.spawn({
       parentRunId: root.runId,
@@ -61,7 +61,7 @@ const immediateDescendantDelivery = () =>
 
 const subscribeBeforeReplayRace = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const root = yield* startRoot("tree-follow:subscribe-before-replay")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
@@ -70,7 +70,7 @@ const subscribeBeforeReplayRace = () =>
       runId: root.runId,
       ownerId: objectWorkerId,
     })
-    const scripted: Runtime.Service = {
+    const scripted: Service = {
       ...runtime,
       treeChanges: (rootRunId) =>
         runtime.treeChanges(rootRunId).pipe(
@@ -91,7 +91,7 @@ const subscribeBeforeReplayRace = () =>
         Stream.filter(({ event }) => event._tag === "TurnStarted"),
         Stream.take(1),
         Stream.runCollect,
-        Effect.provideService(Runtime.Runtime, scripted),
+        Effect.provideService(Runtime, scripted),
       ),
     )
     expect(delivered.map(({ event }) => (event._tag === "TurnStarted" ? event.turn : undefined))).toEqual([11])
@@ -113,12 +113,12 @@ const followCursorValidation = () =>
 
 const missedWakeRecovery = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const root = yield* startRoot("tree-follow:recovery")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const initialRead = yield* Deferred.make<void>()
-    const scripted: Runtime.Service = {
+    const scripted: Service = {
       ...runtime,
       treeChanges: () => Stream.succeed(undefined),
       treeCheckpoint: (rootRunId) =>
@@ -128,7 +128,7 @@ const missedWakeRecovery = () =>
       Stream.filter(({ event }) => event._tag === "TurnStarted"),
       Stream.take(1),
       Stream.runCollect,
-      Effect.provideService(Runtime.Runtime, scripted),
+      Effect.provideService(Runtime, scripted),
       Effect.forkChild({ startImmediately: true }),
     )
     yield* Deferred.await(initialRead)
@@ -151,7 +151,7 @@ const missedWakeRecovery = () =>
 
 const replayEquivalence = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const root = yield* startRoot("tree-follow:replay")
     const child = yield* runtime.spawn({
@@ -194,13 +194,13 @@ const replayEquivalence = () =>
 
 const boundedRecovery = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const root = yield* startRoot("tree-follow:bounded")
     const replay = yield* RunTree.replay({ rootRunId: root.runId, limit: 100 })
     const reads = yield* Ref.make(0)
     const limits = yield* Ref.make<ReadonlyArray<number>>([])
     const initialRead = yield* Deferred.make<void>()
-    const scripted: Runtime.Service = {
+    const scripted: Service = {
       ...runtime,
       treeChanges: () => Stream.succeed(undefined),
       treeReplay: (input) =>
@@ -213,7 +213,7 @@ const boundedRecovery = () =>
     }
     const following = yield* RunTree.watch({ rootRunId: root.runId, cursor: replay.cursor }).pipe(
       Stream.runDrain,
-      Effect.provideService(Runtime.Runtime, scripted),
+      Effect.provideService(Runtime, scripted),
       Effect.forkChild({ startImmediately: true }),
     )
     yield* Deferred.await(initialRead)

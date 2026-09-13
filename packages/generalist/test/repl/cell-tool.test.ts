@@ -1,3 +1,4 @@
+import { Runtime as RuntimeRuntime } from "../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import "./suites/bun-cell-isolation-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
@@ -8,7 +9,6 @@ import { Agent } from "../../src/index.js"
 import { bindInheritance } from "../../src/core/tools/tool-context/internal.js"
 import { Cell, CellTool, KernelPool, KernelProfile, KernelSnapshotStore, TestKernel } from "../../src/repl/index"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
@@ -475,7 +475,7 @@ standalone.live("journals a Sandbox snapshot and continues a reopened memory Run
           Layer.provide(firstResolver),
         ),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           const store = yield* RunStore
           const host = yield* RunExecutor
           const recoverySessionId = "session:sandbox-snapshot-recovery"

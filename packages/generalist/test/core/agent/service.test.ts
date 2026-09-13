@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../runtime/execution/object.js"
 import { layerMemory } from "../../../src/core/context/session-memory.js"
 import { expect, layer } from "@effect/vitest"
@@ -58,7 +59,6 @@ import { withProviderFinish, withProviderFinishContent } from "../provider-finis
 import { layerModel as deterministicModel } from "../../../src/ai/provider/deterministic"
 import { layerTest as modelCatalogLayerTest } from "../../../src/ai/model-catalog"
 import { ExecutableResolver } from "../../../src/runtime/index"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { pinnedTestExecutable } from "../../runtime/run/identity"
@@ -560,7 +560,7 @@ const typedStartRuntime = objectRuntimeLayer({ addresses: [], schedulerMode: "po
 layer(typedStartRuntime)("Agent.start", (it) => {
   it.effect("starts a registered Agent and decodes its durable completion", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const model = yield* Layer.build(deterministicModel({ response: '{"output":{"answer":42}}' }))
       yield* runtime.register(typedStartAgent).pipe(Effect.provideContext(model))
       const handle = yield* Agent.start(
@@ -591,7 +591,7 @@ layer(typedStartRuntime)("Agent.start", (it) => {
 
   it.effect("preserves a valid null durable output instead of falling back to text", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const model = yield* Layer.build(deterministicModel({ response: '{"output":null}' }))
       yield* runtime.register(nullStartAgent).pipe(Effect.provideContext(model))
       const handle = yield* Agent.start(nullStartAgent, "answer", {

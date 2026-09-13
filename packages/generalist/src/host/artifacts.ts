@@ -1,4 +1,4 @@
-import { Effect, Option, Stream } from "effect"
+import { Context, Effect, Option, Stream } from "effect"
 import {
   ArtifactNotFound,
   type ArtifactError,
@@ -8,8 +8,15 @@ import {
   type ReadResult,
   type Version,
 } from "../core/artifact.js"
-import { get as getArtifact } from "../unstable/artifact/registry.js"
-import type { Service as ArtifactService } from "../unstable/artifact/service.js"
+
+interface ArtifactService {
+  readonly get: (name: string) => Effect.Effect<import("../core/artifact.js").RegisteredArtifact, ArtifactError>
+}
+
+/** Internal view of the optional Artifact capability used by the stable Host facade. */
+export class ArtifactCapability extends Context.Service<ArtifactCapability, ArtifactService>()(
+  "generalist/host/artifacts/ArtifactCapability",
+) {}
 
 export interface Artifacts {
   readonly read: (name: string) => Effect.Effect<ReadResult, ArtifactError>
@@ -21,7 +28,7 @@ export interface Artifacts {
 }
 
 const get = (artifacts: Option.Option<ArtifactService>, name: string) =>
-  Option.isNone(artifacts) ? Effect.fail(ArtifactNotFound.make({ artifact: name })) : getArtifact(artifacts.value, name)
+  Option.isNone(artifacts) ? Effect.fail(ArtifactNotFound.make({ artifact: name })) : artifacts.value.get(name)
 
 export const make = (artifacts: Option.Option<ArtifactService>): Artifacts => ({
   read: (name) => get(artifacts, name).pipe(Effect.flatMap((artifact) => artifact.read)),

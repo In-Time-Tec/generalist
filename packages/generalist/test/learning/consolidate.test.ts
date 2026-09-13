@@ -1,3 +1,4 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Context, Effect, Layer, Schema, Stream } from "effect"
@@ -7,7 +8,6 @@ import { Agent, Approvals, Memory, Permissions } from "../../src/index.js"
 import { activate } from "../../src/durability/index.js"
 import { SemanticRecall, VectorStore } from "../../src/memory/index.js"
 import { ExecutableResolver, Run } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore, type Service as RunStoreService } from "../../src/runtime/run/store.js"
 import { RunExecutor, type Service as RunExecutorService } from "../../src/runtime/execution/run-executor.js"
 import { LocalScheduler } from "../../src/runtime/execution/local-scheduler.js"
@@ -87,7 +87,7 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
   provideScoped(
     runtimeLayer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const scheduler = yield* LocalScheduler
@@ -169,7 +169,7 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
         budget: { tokens: 100 },
       })
       const dependencies = Layer.mergeAll(
-        Layer.succeed(Runtime.Runtime, runtime),
+        Layer.succeed(Runtime, runtime),
         memoryLayer,
         fixture.registryLayer,
         approvalLayer,
@@ -224,13 +224,13 @@ it.effect("runs once per UTC day with its own budget", () =>
   provideScoped(
     runtimeLayer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const scheduler = yield* LocalScheduler
       const memoryContext = yield* Layer.build(semanticMemory)
       const memory = Context.get(memoryContext, Memory.Memory)
       const fixture = yield* TestModel.make([TestModel.text("must not run")], { model: "budgeted-consolidation" })
       const dependencies = Layer.mergeAll(
-        Layer.succeed(Runtime.Runtime, runtime),
+        Layer.succeed(Runtime, runtime),
         Layer.succeed(Memory.Memory, memory),
         fixture.registryLayer,
         Approvals.layerAutoApprove,

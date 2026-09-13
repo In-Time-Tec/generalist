@@ -1,3 +1,4 @@
+import { Runtime as RuntimeRuntime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, makeObjectStorage } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Queue, Stream } from "effect"
@@ -5,7 +6,6 @@ import { TestClock } from "effect/testing"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent } from "generalist"
 import { ExecutableResolver } from "generalist/runtime"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import { DurabilityFailure } from "../../../../src/durability/errors.js"
@@ -83,7 +83,7 @@ it.effect("does not persist empty automatic schedule claims while idle or before
     yield* provideScoped(
       layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const scheduler = yield* LocalScheduler
         const activatedWrites = writes
         for (let index = 0; index < 16; index++) yield* scheduler.tick
@@ -109,7 +109,7 @@ it.effect("reconciles an attempted claim after its retained lease moves the next
     yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const store = yield* RunStore
         yield* runtime.register(agent)
         yield* runtime.schedule(agent, "retained claim", {
@@ -159,7 +159,7 @@ it.effect("fires fixed UTC recurrences from the Runtime-scoped scheduler under T
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const scheduler = yield* LocalScheduler
         yield* runtime.register(agent)
         const receipt = yield* runtime.schedule(agent, "run", {
@@ -188,7 +188,7 @@ it.effect("registers a stable schedule idempotently", () =>
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         yield* runtime.register(agent)
         const options = {
           rrule: "FREQ=SECONDLY",
@@ -222,7 +222,7 @@ it.effect("re-registers a stable schedule id on a fresh host after wall-clock ti
     const first = yield* provideScoped(
       Layer.merge(hostLayer("stable-restart-a"), unusedModel),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         yield* runtime.register(agent)
         return yield* runtime.schedule(agent, "run", options)
       }),
@@ -235,7 +235,7 @@ it.effect("re-registers a stable schedule id on a fresh host after wall-clock ti
     const retry = yield* provideScoped(
       Layer.merge(hostLayer("stable-restart-b"), unusedModel),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         yield* runtime.register(agent)
         const reregistered = yield* runtime.schedule(agent, "run", options)
         const changedRule = yield* runtime
@@ -264,7 +264,7 @@ it.effect("rejects recurrence rules outside the documented interval subset", () 
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         yield* runtime.register(agent)
         const failure = yield* runtime
           .schedule(agent, "run", { rrule: "FREQ=WEEKLY;BYDAY=MO", sessionId: "invalid-schedule" })
@@ -281,7 +281,7 @@ it.effect("rejects intervals whose first instant leaves the representable DateTi
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         yield* runtime.register(agent)
         const overflowRules = [
           "FREQ=SECONDLY;INTERVAL=9007199254740991",
@@ -329,7 +329,7 @@ it.effect("fails typed when a stored recurrence cannot advance past the represen
     return yield* provideScoped(
       state.layer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* RuntimeRuntime
         const scheduler = yield* LocalScheduler
         const store = yield* RunStore
         yield* runtime.register(agent)

@@ -1,10 +1,10 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Pins } from "../../../../src/index.js"
 import { ProgramReplayDivergence } from "../../../../src/core/program/capabilities.js"
 import { DurabilityFailure } from "../../../../src/durability/errors.js"
 import { ApprovalMismatch, OperationResolutionConflict } from "../../../../src/runtime/errors.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import type { ReserveProgramOperationInput } from "../../../../src/runtime/program/store.js"
@@ -21,7 +21,7 @@ const options = {
 
 const claimProgram = (label: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: programAddress,
@@ -42,7 +42,7 @@ layer(objectRuntimeLayer(options).pipe(Layer.provide(fixture.resolverLayer)))(
   (it) => {
     it.effect("distinguishes explicit resolution receipt conflicts from a new domain resolution", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const claim = yield* claimProgram("resolution")
         yield* store.reserveProgramOperation({
@@ -94,7 +94,7 @@ layer(objectRuntimeLayer(options).pipe(Layer.provide(fixture.resolverLayer)))(
 
     it.effect("preserves immutable receipts while classifying only retained reservation divergence", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const claim = yield* claimProgram("reservation")
         const request: ReserveProgramOperationInput = {
@@ -171,7 +171,7 @@ layer(objectRuntimeLayer(options).pipe(Layer.provide(approvalFixture.resolverLay
   (it) => {
     it.effect("maps a changed settled decision but preserves metadata-only protocol conflicts", () =>
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const claim = yield* claimProgram("approval")
         yield* host.execute(claim)

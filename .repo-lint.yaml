@@ -35,6 +35,13 @@ rules:
         - "packages/generalist/test/trajectory/export.test.ts"
         # Capability recovery acceptance spans the unstable facade, Agent inheritance, and hosted Runtime journal
         - "packages/generalist/test/unstable/capability/runtime.test.ts"
+        # Runtime acceptance spans declaration lowering, execution-scoped services, and durable state transitions
+        - "packages/generalist/test/runtime/code-mode-declaration.test.ts"
+        - "packages/generalist/test/runtime/code-mode-registration.test.ts"
+        - "packages/generalist/test/runtime/composition-execution-services.test.ts"
+        - "packages/generalist/test/runtime/child/scoped-cancellation.test.ts"
+        # Reward recording spans the unstable RL facade, Runtime lifecycle, journal, and durable store
+        - "packages/generalist/test/trajectory/reward-writer.test.ts"
     - source: "packages/*/test/**/*.tui.test.ts"
       target: "packages/*/src/**/*.ts"
       pattern: "*.tui.test.ts -> *.ts"
@@ -92,6 +99,13 @@ rules:
       maxDirectories: 12
       exclude:
         - "packages/generalist/src/unstable"
+        - "packages/generalist/src/runtime"
+    # Runtime exposes several independent durable ownership domains directly; nesting them would obscure authority.
+    - pattern: "packages/generalist/src/runtime"
+      case: kebab
+      childCase: kebab
+      maxFiles: 16
+      maxDirectories: 15
     # Every publicly unstable leaf is its own directory; artifact and capability took it past the default cap.
     - pattern: "packages/generalist/src/unstable"
       case: kebab
@@ -103,6 +117,14 @@ rules:
       childCase: kebab
       maxFiles: 12
       maxDirectories: 12
+      exclude:
+        - "packages/generalist/src/runtime/execution"
+    # Execution keeps its public scheduler, inspection, recovery, and attempt boundaries together.
+    - pattern: "packages/generalist/src/runtime/execution"
+      case: kebab
+      childCase: kebab
+      maxFiles: 13
+      maxDirectories: 12
     - pattern: "packages/*/test"
       childCase: kebab
       maxFiles: 12
@@ -112,6 +134,14 @@ rules:
       case: kebab
       childCase: kebab
       maxFiles: 12
+      maxDirectories: 12
+      exclude:
+        - "packages/generalist/test/runtime"
+    # Runtime's cross-module acceptance files intentionally mirror public ownership boundaries, not one source file.
+    - pattern: "packages/generalist/test/runtime"
+      case: kebab
+      childCase: kebab
+      maxFiles: 14
       maxDirectories: 12
     - pattern: "packages/*/test/*/**"
       case: kebab

@@ -2,7 +2,9 @@ import { BunCrypto } from "@effect/platform-bun"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 import { activate, layer as layerDurability } from "generalist/durability"
-import { AgentDirectory, LocalScheduler, Runtime } from "generalist/runtime"
+import { AgentDirectory } from "generalist/runtime"
+import { LocalScheduler } from "../../../packages/generalist/src/runtime/execution/local-scheduler.js"
+import { Runtime } from "../../../packages/generalist/src/runtime/engine.js"
 import { layer as layerSimulator, make as makeSimulator, type Client } from "generalist/testing/durability"
 import { key, make as makeCodingAgentActor, namespaceFromActorKey } from "../src/actor.js"
 import { make as makeCommand, treePolicy } from "../src/command.js"
@@ -35,7 +37,7 @@ const runtimeLayer = (client: Client, active: boolean) => {
 }
 
 const drain = Effect.gen(function* () {
-  const scheduler = yield* LocalScheduler.LocalScheduler
+  const scheduler = yield* LocalScheduler
   for (let pass = 0; pass < 16; pass++) {
     const result = yield* scheduler.drain({ fuel: 32 })
     if (!result.hasMore) return
@@ -66,9 +68,7 @@ it.effect("recovers a registered parent, bounded child Sessions, and family mess
     const command = makeCommand(config)
     const admitted = yield* Effect.scoped(
       Layer.build(runtimeLayer(simulator, false)).pipe(
-        Effect.flatMap((context) =>
-          Runtime.Runtime.use((runtime) => runtime.send(command)).pipe(Effect.provide(context)),
-        ),
+        Effect.flatMap((context) => Runtime.use((runtime) => runtime.send(command)).pipe(Effect.provide(context))),
       ),
     )
 
@@ -77,8 +77,8 @@ it.effect("recovers a registered parent, bounded child Sessions, and family mess
       Layer.build(runtimeLayer(reopenedClient, true)).pipe(
         Effect.flatMap((context) =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
+            const runtime = yield* Runtime
+            const scheduler = yield* LocalScheduler
             let waiting = yield* runtime.inspect(admitted.runId)
             for (let pass = 0; pass < 4 && waiting.children.length === 0; pass++) {
               yield* scheduler.drain({ fuel: 1 })
@@ -170,7 +170,7 @@ it.effect("recovers a registered parent, bounded child Sessions, and family mess
       Layer.build(runtimeLayer(finalClient, false)).pipe(
         Effect.flatMap((context) =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const receipt = yield* runtime.send(command)
             const inspection = yield* runtime.inspect(receipt.runId)
             return { receipt, inspection }

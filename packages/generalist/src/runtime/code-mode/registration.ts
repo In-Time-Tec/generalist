@@ -335,7 +335,8 @@ export const bind = (input: {
                                 },
                               }),
                             ),
-                          onSuccess: (encoded) => Effect.fail(ProgramInvocationFailure.make({ cause: encoded })),
+                          onSuccess: (encodedFailure) =>
+                            Effect.fail(ProgramInvocationFailure.make({ cause: encodedFailure })),
                         }),
                       ),
                     ),

@@ -1,7 +1,7 @@
+import { Runtime } from "../../../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Clock, DateTime, Effect } from "effect"
 import { TestClock } from "effect/testing"
-import * as Runtime from "../../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { digest } from "../../../../../src/runtime/run/steering.js"
 import { assistantAddress, completedResult, objectLayer, suspension, textPrompt } from "../../../execution/fixtures.js"
@@ -10,7 +10,7 @@ import { objectWorkerId } from "../../../execution/object.js"
 let fixtureId = 0
 const setup = Effect.gen(function* () {
   const fixtureKey = String(fixtureId++)
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* Runtime
   const store = yield* RunStore
   const parent = yield* runtime.send({
     to: assistantAddress,

@@ -1,7 +1,7 @@
+import { Runtime } from "../../../../../src/runtime/engine.js"
 import { expect, layer } from "@effect/vitest"
 import { Effect, Layer, pipe, Ref } from "effect"
 import { Errors, ExecutableResolver } from "../../../../../src/runtime/index.js"
-import * as Runtime from "../../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../../src/runtime/run/store.js"
 import {
   alternateAssistant,
@@ -62,7 +62,7 @@ layer(
 )("attests an addressed binding before object admission", (it) => {
   it.effect("attests before object admission", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const receipt = yield* runtime.send(input)
       expect(receipt.duplicate).toBe(false)
       expect(yield* Ref.get(objectAdmissions)).toBe(1)
@@ -82,7 +82,7 @@ layer(
   it.effect("rejects invalid registrations", () =>
     Effect.gen(function* () {
       const store = yield* RunStore
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const error = yield* runtime.send(input).pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ExecutableRegistrationInvalid)
       expect(yield* store.list({ limit: 10 })).toHaveLength(0)
@@ -96,7 +96,7 @@ layer(objectLayerFor([{ address: assistantAddress, executable: assistantRef, reg
     it.effect("rejects missing registrations", () =>
       Effect.gen(function* () {
         const store = yield* RunStore
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const error = yield* runtime.send(input).pipe(Effect.flip)
         expect(error).toBeInstanceOf(Errors.ExecutableRegistrationMissing)
         expect(yield* store.list({ limit: 10 })).toHaveLength(0)
@@ -119,7 +119,7 @@ layer(
   it.effect("rejects an unsupported binding", () =>
     Effect.gen(function* () {
       const store = yield* RunStore
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const error = yield* runtime.send(input).pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ExecutablePinMissing)
       expect(yield* store.list({ limit: 10 })).toHaveLength(0)
@@ -145,7 +145,7 @@ layer(
   it.effect("rejects an identity mismatch", () =>
     Effect.gen(function* () {
       const store = yield* RunStore
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const error = yield* runtime.send(input).pipe(Effect.flip)
       expect(error).toBeInstanceOf(Errors.ExecutableIdentityMismatch)
       expect(yield* store.list({ limit: 10 })).toHaveLength(0)

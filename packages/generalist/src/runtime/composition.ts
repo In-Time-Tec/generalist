@@ -130,7 +130,7 @@ export interface Options<
 > {
   readonly agents: Agents
   readonly revision: string
-  readonly services: Layer.Layer<AgentServices<Agents[keyof Agents]>, ServiceError, ServiceRequirements>
+  readonly services: Layer.Layer<AgentServices<NoInfer<Agents[keyof Agents]>>, ServiceError, ServiceRequirements>
   readonly storage: Layer.Layer<ObjectStore | Crypto.Crypto, StorageError, StorageRequirements>
   readonly namespace: Namespace
   readonly scheduler?: {
@@ -748,9 +748,7 @@ const make = (options: AnyOptions) =>
         : Context.merge(storage, Context.make(ExecutableResolver, resolver)).pipe(
             Context.add(ExternalChildPeerRoutes, peerRoutes.value),
           )
-      const built = yield* Layer.build(inner).pipe(
-        Effect.provide(kernelServices),
-      )
+      const built = yield* Layer.build(inner).pipe(Effect.provide(kernelServices))
       const runtime = Context.get(built, EngineRuntime)
       const declared = Object.values(options.agents)
       const mergedServices = Context.merge(environment, services)

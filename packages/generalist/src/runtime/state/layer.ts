@@ -23,7 +23,7 @@ import {
 import type { ObjectStore } from "../../durability/object-store.js"
 import { ExternalChildStore } from "../child/external/store.js"
 import { ExternalChildPeerRoutes, reconcilePage } from "../child/external/reconciliation.js"
-import { bind as bindExternalChildRuntime } from "../child/external/runtime.js"
+import { bind as bindExternalChildRuntime } from "../child/external/binding.js"
 import { DurabilityFailure } from "../../durability/errors.js"
 import { ScheduleInvalid } from "../execution/trigger/schedule.js"
 import { RuntimeOwnershipLost, RuntimeRetired, RuntimeUnavailable, type RuntimeAvailabilityError } from "../errors.js"
@@ -193,11 +193,10 @@ export const layer = (
                   connect: routes.connect,
                 }).pipe(
                   Effect.provideService(ExternalChildStore, externalChildStore),
-                  Effect.mapError(
-                    (error): DurabilityFailure | RuntimeUnavailable =>
-                      Schema.is(DurabilityFailure)(error) || Schema.is(RuntimeUnavailable)(error)
-                        ? error
-                        : RuntimeUnavailable.make({ message: "External child reconciliation failed" }),
+                  Effect.mapError((error): DurabilityFailure | RuntimeUnavailable =>
+                    Schema.is(DurabilityFailure)(error) || Schema.is(RuntimeUnavailable)(error)
+                      ? error
+                      : RuntimeUnavailable.make({ message: "External child reconciliation failed" }),
                   ),
                   Effect.map((result) => {
                     placementCursor = result.placementCursor
@@ -220,19 +219,18 @@ export const layer = (
               termination,
             )
           let triggersFirst = false
+          const allocateExternalFuel = (fuel: number): number => {
+            if (Option.isNone(peerRoutes)) return 0
+            if (fuel >= 3) return Math.max(1, Math.floor(fuel / 3))
+            return externalFirst ? 0 : 1
+          }
           const drain: SchedulerService["drain"] = ({ fuel = 64 } = {}) => {
             if (!Number.isSafeInteger(fuel) || fuel <= 0) {
               return RuntimeUnavailable.make({ message: "scheduler fuel must be a positive safe integer" })
             }
             triggersFirst = !triggersFirst
             externalFirst = !externalFirst
-            const externalFuel = Option.isNone(peerRoutes)
-              ? 0
-              : fuel >= 3
-                ? Math.max(1, Math.floor(fuel / 3))
-                : externalFirst
-                  ? 0
-                  : 1
+            const externalFuel = allocateExternalFuel(fuel)
             const internalFuel = fuel - externalFuel
             let triggerFuel = Math.ceil(internalFuel / 2)
             if (internalFuel === 1 && !triggersFirst) triggerFuel = 0
@@ -247,9 +245,7 @@ export const layer = (
                 const scheduled = yield* execute
                 yield* scheduler.idle
                 const reconciled =
-                  externalFuel === 0
-                    ? { processed: 0, hasMore: false }
-                    : yield* reconcileExternal(externalFuel)
+                  externalFuel === 0 ? { processed: 0, hasMore: false } : yield* reconcileExternal(externalFuel)
                 const nextDueAt = yield* ownership.nextDueAt
                 const now = yield* Clock.currentTimeMillis
                 const hasMore =

@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, type Scope } from "effect"
-import { ArtifactCrdt, type ArtifactError } from "../../core/artifact.js"
+import { ArtifactCrdt, type ArtifactError, type RegisteredArtifact } from "../../core/artifact.js"
 import type { Document } from "./document.js"
 
 /** Configuration for opening one shared text artifact. @experimental */
@@ -10,6 +10,8 @@ export interface OpenOptions<Error, Requirements> {
 
 /** Artifact operations supplied by one concrete Runtime and BlobStore pair. @experimental */
 export interface Service {
+  /** @internal Resolve an Artifact already opened in this process. */
+  readonly get: (name: string) => Effect.Effect<RegisteredArtifact, ArtifactError>
   readonly open: <Error, Requirements>(
     name: string,
     options: OpenOptions<Error, Requirements>,

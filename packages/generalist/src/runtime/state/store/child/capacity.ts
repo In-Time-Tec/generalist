@@ -425,17 +425,10 @@ export const readinessForAdmission: {
     activeChildCount(state, parent) < parent.treePolicy.concurrency.agents ? "ready" : "queued",
 )
 
-export const promoteChildCapacity: {
-  (parentRunId: string): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
-  (state: RuntimeState, parentRunId: string): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
-} = Function.dual(2, (state: RuntimeState, parentRunId: string) =>
+const promoteInternalChildren = (state: RuntimeState, parent: StoredRun, initialActive: number) =>
   Effect.gen(function* () {
-    const parent = state.runs.get(parentRunId)
-    if (parent === undefined || parent.cancellationRequested || parent.treePolicy.concurrency.agents === 0) {
-      return state
-    }
     let next = state
-    let active = activeChildCount(next, parent)
+    let active = initialActive
     for (const childRunId of familyRuns(next, parent.rootRunId)
       .filter((run) => run.parentRunId !== undefined)
       .map((run) => run.runId)) {
@@ -469,6 +462,13 @@ export const promoteChildCapacity: {
       next = promoted
       active++
     }
+    return [next, active] as const
+  })
+
+const promoteExternalChildren = (state: RuntimeState, parent: StoredRun, initialActive: number) =>
+  Effect.gen(function* () {
+    let next = state
+    let active = initialActive
     for (const placement of [...next.externalChildPlacements.values()].toSorted((left, right) =>
       left.placementId.localeCompare(right.placementId),
     )) {
@@ -494,6 +494,19 @@ export const promoteChildCapacity: {
       active++
     }
     return next
+  })
+
+export const promoteChildCapacity: {
+  (parentRunId: string): (state: RuntimeState) => Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+  (state: RuntimeState, parentRunId: string): Effect.Effect<RuntimeState, RuntimeUnavailable, PreparedObservation>
+} = Function.dual(2, (state: RuntimeState, parentRunId: string) =>
+  Effect.gen(function* () {
+    const parent = state.runs.get(parentRunId)
+    if (parent === undefined || parent.cancellationRequested || parent.treePolicy.concurrency.agents === 0) {
+      return state
+    }
+    const [next, active] = yield* promoteInternalChildren(state, parent, activeChildCount(state, parent))
+    return yield* promoteExternalChildren(next, parent, active)
   }),
 )
 

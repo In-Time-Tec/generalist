@@ -1,8 +1,8 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
 import { expect, it, layer } from "@effect/vitest"
 import { Effect, Fiber, Layer, Option, Random, Stream } from "effect"
 import { AgentDirectory, ChildSettlement, Errors } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import {
@@ -44,7 +44,7 @@ it("separates cancelled settlement observation from model delivery", () => {
 })
 
 const admit = Effect.gen(function* () {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* Runtime
   const parent = yield* runtime.send({
     to: assistantAddress,
     sessionId: `settlement:${yield* Random.nextInt}`,
@@ -337,7 +337,7 @@ layer(runtimeLayer)("object child settlement notifications", (suite) => {
         expect(notification!.resultText).toContain("the terminal event of child")
         expect(notification!.resultText).not.toContain("result-handoff adapter")
         expect(notification!.resultText).toContain(child.runId)
-        expect(notification!.resultText).not.toContain("Runtime.snapshot")
+        expect(notification!.resultText).not.toContain("snapshot")
         expect(notification!.resultText).not.toContain("x".repeat(1000))
       }),
   )
@@ -396,7 +396,7 @@ it.effect("object storage preserves exactly one notification across close and re
     )
     yield* scopedWith(object)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const notifications = yield* runtime.childSettlements({ parentRunId, limit: 10 })
         expect(notifications).toHaveLength(1)
         expect(notifications[0]).toMatchObject({ childRunId, resultText: "persisted" })
@@ -413,7 +413,7 @@ it.effect("object storage preserves exactly one notification across close and re
 layer(runtimeLayer)("object settlement observation", (suite) => {
   suite.effect("never binds a settled child into the parent Session's steering inbox", () =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const sessionId = `joined-settlement:${yield* Random.nextInt}`
       const parent = yield* runtime.send({

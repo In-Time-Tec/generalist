@@ -1,10 +1,10 @@
+import { Runtime, type Service } from "../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, Approvals, Permissions } from "../../src/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import {
@@ -96,7 +96,7 @@ const handlers = (apply: (proposal: Proposal) => Effect.Effect<void>): ApplyHand
 })
 
 const registration = (
-  runtime: Runtime.Service,
+  runtime: Service,
   approvals: Layer.Layer<Approvals.Approvals>,
   propose: Proposer["propose"],
   apply: ApplyHandlers,
@@ -105,9 +105,7 @@ const registration = (
     model,
     Permissions.layerAllowAll,
     approvals,
-    learningLayer({ propose, apply }).pipe(
-      Layer.provide(Layer.merge(Layer.succeed(Runtime.Runtime, runtime), approvals)),
-    ),
+    learningLayer({ propose, apply }).pipe(Layer.provide(Layer.merge(Layer.succeed(Runtime, runtime), approvals))),
   )
 
 it.effect("asks the configured model for Schema-decoded proposals", () =>
@@ -138,7 +136,7 @@ it.effect("journals and applies an approved proposal exactly once", () => {
   return provideScoped(
     runtimeLayer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const propose: Proposer["propose"] = (completed) =>
@@ -200,7 +198,7 @@ it.effect("journals a denied proposal reason without applying it", () => {
   return provideScoped(
     runtimeLayer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const propose: Proposer["propose"] = (completed) =>
@@ -266,7 +264,7 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
     const suspended = yield* provideScoped(
       beforeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         const propose: Proposer["propose"] = (completed) =>
@@ -312,7 +310,7 @@ it.live("recovers a pending proposal, approves it through the operator, and appl
     yield* provideScoped(
       afterLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         const propose: Proposer["propose"] = () =>

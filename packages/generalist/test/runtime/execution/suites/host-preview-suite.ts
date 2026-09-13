@@ -1,10 +1,10 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Ref, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ToolExecutor } from "../../../../src/index.js"
 import { Address, ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import type {
   Cleared as ModelPreviewCleared,
   Event as ModelPreviewEvent,
@@ -75,7 +75,7 @@ const execute = (input: {
 
     return yield* scopedWith(layer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -196,7 +196,7 @@ it.effect("keeps the claim-wide preview sink open across a tool continuation", (
 
     yield* scopedWith(layer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({
@@ -301,7 +301,7 @@ it.effect("retires the published frame when a response commits while keeping the
 
     yield* scopedWith(layer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const receipt = yield* runtime.send({

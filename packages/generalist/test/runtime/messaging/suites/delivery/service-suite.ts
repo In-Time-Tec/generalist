@@ -1,10 +1,10 @@
+import { Runtime } from "../../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../../execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest } from "../../../../../src/index.js"
 import { Address, ExecutableResolver } from "../../../../../src/runtime/index.js"
-import * as Runtime from "../../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../../src/runtime/execution/run-executor.js"
 import { registrationsFor, textPrompt } from "../../../execution/fixtures.js"
@@ -94,7 +94,7 @@ it.effect("delivers an addressed message at the next turn boundary without inter
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const target = yield* runtime.send({
@@ -175,7 +175,7 @@ it.effect("carries the authoritative sender into the delivered prompt", () =>
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const target = yield* runtime.send({
@@ -246,7 +246,7 @@ it.effect("holds a message for an idle target until its next execution drains it
     yield* provideScoped(
       runtimeLayer,
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const host = yield* RunExecutor
         const store = yield* RunStore
         const target = yield* runtime.send({

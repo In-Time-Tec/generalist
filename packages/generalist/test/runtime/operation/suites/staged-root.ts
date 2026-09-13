@@ -1,7 +1,7 @@
+import { Runtime, type StartExecutionInput } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { Errors } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { assistantRef, registrationsFor, textPrompt } from "../../execution/fixtures.js"
 import { objectWorkerId } from "../../execution/object.js"
@@ -9,13 +9,13 @@ import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface StagedRootSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
+  readonly storeLayer: Layer.Layer<Runtime | RunStore | Extra, StoreError>
   readonly skip?: boolean
 }
 
 export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSuiteOptions<StoreError, Extra>) => {
   const describeBackend = options.skip === true ? describe.skip : describe
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
   const input = (label: string) => ({
     runId: `run:staged:${options.name}:${label}`,
@@ -35,7 +35,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("holds an admitted root behind the execution gate until activation", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const receipt = yield* runtime.admit(input("gate"))
 
@@ -73,8 +73,8 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("admits exactly one root when a broader start value carries initial work", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const broaderStart: Runtime.StartExecutionInput = {
+          const runtime = yield* Runtime
+          const broaderStart: StartExecutionInput = {
             ...input("one-root"),
             initialChildren: [
               {
@@ -97,7 +97,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("recovers a lost receipt and keeps divergent and Run-ID conflicts typed", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const admittedInput = input("receipt")
           const first = yield* runtime.admit(admittedInput)
           expect(yield* runtime.admit(admittedInput)).toEqual(first)
@@ -128,7 +128,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("keeps a cancelled queued root terminal when activation arrives later", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const receipt = yield* runtime.admit(input("cancel-first"))
 
@@ -164,7 +164,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("applies ordinary cancellation after activation wins", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const receipt = yield* runtime.admit(input("activate-first"))
 
           expect(
@@ -192,7 +192,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("serializes concurrent duplicate activation to one attempt", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const receipt = yield* runtime.admit(input("concurrent-activation"))
           const activations = yield* Effect.all(
             Array.from({ length: 16 }, () =>
@@ -213,7 +213,7 @@ export const stagedRootSuite = <StoreError, Extra = never>(options: StagedRootSu
     it.live("preserves ordinary immediate Runtime.start behavior", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const startInput = input("ordinary-start")
           const first = yield* runtime.startExecution(startInput)
 

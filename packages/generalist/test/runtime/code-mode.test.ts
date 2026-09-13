@@ -1,3 +1,12 @@
+import {
+  type Parameters,
+  ProgramHandle,
+  make as makeCodeModeImplementation,
+  makeTool,
+} from "../../src/runtime/code-mode/internal.js"
+import { LocalScheduler } from "../../src/runtime/execution/local-scheduler.js"
+import { RunStore } from "../../src/runtime/run/store.js"
+import { Runtime as RuntimeRuntime } from "../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./execution/object.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Schema, Scope, Stream } from "effect"
@@ -13,10 +22,6 @@ import {
   CodeExecutor,
 } from "../../src/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
-import * as RunStore from "../../src/runtime/run/store.js"
-import * as LocalScheduler from "../../src/runtime/execution/local-scheduler.js"
-import * as CodeMode from "../../src/runtime/code-mode/internal.js"
 import { make as makeRunExecutor } from "../../src/runtime/execution/run-executor-internal.js"
 import { layer as activeExecutionsLayer } from "../../src/runtime/execution/active-executions.js"
 import { allowAllAuthorization } from "../authorization.js"
@@ -174,8 +179,8 @@ let codeModeFixtureId = 0
 const makeCodeMode = (authority: AgentManifest.ProgramAuthority) =>
   Effect.gen(function* () {
     codeModeFixtureId += 1
-    const runtime = yield* Runtime.Runtime
-    const store = yield* RunStore.RunStore
+    const runtime = yield* RuntimeRuntime
+    const store = yield* RunStore
     const runId = (yield* runtime.startExecution({
       executable,
       registrations,
@@ -189,7 +194,7 @@ const makeCodeMode = (authority: AgentManifest.ProgramAuthority) =>
       ownerId: objectWorkerId,
     })
     const claimed = yield* store.loadExecution(runId)
-    return CodeMode.make({ claim, claimed, authority, store })
+    return makeCodeModeImplementation({ claim, claimed, authority, store })
   })
 
 const manifestWithAuthority = (programAuthority: AgentManifest.ProgramAuthority) =>
@@ -231,7 +236,7 @@ describe("Runtime code_mode Program children", () => {
         const first = yield* owner.invokeBackground(request("start_program", parameters))
         expect(first._tag).toBe("Success")
         if (first._tag !== "Success") return yield* Effect.die("expected admission")
-        const handle = yield* Schema.decodeUnknownEffect(CodeMode.ProgramHandle)(first.result)
+        const handle = yield* Schema.decodeUnknownEffect(ProgramHandle)(first.result)
         expect(yield* owner.invokeBackground(request("start_program", parameters))).toEqual(first)
         expect(
           yield* owner.invokeBackground(request("start_program", { ...parameters, source: "return 2" })),
@@ -280,8 +285,8 @@ describe("Runtime code_mode Program children", () => {
     let childRunId = ""
     const crash = withLayer(crashRuntimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
+        const runtime = yield* RuntimeRuntime
+        const store = yield* RunStore
         rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
@@ -289,13 +294,11 @@ describe("Runtime code_mode Program children", () => {
           idempotencyKey: "root",
           prompt: "work",
         })).runId
-        const crashStore = RunStore.RunStore.of({
+        const crashStore = RunStore.of({
           ...store,
           admitProgramChild: (input) => store.admitProgramChild(input).pipe(Effect.andThen(Effect.interrupt)),
         })
-        yield* withLayer(
-          Layer.mergeAll(Layer.succeed(RunStore.RunStore, crashStore), activeExecutionsLayer, resolverLayer),
-        )(
+        yield* withLayer(Layer.mergeAll(Layer.succeed(RunStore, crashStore), activeExecutionsLayer, resolverLayer))(
           Effect.gen(function* () {
             const host = yield* makeRunExecutor
             const claim = yield* store.claimExecution({
@@ -319,8 +322,8 @@ describe("Runtime code_mode Program children", () => {
     )
     const reopen = withLayer(recoveryRuntimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const runtime = yield* RuntimeRuntime
+        const scheduler = yield* LocalScheduler
         for (let index = 0; index < 6; index++) {
           yield* scheduler.tick
           yield* scheduler.idle
@@ -352,8 +355,8 @@ describe("Runtime code_mode Program children", () => {
         let rootRunId = ""
         let childRunId = ""
         const admit = Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
+          const runtime = yield* RuntimeRuntime
+          const scheduler = yield* LocalScheduler
           rootRunId = (yield* runtime.startExecution({
             executable,
             registrations,
@@ -377,8 +380,8 @@ describe("Runtime code_mode Program children", () => {
           if (background === "await") expect((yield* runtime.inspect(rootRunId)).waits).toHaveLength(2)
         })
         const complete = Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const scheduler = yield* LocalScheduler.LocalScheduler
+          const runtime = yield* RuntimeRuntime
+          const scheduler = yield* LocalScheduler
           for (let index = 0; index < 3; index++) {
             yield* scheduler.tick
             yield* scheduler.idle
@@ -406,8 +409,8 @@ describe("Runtime code_mode Program children", () => {
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
       let rootRunId = ""
       const admit = Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const runtime = yield* RuntimeRuntime
+        const scheduler = yield* LocalScheduler
         rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
@@ -427,8 +430,8 @@ describe("Runtime code_mode Program children", () => {
         )
       })
       const finishRun = Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const runtime = yield* RuntimeRuntime
+        const scheduler = yield* LocalScheduler
         yield* Effect.forEach([0, 1, 2, 3], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
           discard: true,
         })
@@ -449,9 +452,9 @@ describe("Runtime code_mode Program children", () => {
       const { resolverLayer, counts } = fixture({ calls: 3 })
       const options = { addresses: [], scheduler: { pollInterval: "1 day" as const } }
       const scenario = Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const store = yield* RunStore.RunStore
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const runtime = yield* RuntimeRuntime
+        const store = yield* RunStore
+        const scheduler = yield* LocalScheduler
         const rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
@@ -522,8 +525,8 @@ describe("Runtime code_mode Program children", () => {
       layer(runtimeLayer)("object propagates root cancellation to an admitted code_mode Program child", (it) => {
         it.effect("propagates root cancellation to the child", () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
-            const scheduler = yield* LocalScheduler.LocalScheduler
+            const runtime = yield* RuntimeRuntime
+            const scheduler = yield* LocalScheduler
             const rootRunId = (yield* runtime.startExecution({
               executable,
               registrations,
@@ -566,8 +569,8 @@ describe("Runtime code_mode Program children", () => {
       )
       const crash = withLayer(crashRuntimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
-          const store = yield* RunStore.RunStore
+          const runtime = yield* RuntimeRuntime
+          const store = yield* RunStore
           rootRunId = (yield* runtime.startExecution({
             executable,
             registrations,
@@ -576,7 +579,7 @@ describe("Runtime code_mode Program children", () => {
             prompt: "use code mode",
           })).runId
           const reached = yield* Deferred.make<void>()
-          const crashStore = RunStore.RunStore.of({
+          const crashStore = RunStore.of({
             ...store,
             admitProgramChildAndSuspend: (input) => {
               const admitted =
@@ -589,7 +592,7 @@ describe("Runtime code_mode Program children", () => {
           yield* withLayer(
             Layer.mergeAll(
               allowAllAuthorization,
-              Layer.succeed(RunStore.RunStore, crashStore),
+              Layer.succeed(RunStore, crashStore),
               activeExecutionsLayer,
               resolverLayer,
             ),
@@ -621,14 +624,14 @@ describe("Runtime code_mode Program children", () => {
       )
       const reopen = withLayer(recoveryRuntimeLayer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* RuntimeRuntime
           if (crashPoint === "before-admission") {
             expect((yield* runtime.treeCheckpoint(rootRunId)).inspection.runs).toHaveLength(1)
             expect(counts.model).toBe(1)
             expect(counts.capability).toBe(0)
             return
           }
-          const scheduler = yield* LocalScheduler.LocalScheduler
+          const scheduler = yield* LocalScheduler
           yield* Effect.forEach([0, 1, 2, 3, 4, 5, 6, 7], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), {
             discard: true,
           })
@@ -658,8 +661,8 @@ describe("Runtime code_mode Program children", () => {
     const runtimeLayer = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
     const completeChild = withLayer(runtimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const runtime = yield* RuntimeRuntime
+        const scheduler = yield* LocalScheduler
         rootRunId = (yield* runtime.startExecution({
           executable,
           registrations,
@@ -685,8 +688,8 @@ describe("Runtime code_mode Program children", () => {
     )
     const reopen = withLayer(runtimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
-        const scheduler = yield* LocalScheduler.LocalScheduler
+        const runtime = yield* RuntimeRuntime
+        const scheduler = yield* LocalScheduler
         yield* Effect.forEach([0, 1, 2], () => scheduler.tick.pipe(Effect.andThen(scheduler.idle)), { discard: true })
         expect((yield* runtime.inspect(rootRunId)).status).toBe("succeeded")
         expect((yield* runtime.inspect(childRunId)).status).toBe("succeeded")
@@ -707,7 +710,7 @@ describe("Runtime code_mode Program children", () => {
       (it) => {
         it.effect("requires the sandbox and bounded authority registrations", () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* RuntimeRuntime
             const failure = yield* Effect.flip(
               runtime.startExecution({
                 executable,
@@ -739,7 +742,7 @@ describe("Runtime code_mode Program children", () => {
       steps: [{ name: "load.dataset", pin: Pins.makeCapability({ step: "load.dataset" }) }],
       budget: { ...budget, agentRuns: 2, toolCalls: 3 },
     }
-    const declaration = CodeMode.makeTool(authority)
+    const declaration = makeTool(authority)
     const modelSchema = Tool.getJsonSchema(declaration)
     expect(modelSchema).toMatchObject({
       properties: {
@@ -789,7 +792,7 @@ describe("Runtime code_mode Program children", () => {
       expect(authority.tools).toEqual([])
       expect(authority.agents).toEqual([])
       expect(authority.steps).toEqual([])
-      const declaration = CodeMode.makeTool(authority)
+      const declaration = makeTool(authority)
       const modelSchema = Tool.getJsonSchema(declaration)
       expect(JSON.stringify(modelSchema)).not.toContain('"not"')
       const selectionSchema = Schema.Struct({
@@ -885,7 +888,7 @@ describe("Runtime code_mode Program children", () => {
     withLayer(objectRuntimeLayer({ addresses: [] }).pipe(Layer.provide(fixture().resolverLayer)))(
       Effect.gen(function* () {
         const implementation = yield* makeCodeMode(root.manifest.programAuthority!)
-        const invoke = (overrides: Partial<CodeMode.Parameters>) =>
+        const invoke = (overrides: Partial<Parameters>) =>
           implementation.invoke({
             source: "return input",
             input: "input",

@@ -1,9 +1,9 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import "./suites/session-suite.js"
 import { describe, expect, it as standalone, layer } from "@effect/vitest"
 import { Effect, Layer } from "effect"
 import { DurableDriver, ToolContext } from "../../../src/index.js"
 import { ChildAdmission } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { assistantAddress, objectLayer, textPrompt } from "../execution/fixtures.js"
 import { provideScoped } from "../execution/scoped-provide.js"
@@ -50,7 +50,7 @@ const withCell =
 
 const parentRun = (label: string) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime.Runtime
+    const runtime = yield* Runtime
     const store = yield* RunStore
     const receipt = yield* runtime.send({
       to: assistantAddress,

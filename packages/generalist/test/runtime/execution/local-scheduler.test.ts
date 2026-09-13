@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import "../state/suites/worker-wakeup-suite.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "./object.js"
 import "./suites/fifo-suite.js"
@@ -6,7 +7,6 @@ import { provideScoped } from "./scoped-provide.js"
 import { Deferred, Effect, Exit, Layer, Ref, Stream } from "effect"
 import { LanguageModel, Response } from "effect/unstable/ai"
 import { ChildRuns, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { LocalScheduler } from "../../../src/runtime/execution/local-scheduler.js"
@@ -71,7 +71,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       }).pipe(Layer.provide(resolver)),
       Effect.gen(function* () {
         yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const scheduler = yield* LocalScheduler
         yield* runtime.send({
           to: assistantAddress,
@@ -117,7 +117,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object local scheduler executes admitted roots and children`, (it) => {
       it.effect("executes admitted roots and children", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const root = yield* runtime.send({
@@ -205,7 +205,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object local scheduler preserves an external execution claim`, (it) => {
       it.effect("does not fence an external execution claim", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -272,7 +272,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object local scheduler reconciles an orphaned cancelling tree root last`, (it) => {
       it.effect("reconciles an orphaned cancelling tree root last", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const parent = yield* runtime.send({
@@ -417,7 +417,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object overlapping scheduler ticks do not reclaim an active local Run`, (it) => {
       it.effect("does not reclaim an active local Run", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -460,7 +460,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
           const persisted = yield* provideScoped(
             runtimeLayer(),
             Effect.gen(function* () {
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const store = yield* RunStore
               const workerId = objectWorkerId
 
@@ -514,7 +514,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
             runtimeLayer(),
             Effect.gen(function* () {
               const { owned, orphaned, ownedClaim, orphanedClaim } = persisted
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const scheduler = yield* LocalScheduler
               const store = yield* RunStore
               for (const claim of [ownedClaim, orphanedClaim]) {
@@ -560,7 +560,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object scheduler selection claims the oldest ready Runs beyond the window`, (it) => {
       it.effect("claims the oldest ready Runs beyond the window", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const host = RunExecutor.of({
             execute: (claim) =>
@@ -628,7 +628,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         "stays bounded past the query window",
         () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* makeLocalScheduler({ workerId: objectWorkerId }).pipe(
               Effect.provideContext(yield* Layer.build(activeExecutionsLayer)),
             )
@@ -704,7 +704,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         "resumes a parent whose child settles after a later-created run",
         () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* LocalScheduler
             const store = yield* RunStore
             const parent = yield* runtime.send({
@@ -769,7 +769,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         "resumes a parent whose child sits beyond the reconcile window",
         () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* LocalScheduler
             const store = yield* RunStore
             const filler = Effect.fn("backlog.filler")(function* (label: string) {
@@ -841,7 +841,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         "resumes a resolvable parent queued behind a full page of unresolvable ones",
         () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* LocalScheduler
             const store = yield* RunStore
             // Approval waits no terminal child can ever answer, so reconciliation never
@@ -912,7 +912,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object idle scheduler performs no child-settlement polling`, (it) => {
       it.effect("does no child-settlement work while nothing changes", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const receipt = yield* runtime.send({
@@ -994,7 +994,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object scheduler resumes a waiting parent once its child settles`, (it) => {
       it.effect("resumes a waiting parent once its child settles", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const parent = yield* runtime.send({
@@ -1064,7 +1064,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
     layer(runtimeLayer)(`object a tick admits a long-running Run without blocking on it`, (it) => {
       it.effect("admits a long-running Run without blocking on it", () =>
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const scheduler = yield* LocalScheduler
           const store = yield* RunStore
           const blocking = yield* runtime.send({
@@ -1153,7 +1153,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
       (it) => {
         it.effect("interrupts an executing Run on cancellation", () =>
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* LocalScheduler
             const store = yield* RunStore
             const receipt = yield* runtime.send({
@@ -1223,7 +1223,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         it.effect("bounds simultaneously executing Runs across ticks", () =>
           Effect.gen(function* () {
             yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* LocalScheduler
             for (let index = 0; index < 6; index += 1) {
               yield* runtime.send({
@@ -1284,7 +1284,7 @@ standalone.effect("releases blocked provider resources after a scheduler fixture
         it.effect("starts more than the former default bound", () =>
           Effect.gen(function* () {
             yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const scheduler = yield* LocalScheduler
             for (let index = 0; index < 6; index += 1) {
               yield* runtime.send({

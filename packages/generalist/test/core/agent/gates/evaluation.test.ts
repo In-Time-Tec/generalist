@@ -1,3 +1,4 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../../../runtime/execution/object.js"
 /* oxlint-disable effecttsgo/strict-effect-provide -- tests provide scripted models and gate requirements at the process boundary. */
 import { expect, it } from "@effect/vitest"
@@ -5,7 +6,6 @@ import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, DurableDriver, ExecutableManifest, Gate, Hooks, RunBudget } from "../../../../src/index.js"
 import { ExecutableResolver } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { make as makeSandbox, type SandboxService } from "../../../../src/sandbox/index.js"
@@ -313,7 +313,7 @@ it.effect("suspends on retry budget exhaustion without false completion", () =>
     yield* provideScoped(
       Layer.merge(runtimeLayer, fixture.layer),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)

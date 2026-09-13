@@ -1,3 +1,4 @@
+import type { LayerOptions } from "../../../src/runtime/engine.js"
 import { Layer, Schema } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { Agent, AgentEvent, AgentManifest, RunBudget } from "../../../src/index.js"
@@ -8,7 +9,6 @@ import {
   ExecutableResolver,
   RunWait,
 } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { closedTestAgent, pinnedTestAgent } from "../run/identity.js"
 import { objectRuntimeLayer } from "./object.js"
 
@@ -117,7 +117,7 @@ export const resolverLayer = ExecutableResolver.layerStatic([
   { executable: alternateResearcherRef, agent: closedTestAgent(alternateResearcher) },
 ])
 
-export const parentRelativeOptions: Runtime.LayerOptions = {
+export const parentRelativeOptions: LayerOptions = {
   addresses: [
     { address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) },
     {

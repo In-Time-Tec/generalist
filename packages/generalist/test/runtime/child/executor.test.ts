@@ -1,10 +1,10 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../execution/object.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Response, Toolkit } from "effect/unstable/ai"
 import { Agent, AgentTool, RunBudget } from "../../../src/index.js"
 import { ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { allowAllAuthorization } from "../../authorization.js"
@@ -158,7 +158,7 @@ it.effect("runs typed durable children under the parent and returns their ordere
   return provideScoped(
     layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(parent)
@@ -270,7 +270,7 @@ it.effect("rejects a child tool set wider than its parent before admission", () 
   return provideScoped(
     layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(parent)
@@ -300,7 +300,7 @@ it.effect("encodes a durable child failure in collect results without failing th
   return provideScoped(
     fixture.layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(fixture.parent)
@@ -351,7 +351,7 @@ it.effect("fails the durable parent and requests cancellation of siblings in fai
   return provideScoped(
     fixture.layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(fixture.parent)

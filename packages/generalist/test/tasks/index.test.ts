@@ -1,3 +1,4 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../runtime/execution/object.js"
 /* oxlint-disable effecttsgo/strict-effect-provide -- Each test is a test-host Layer composition root. */
 import { expect, it } from "@effect/vitest"
@@ -6,7 +7,6 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, AgentTool, Approvals, Compaction, Hooks, Permissions, RunBudget, Tasks } from "../../src/index.js"
 import { Host } from "../../src/host/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { JournalFault } from "../../src/runtime/operation/journal-fault.js"
@@ -351,7 +351,7 @@ it.effect("journals task inheritance for durable children", () => {
 
   return scopedWith(layer)(
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(parent)
@@ -463,7 +463,7 @@ it.effect("applies Tasks.update through runtime steer", () =>
 
     yield* scopedWith(runtimeLayer)(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)

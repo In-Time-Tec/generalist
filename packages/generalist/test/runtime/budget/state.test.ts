@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import {
   makeObjectStorage,
   objectRuntimeLayer,
@@ -11,7 +12,6 @@ import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/
 import { Agent, AgentTool, RunBudget } from "../../../src/index.js"
 import { TestModel } from "../../../src/testing/index.js"
 import { Address, ChildAdmission, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import { allowAllAuthorization } from "../../authorization.js"
@@ -68,7 +68,7 @@ const runtimeLayer = (
   )
 
 const execute = Effect.fn("test.executeBudgetRun")(function* (budget: RunBudget.RunBudget) {
-  const runtime = yield* Runtime.Runtime
+  const runtime = yield* Runtime
   const executor = yield* RunExecutor
   const store = yield* RunStore
   yield* runtime.register(agent)
@@ -87,7 +87,7 @@ it.effect("suspends on exhaustion, journals extension, and resumes", () =>
   provideScoped(
     runtimeLayer(textModel),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(agent)
@@ -186,7 +186,7 @@ it.effect("suspends when elapsed duration is exhausted before provider dispatch"
   provideScoped(
     runtimeLayer(textModel, { reconcileInterval: "2 hours", ownershipLeaseMillis: 6 * 60 * 60 * 1000 }),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(agent)
@@ -220,7 +220,7 @@ it.effect("rejects malformed budget extensions with RunBudgetInvalid", () =>
   provideScoped(
     runtimeLayer(textModel),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       yield* runtime.register(agent)
       const handle = yield* runtime.start(agent, "run", { budget: RunBudget.make({ duration: "1 minute" }) })
       for (const duration of [Number.NaN, Number.POSITIVE_INFINITY, -1]) {
@@ -288,7 +288,7 @@ it.effect("one tool-call extension pays for exactly one handler execution", () =
       }),
     ),
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       yield* runtime.register(toolAgent)
@@ -345,7 +345,7 @@ it.effect("suspends before admitting a child when the child budget is exhausted"
   return provideScoped(
     layer,
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const receipt = yield* runtime.send({
@@ -448,7 +448,7 @@ it.effect("resumes a fan-out interrupted by zero child slots after one extension
   return Effect.gen(function* () {
     const runId = yield* Effect.scoped(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(parent)
@@ -469,7 +469,7 @@ it.effect("resumes a fan-out interrupted by zero child slots after one extension
     )
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(parent)
@@ -559,7 +559,7 @@ it.effect("recomputes spend after fresh object-host recovery and resumes without
   return Effect.gen(function* () {
     const runId = yield* Effect.scoped(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         yield* runtime.register(agent)
@@ -588,7 +588,7 @@ it.effect("recomputes spend after fresh object-host recovery and resumes without
 
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         const reopened = yield* runtime.inspect(runId)
@@ -659,7 +659,7 @@ it.effect("clears a stale budget suspension when child settlement refunds its di
     return yield* provideScoped(
       runtimeLayer(fixture.layer),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const executor = yield* RunExecutor
         const store = yield* RunStore
         const worker = Agent.make({ name: "refund-worker" })

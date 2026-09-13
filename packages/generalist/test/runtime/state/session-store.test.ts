@@ -1,3 +1,4 @@
+import { Runtime } from "../../../src/runtime/engine.js"
 import { register as registerProjection } from "./session/projection-suite.js"
 import "./session/terminalization-suite.js"
 import { expect, it } from "@effect/vitest"
@@ -5,7 +6,6 @@ import { Effect, Layer, Option, Schema, Stream } from "effect"
 import { LanguageModel, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, ToolExecutor } from "../../../src/index.js"
 import { Address, ChildRuns, ExecutableResolver } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
 import type { RunEvent } from "../../../src/runtime/run/event.js"
@@ -218,7 +218,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
       provideScoped(
         fixture.runtimeLayer(),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const host = yield* RunExecutor
           const store = yield* RunStore
           const parent = yield* runtime.send({
@@ -291,7 +291,7 @@ it.live("preserves 42 provider-free model calls across four durable children and
       provideScoped(
         fixture.runtimeLayer(),
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const host = yield* RunExecutor
           const store = yield* RunStore
           expect(

@@ -1,3 +1,4 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Result, Schema } from "effect"
@@ -9,7 +10,6 @@ import { ObjectStore } from "../../../../src/durability/object-store.js"
 import { Address } from "../../../../src/runtime/address.js"
 import { make as makeExecutable, makeTest } from "../../../../src/runtime/executable/manifest.js"
 import { layerStatic, type StaticToolExecutable } from "../../../../src/runtime/executable/resolver.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../../src/runtime/execution/run-executor.js"
 import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
@@ -221,7 +221,7 @@ it.effect("reserves every admitted Tool obligation before fresh-host bounded set
     const admitted = yield* provideScoped(
       fresh(),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const receipts: Array<{ readonly runId: string }> = []
         let refused = false
         for (let index = 0; index < 64; index++) {
@@ -243,7 +243,7 @@ it.effect("reserves every admitted Tool obligation before fresh-host bounded set
     yield* provideScoped(
       fresh(),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         const executor = yield* RunExecutor
         for (const [index, receipt] of settled.entries()) {
@@ -267,7 +267,7 @@ it.effect("reserves every admitted Tool obligation before fresh-host bounded set
     yield* provideScoped(
       fresh(),
       Effect.gen(function* () {
-        const runtime = yield* Runtime.Runtime
+        const runtime = yield* Runtime
         const store = yield* RunStore
         for (const receipt of settled) {
           const operation = yield* store.getOperationByKey({

@@ -406,13 +406,19 @@ class RuntimeRequestHandler extends DefaultRequestHandler {
 /** @experimental Construct the SDK handler while keeping Runtime as task authority. */
 export const make: {
   (runtime: ApplicationRuntimeService, deployment: Deployment): Effect.Effect<DefaultRequestHandler, RuntimeUnavailable>
-  (deployment: Deployment): (runtime: ApplicationRuntimeService) => Effect.Effect<DefaultRequestHandler, RuntimeUnavailable>
+  (
+    deployment: Deployment,
+  ): (runtime: ApplicationRuntimeService) => Effect.Effect<DefaultRequestHandler, RuntimeUnavailable>
 } = Function.dual(
   2,
-  (runtime: ApplicationRuntimeService, deployment: Deployment): Effect.Effect<DefaultRequestHandler, RuntimeUnavailable> =>
+  (
+    runtime: ApplicationRuntimeService,
+    deployment: Deployment,
+  ): Effect.Effect<DefaultRequestHandler, RuntimeUnavailable> =>
     engineFor(runtime).pipe(
-      Effect.map((engine) =>
-        new RuntimeRequestHandler(deployment.card, makeTaskStore(engine), makeExecutor(engine, deployment), engine),
+      Effect.map(
+        (engine) =>
+          new RuntimeRequestHandler(deployment.card, makeTaskStore(engine), makeExecutor(engine, deployment), engine),
       ),
     ),
 )

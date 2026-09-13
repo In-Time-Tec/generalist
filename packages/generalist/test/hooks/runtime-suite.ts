@@ -1,9 +1,9 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, Approvals, Hooks, Permissions } from "../../src/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { RunStore } from "../../src/runtime/run/store.js"
 import { RunExecutor } from "../../src/runtime/execution/run-executor.js"
 import { JournalFault } from "../../src/runtime/operation/journal-fault.js"
@@ -74,7 +74,7 @@ export const register = ({
       )
       const runId = yield* scopedWith(first)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* runtime.register(agent)
@@ -101,7 +101,7 @@ export const register = ({
       )
       yield* scopedWith(recovered)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* runtime.register(agent)
@@ -163,7 +163,7 @@ export const register = ({
       )
       const runId = yield* scopedWith(first)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* runtime.register(agent)
@@ -214,7 +214,7 @@ export const register = ({
       )
       yield* scopedWith(recovered)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* runtime.register(agent)
@@ -256,7 +256,7 @@ export const register = ({
       )
       yield* scopedWith(layer)(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const executor = yield* RunExecutor
           const store = yield* RunStore
           yield* runtime.register(agent)

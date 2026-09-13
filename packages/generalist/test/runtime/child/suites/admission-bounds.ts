@@ -1,8 +1,8 @@
+import { Runtime, type Service as RuntimeService } from "../../../../src/runtime/engine.js"
 import { describe, expect, it } from "@effect/vitest"
 import { objectWorkerId } from "../../execution/object.js"
 import { Effect, Layer } from "effect"
 import { Address, ChildAdmission, Errors, Message } from "../../../../src/runtime/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import {
   assistantAddress,
@@ -17,8 +17,8 @@ import { provideScoped } from "../../execution/scoped-provide.js"
 
 export interface ChildAdmissionBoundsSuiteOptions<StoreError, Extra = never> {
   readonly name: string
-  readonly storeLayer: Layer.Layer<Runtime.Runtime | RunStore | Extra, StoreError>
-  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime.Runtime | RunStore | Extra>
+  readonly storeLayer: Layer.Layer<Runtime | RunStore | Extra, StoreError>
+  readonly activate?: (runId: string) => Effect.Effect<void, never, Runtime | RunStore | Extra>
   readonly skip?: boolean
 }
 
@@ -26,7 +26,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
   options: ChildAdmissionBoundsSuiteOptions<StoreError, Extra>,
 ) => {
   const suite = options.skip === true ? describe.skip : describe
-  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime.Runtime | RunStore | Extra>) =>
+  const provide = <A, E>(effect: Effect.Effect<A, E, Runtime | RunStore | Extra>) =>
     provideScoped(options.storeLayer, effect)
   const activate = options.activate ?? (() => Effect.void)
   let sequence = 0
@@ -36,7 +36,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
     readonly concurrency: { readonly agents: number; readonly tools: number }
   }) =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime.Runtime
+      const runtime = yield* Runtime
       const store = yield* RunStore
       const id = `${options.name}:bounds:${sequence++}`
       const receipt = yield* runtime.send({
@@ -55,7 +55,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
     prompt = key,
     selection = "researcher",
   ) => children.admit({ parentRunId, toolCallId: `call:${key}`, selection, prompt, key })
-  const group = (runtime: Runtime.Service, parentRunId: string, key: string, size: number) =>
+  const group = (runtime: RuntimeService, parentRunId: string, key: string, size: number) =>
     runtime.fanOut({
       parentRunId,
       idempotencyKey: key,
@@ -387,7 +387,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
     it.live("validates and detaches the root-pinned policy before any admission mutation", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const id = `${options.name}:bounds:policy:${sequence++}`
           const base = {
             to: assistantAddress,
@@ -463,7 +463,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
     it.live("applies the same policy atomically to initial and Program child entry paths", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const store = yield* RunStore
           const initialId = `${options.name}:bounds:initial:${sequence++}`
           const initialFailure = yield* runtime
@@ -550,7 +550,7 @@ export const childAdmissionBoundsSuite = <StoreError, Extra = never>(
     it.live("rolls back every Program child when a later atomic batch admission fails validation", () =>
       provide(
         Effect.gen(function* () {
-          const runtime = yield* Runtime.Runtime
+          const runtime = yield* Runtime
           const context = yield* root({ maxDepth: 1, maxSessions: 1024, concurrency: { agents: 1, tools: 1024 } })
           yield* activate(context.runId)
           const claim = yield* context.store.claimExecution({

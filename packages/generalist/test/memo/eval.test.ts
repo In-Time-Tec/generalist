@@ -1,10 +1,10 @@
+import { Runtime } from "../../src/runtime/engine.js"
 import { expect, it } from "@effect/vitest"
 import { Effect, Layer, pipe, Ref, Schema } from "effect"
 import { Tool, Toolkit } from "effect/unstable/ai"
 import { Agent, Memo } from "../../src/index.js"
 import { outputMatches, runSuite } from "../../src/eval/index.js"
 import { ExecutableResolver } from "../../src/runtime/index.js"
-import * as Runtime from "../../src/runtime/engine.js"
 import { TestModel } from "../../src/testing/index.js"
 import { fromJournal } from "../../src/trajectory/index.js"
 import { allowAllAuthorization } from "../authorization.js"
@@ -61,7 +61,7 @@ it.live("runs an eval suite twice without a second tool dispatch", () =>
     const [first, second, secondTrajectory, secondCompletion] = yield* Effect.gen(function* () {
       const firstSuite = yield* run("memo-eval-first")
       const secondSuite = yield* run("memo-eval-second")
-      const activeRuntime = yield* Runtime.Runtime
+      const activeRuntime = yield* Runtime
       const runId = secondSuite.rows[0]!.runId
       const trajectory = yield* fromJournal(activeRuntime, runId)
       const history = yield* activeRuntime.history({ runId, limit: 1_000 })

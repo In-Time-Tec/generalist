@@ -1,3 +1,4 @@
+import type { RunSendError, RunSendOptions, SendError, SendInput, Service } from "../../../src/runtime/engine.js"
 import {
   type AgentCard,
   type Message,
@@ -8,7 +9,6 @@ import {
 } from "@a2a-js/sdk"
 import { ServerCallContext } from "@a2a-js/sdk/server"
 import { Address, ExecutableManifest, TreePolicy, type Run, type RunEvent } from "../../../src/runtime/index.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { make as makeApplication } from "../../../src/runtime/hosting/application.js"
 import type { SteeringReceipt } from "../../../src/runtime/run/steering.js"
 import { describe, expect, it } from "@effect/vitest"
@@ -125,14 +125,14 @@ const makeRuntime = (acceptedSequence = 0) => {
   function send(
     runId: string,
     prompt: AiPrompt.Prompt | string,
-    options?: Runtime.RunSendOptions,
-  ): Effect.Effect<SteeringReceipt, Runtime.RunSendError>
-  function send(input: Runtime.SendInput): Effect.Effect<Run.RunReceipt, Runtime.SendError>
+    options?: RunSendOptions,
+  ): Effect.Effect<SteeringReceipt, RunSendError>
+  function send(input: SendInput): Effect.Effect<Run.RunReceipt, SendError>
   function send(
-    input: Runtime.SendInput | string,
+    input: SendInput | string,
     _prompt?: AiPrompt.Prompt | string,
-    _options?: Runtime.RunSendOptions,
-  ): Effect.Effect<SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
+    _options?: RunSendOptions,
+  ): Effect.Effect<SteeringReceipt | Run.RunReceipt, RunSendError | SendError> {
     if (Predicate.isString(input)) return Effect.die("existing-run send is not used")
     sentRunIds.push(input.runId!)
     const runId = input.runId!
@@ -149,7 +149,7 @@ const makeRuntime = (acceptedSequence = 0) => {
     return Effect.succeed({ runId, messageId: input.messageId!, acceptedSequence, duplicate: false })
   }
 
-  const runtime: Runtime.Service = {
+  const runtime: Service = {
     hold: () => Effect.die("not used"),
     sessions: {
       create: () => Effect.die("not used"),

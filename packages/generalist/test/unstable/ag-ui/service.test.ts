@@ -1,11 +1,18 @@
+import {
+  type RunSendError,
+  type RunSendOptions,
+  Runtime as RuntimeRuntime,
+  type RuntimeInspection,
+  type SendError,
+  type SendInput,
+  type Service,
+} from "../../../src/runtime/engine.js"
 import { describe, expect, layer } from "@effect/vitest"
 import type { RunAgentInput } from "@ag-ui/core"
 import { Effect, Layer, Predicate, Schema, Stream } from "effect"
 import type { Prompt } from "effect/unstable/ai"
 import { Address, Approval, ExecutableManifest, Errors as RuntimeErrors, Run, TreePolicy } from "generalist/runtime"
 import { AGUI } from "../../../src/unstable/ag-ui/index.js"
-import type { RuntimeInspection } from "../../../src/runtime/engine.js"
-import * as Runtime from "../../../src/runtime/engine.js"
 import { Runtime as ApplicationRuntime } from "../../../src/runtime/service.js"
 import { make as makeApplication } from "../../../src/runtime/hosting/application.js"
 import type { SteeringReceipt } from "../../../src/runtime/run/steering.js"
@@ -101,7 +108,7 @@ const runtimeInspection = (runId: string, overrides: Partial<RuntimeInspection> 
   ...overrides,
 })
 
-const runtimeLayer = (runtime: Runtime.Service) =>
+const runtimeLayer = (runtime: Service) =>
   Layer.succeed(
     ApplicationRuntime,
     makeApplication({
@@ -119,27 +126,25 @@ const runtimeLayer = (runtime: Runtime.Service) =>
 
 const unused = <A>(): Effect.Effect<A, never> => Effect.die("unused Runtime method")
 
-const rootSend = (
-  handler: (input: Runtime.SendInput) => Effect.Effect<Run.RunReceipt, Runtime.SendError>,
-): Runtime.Service["send"] => {
+const rootSend = (handler: (input: SendInput) => Effect.Effect<Run.RunReceipt, SendError>): Service["send"] => {
   function send(
     runId: string,
     prompt: Prompt.Prompt | string,
-    options?: Runtime.RunSendOptions,
-  ): Effect.Effect<SteeringReceipt, Runtime.RunSendError>
-  function send(input: Runtime.SendInput): Effect.Effect<Run.RunReceipt, Runtime.SendError>
+    options?: RunSendOptions,
+  ): Effect.Effect<SteeringReceipt, RunSendError>
+  function send(input: SendInput): Effect.Effect<Run.RunReceipt, SendError>
   function send(
-    sendInput: Runtime.SendInput | string,
+    sendInput: SendInput | string,
     _prompt?: Prompt.Prompt | string,
-    _options?: Runtime.RunSendOptions,
-  ): Effect.Effect<SteeringReceipt | Run.RunReceipt, Runtime.RunSendError | Runtime.SendError> {
+    _options?: RunSendOptions,
+  ): Effect.Effect<SteeringReceipt | Run.RunReceipt, RunSendError | SendError> {
     return Predicate.isString(sendInput) ? unused() : handler(sendInput)
   }
   return send
 }
 
-const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service =>
-  Runtime.Runtime.of({
+const mockRuntime = (implementation: Partial<Service>): Service =>
+  RuntimeRuntime.of({
     messageSessionInput: () => unused(),
     controlSession: () => unused(),
     getTool: () => unused(),
@@ -227,7 +232,7 @@ const mockRuntime = (implementation: Partial<Runtime.Service>): Runtime.Service 
 
 describe("AGUI", () => {
   {
-    let sent: Runtime.SendInput | undefined
+    let sent: SendInput | undefined
     let activatedRunId: string | undefined
     const runtime = mockRuntime({
       send: rootSend((value) => {

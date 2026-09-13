@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
+import type { JournalReader } from "../../trajectory/index.js"
 
 const RewardFields = Schema.Struct({
   runId: Schema.String,
@@ -62,4 +63,9 @@ export type RewardWriteError = RewardRunNotFound | RewardConflict | RewardStorag
 /** One command-idempotent mutation capability, with no other Runtime controls. @experimental */
 export interface RewardWriter {
   readonly record: (input: RewardInput & { readonly commandId: string }) => Effect.Effect<void, RewardWriteError>
+}
+
+/** Cross-driver Runtime methods required by unstable trajectory export. @internal */
+export interface ExportRuntime extends JournalReader {
+  readonly rewards: RewardWriter
 }

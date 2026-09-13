@@ -36,8 +36,11 @@ import { Configuration as Tasks } from "../../tasks/internal.js"
 import type { ManagedArtifactTool } from "../artifact.js"
 import { definitionCapabilities } from "./lifecycle/construction.js"
 import { projectPublicRunOptions, type PublicRunOptionGuard } from "./lifecycle/hosted/options.js"
-import type * as CodeMode from "../program/code-mode-declaration.js"
-import { validateOptions as validateCodeModeOptions } from "../program/code-mode-declaration.js"
+import {
+  validateOptions as validateCodeModeOptions,
+  type AnyOptions as CodeModeAnyOptions,
+  type Requirements as CodeModeRequirements,
+} from "../program/code-mode-declaration.js"
 export {
   AgentTypeId,
   close,
@@ -106,7 +109,7 @@ export interface MakeOptions<
   readonly gates?: ReadonlyArray<Gate<OutputSchema["Type"], unknown>>
   readonly onGateFailure?: GateFailureMode
   readonly sandbox?: SandboxService
-  readonly codeMode?: CodeMode.AnyOptions
+  readonly codeMode?: CodeModeAnyOptions
 }
 /** Agent options with ordered static declarations instead of a pre-built toolkit. */
 export interface MakeToolsOptions<
@@ -138,7 +141,7 @@ type GateRequirement<O> = O extends { readonly gates: ReadonlyArray<infer G> }
     ? never
     : GateRequirements<G>
   : never
-type CodeModeRequirement<O> = O extends { readonly codeMode: infer C } ? CodeMode.Requirements<C> : never
+type CodeModeRequirement<O> = O extends { readonly codeMode: infer C } ? CodeModeRequirements<C> : never
 type InputCodecOf<O> = O extends { readonly input: infer S extends Schema.Top } ? S : typeof Schema.String
 type OutputCodecOf<O> = O extends { readonly output: infer S extends Schema.Top } ? S : typeof Schema.String
 type StaticToolServices<Tools extends Record<string, Tool.Any>> = {
@@ -177,7 +180,7 @@ type GateOutputConstraint<O> = {
   >
 }
 
-const validateDeclaredCodeMode = (toolkit: Toolkit.Any, codeMode: CodeMode.AnyOptions | undefined): void => {
+const validateDeclaredCodeMode = (toolkit: Toolkit.Any, codeMode: CodeModeAnyOptions | undefined): void => {
   if (codeMode !== undefined) validateCodeModeOptions(toolkit, codeMode)
 }
 

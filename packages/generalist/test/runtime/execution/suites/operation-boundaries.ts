@@ -1,10 +1,10 @@
+import { Runtime } from "../../../../src/runtime/engine.js"
 import { objectRuntimeLayer, objectWorkerId } from "../object.js"
 import { make as makeSimulator } from "../../../../src/testing/durability/index.js"
 import { expect, it } from "@effect/vitest"
 import { Cause, Deferred, Effect, Exit, Fiber, Layer, Ref, Schema, Stream } from "effect"
 import { Prompt } from "effect/unstable/ai"
 import { DurableDriver, RunBudget } from "../../../../src/index.js"
-import * as Runtime from "../../../../src/runtime/engine.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
 import { settleInterruptedExecution } from "../../../../src/runtime/execution/interruption.js"
@@ -56,7 +56,7 @@ for (const replayPolicy of ["pure", "never"] as const) {
           const first = yield* scopedWith(layerObject())(
             Effect.gen(function* () {
               const store = yield* RunStore
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const receipt = yield* runtime.send({
                 to: assistantAddress,
                 sessionId: "stream",
@@ -145,7 +145,7 @@ for (const replayPolicy of ["pure", "never"] as const) {
           )
           yield* scopedWith(layerObject())(
             Effect.gen(function* () {
-              const runtime = yield* Runtime.Runtime
+              const runtime = yield* Runtime
               const store = yield* RunStore
               if (!persisted && replayPolicy === "never") {
                 expect((yield* runtime.inspect(first.runId)).status).toBe("needs-resolution")
@@ -225,7 +225,7 @@ for (const persisted of [false, true]) {
         const fault = RuntimeUnavailable.make({ message: "injected expiration failure" })
         const first = yield* scopedWith(layerObject())(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const receipt = yield* runtime.send({
               to: assistantAddress,
@@ -290,7 +290,7 @@ for (const persisted of [false, true]) {
         )
         yield* scopedWith(layerObject())(
           Effect.gen(function* () {
-            const runtime = yield* Runtime.Runtime
+            const runtime = yield* Runtime
             const store = yield* RunStore
             const claim = yield* store.claimExecution({
               commandId: "runtime-execution-suites-operation-boundaries-ts-claim-4",
