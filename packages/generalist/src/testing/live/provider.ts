@@ -76,6 +76,8 @@ export interface Controls {
     call: Response.ToolCallPart<string, unknown>,
   ) => Effect.Effect<void, InvalidCommand | ConnectionClosed>
   readonly complete: (response: TurnResponse) => Effect.Effect<void, InvalidCommand | ConnectionClosed>
+  readonly interrupt: Effect.Effect<void, InvalidCommand | ConnectionClosed | UnsupportedCapability>
+  readonly emit: (event: UnsequencedEvent) => Effect.Effect<void, ConnectionClosed>
   readonly lose: (reason: string) => Effect.Effect<void>
 }
 
@@ -91,12 +93,14 @@ export interface Harness {
   readonly resourceCount: Effect.Effect<number>
 }
 
-type ActiveControls = Controls
-type EventWithoutSequence = Event extends infer Current
+/** An ordered provider event before the connection assigns its sequence. @experimental */
+export type UnsequencedEvent = Event extends infer Current
   ? Current extends Event
     ? Omit<Current, "sequence">
     : never
   : never
+
+type ActiveControls = Controls
 
 /** Make a provider that performs no model work until its controls emit events. @experimental */
 export const make = (capabilities: Capabilities = defaultCapabilities): Effect.Effect<Harness> =>
@@ -154,7 +158,7 @@ export const make = (capabilities: Capabilities = defaultCapabilities): Effect.E
               current.status === "open" ? effect(current) : Effect.fail(closed()),
           ),
         )
-      const withSequence = (event: EventWithoutSequence, sequence: number): Event => {
+      const withSequence = (event: UnsequencedEvent, sequence: number): Event => {
         switch (event._tag) {
           case "TurnStarted":
           case "Output":
@@ -168,7 +172,7 @@ export const make = (capabilities: Capabilities = defaultCapabilities): Effect.E
       }
       const updateOpen = (next: State): Effect.Effect<boolean> =>
         Ref.modify(state, (latest) => (latest.status === "open" ? [true, next] : [false, latest]))
-      const offer = (next: State, event: EventWithoutSequence): Effect.Effect<void, ConnectionClosed> =>
+      const offer = (next: State, event: UnsequencedEvent): Effect.Effect<void, ConnectionClosed> =>
         Effect.gen(function* () {
           const previous = yield* Ref.get(state)
           if (previous.status !== "open") return yield* closed()
@@ -199,6 +203,19 @@ export const make = (capabilities: Capabilities = defaultCapabilities): Effect.E
           ? InvalidCommand.make({ connectionId: id, reason: "no active turn" })
           : Effect.succeed(current.active)
 
+      const interruptTurn = (current: State, turnId: string) =>
+        Effect.gen(function* () {
+          if (!options.capabilities.interruption) {
+            return yield* UnsupportedCapability.make({ direction: "operation", capability: "interruption" })
+          }
+          const assignment = yield* active(current)
+          if (assignment.turnId !== turnId) {
+            return yield* InvalidCommand.make({ connectionId: id, reason: `turn ${turnId} is not active` })
+          }
+          const unresolved = new Map([...current.unresolved].filter(([, call]) => call.turnId !== assignment.turnId))
+          yield* offer({ ...current, active: undefined, unresolved }, { _tag: "TurnInterrupted", assignment })
+        })
+
       const controls: ActiveControls = {
         output: (part) =>
           withOpen((current) =>
@@ -227,6 +244,10 @@ export const make = (capabilities: Capabilities = defaultCapabilities): Effect.E
               yield* offer({ ...current, active: undefined }, { _tag: "TurnCompleted", assignment, response })
             }),
           ),
+        interrupt: withOpen((current) =>
+          Effect.flatMap(active(current), (assignment) => interruptTurn(current, assignment.turnId)),
+        ),
+        emit: (event) => withOpen((current) => offer(current, event)),
         lose: (reason) =>
           Ref.modify(state, (current) => [
             current.status === "open",
@@ -352,22 +373,7 @@ export const make = (capabilities: Capabilities = defaultCapabilities): Effect.E
               )
             }),
           ),
-        interrupt: (turnId) =>
-          withOpen((current) =>
-            Effect.gen(function* () {
-              if (!options.capabilities.interruption) {
-                return yield* UnsupportedCapability.make({ direction: "operation", capability: "interruption" })
-              }
-              const assignment = yield* active(current)
-              if (assignment.turnId !== turnId) {
-                return yield* InvalidCommand.make({ connectionId: id, reason: `turn ${turnId} is not active` })
-              }
-              const unresolved = new Map(
-                [...current.unresolved].filter(([, call]) => call.turnId !== assignment.turnId),
-              )
-              yield* offer({ ...current, active: undefined, unresolved }, { _tag: "TurnInterrupted", assignment })
-            }),
-          ),
+        interrupt: (turnId) => withOpen((current) => interruptTurn(current, turnId)),
         close: Ref.modify(state, (current): [boolean, State] => {
           if (current.status !== "open") return [false, current]
           return [true, { ...current, status: "closed" }]
@@ -391,6 +397,8 @@ export const make = (capabilities: Capabilities = defaultCapabilities): Effect.E
       output: (part) => currentControls.pipe(Effect.flatMap((current) => current.output(part))),
       toolCall: (call) => currentControls.pipe(Effect.flatMap((current) => current.toolCall(call))),
       complete: (response) => currentControls.pipe(Effect.flatMap((current) => current.complete(response))),
+      interrupt: currentControls.pipe(Effect.flatMap((current) => current.interrupt)),
+      emit: (event) => currentControls.pipe(Effect.flatMap((current) => current.emit(event))),
       lose: (reason) => currentControls.pipe(Effect.flatMap((current) => current.lose(reason))),
     }
     return {

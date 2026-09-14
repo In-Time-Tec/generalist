@@ -138,7 +138,7 @@ const featureEntries: ReadonlyArray<FeatureEntry> = [
   [
     "testing",
     () => import("../src/testing/index.js"),
-    ["KernelProviderConformance", "TestModel", "Testing", "codeExecutorConformance"],
+    ["KernelProviderConformance", "Live", "TestModel", "Testing", "codeExecutorConformance"],
   ],
   [
     "repl",

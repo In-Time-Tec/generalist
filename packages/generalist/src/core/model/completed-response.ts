@@ -1,4 +1,4 @@
-import { Context } from "effect"
+import { Context, Predicate } from "effect"
 import { LanguageModel, type Toolkit } from "effect/unstable/ai"
 import { registerMetadataCopier } from "./service.js"
 
@@ -38,5 +38,6 @@ export const forbidRetry = <A extends object>(failure: A): A => {
 }
 
 /** @internal Whether retrying could duplicate an outcome with unknown authority. */
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- arbitrary classified failures are inspected here; only identity-tracked error objects forbid retry.
 export const isRetryForbidden = (failure: unknown): boolean =>
-  typeof failure === "object" && failure !== null && retryForbiddenFailures.has(failure)
+  Predicate.isObject(failure) && retryForbiddenFailures.has(failure)
