@@ -42,6 +42,33 @@ import { make as makeRetryableOverflow } from "./retryable-overflow.js"
 import { validateContext } from "../../context/session.js"
 import { scheduleBatch, type ToolExecution } from "./tool-batch.js"
 import { ModelSource } from "./model-source.js"
+import { CurrentInvocation, isCompletedResponseModel } from "../../model/completed-response.js"
+
+const completedResponseParts = (
+  operationKey: string,
+  content: ReadonlyArray<Response.Part<Record<string, Tool.Any>>>,
+): ReadonlyArray<Response.StreamPart<Record<string, Tool.Any>>> => {
+  const parts = new Array<Response.StreamPart<Record<string, Tool.Any>>>()
+  for (const [index, part] of content.entries()) {
+    if (part.type === "text") {
+      const id = `${operationKey}:completed:text:${index}`
+      parts.push(
+        Response.makePart("text-start", { id }),
+        Response.makePart("text-delta", { id, delta: part.text, metadata: part.metadata }),
+        Response.makePart("text-end", { id }),
+      )
+    } else if (part.type === "reasoning") {
+      const id = `${operationKey}:completed:reasoning:${index}`
+      parts.push(
+        Response.makePart("reasoning-start", { id }),
+        Response.makePart("reasoning-delta", { id, delta: part.text, metadata: part.metadata }),
+        Response.makePart("reasoning-end", { id }),
+      )
+    } else parts.push(part)
+  }
+  return parts
+}
+
 export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeContext<T, R>) => {
   const {
     agent,
@@ -278,11 +305,29 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                       prompt: responsePrompt,
                       turn,
                     })
-                    const rawParts = LanguageModel.streamText({
-                      prompt: wirePrompt,
+                    const invocation = {
+                      turnId: operationKey,
+                      assignmentId: operationKey,
                       toolkit: activeRegistry.toolkit,
-                      disableToolCallResolution: true,
-                    }).pipe(
+                    }
+                    const providerParts = isCompletedResponseModel(activeModel)
+                      ? Stream.fromEffect(
+                          LanguageModel.generateText({
+                            prompt: wirePrompt,
+                            toolkit: activeRegistry.toolkit,
+                            disableToolCallResolution: true,
+                          }).pipe(Effect.provideService(CurrentInvocation, invocation)),
+                        ).pipe(
+                          Stream.flatMap((response) =>
+                            Stream.fromIterable(completedResponseParts(operationKey, response.content)),
+                          ),
+                        )
+                      : LanguageModel.streamText({
+                          prompt: wirePrompt,
+                          toolkit: activeRegistry.toolkit,
+                          disableToolCallResolution: true,
+                        })
+                    const rawParts = providerParts.pipe(
                       Stream.mapEffect((part) =>
                         part.type === "error"
                           ? Effect.fail(

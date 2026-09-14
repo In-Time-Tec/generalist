@@ -1,9 +1,10 @@
 import { Cause, Context, Effect, Fiber, Layer, Queue, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
-import { ModelRegistry } from "generalist"
+import { Agent, ModelRegistry } from "generalist"
 import * as Live from "generalist/live"
 import * as ModelCatalog from "generalist/providers/model-catalog"
 import * as Deterministic from "generalist/providers/deterministic"
+import * as RuntimeLive from "generalist/runtime/live"
 import * as ModelRoute from "generalist/unstable/providers/model-route"
 
 const assert = (condition: boolean, message: string): void => {
@@ -68,6 +69,12 @@ const qualifyLiveProvider = Effect.gen(function* () {
   assert(events[0]?._tag === "TurnStarted" && events[1]?._tag === "TurnCompleted", "Live events diverged")
   assert(observed.length === 1 && observed[0]?.context === context, "Live provider lost authoritative context")
   assert(observed[0]?.toolkit === toolkit, "Live provider lost the active toolkit")
+
+  const model = RuntimeLive.layer({ capabilities }).pipe(Layer.provide(Layer.succeed(Live.LiveProvider, provider)))
+  const output = yield* Agent.run(Agent.make({ name: "packed-live-agent" }), "use durable Live binding").pipe(
+    Effect.provide(model),
+  )
+  assert(output === "live response", "the packed Runtime Live binding returned the wrong semantic response")
 })
 
 const program = Effect.gen(function* () {

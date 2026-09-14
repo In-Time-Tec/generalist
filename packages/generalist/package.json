@@ -119,6 +119,10 @@
       "types": "./dist/runtime/inspection.d.ts",
       "import": "./dist/runtime/inspection.js"
     },
+    "./runtime/live": {
+      "types": "./dist/runtime/live/index.d.ts",
+      "import": "./dist/runtime/live/index.js"
+    },
     "./runtime/native-layer-environment": {
       "types": "./dist/runtime/hosting/native-layer-environment.d.ts",
       "import": "./dist/runtime/hosting/native-layer-environment.js"

@@ -19,6 +19,7 @@ import {
   generateId,
   isInvocationLifecycleFailed,
 } from "./telemetry/events.js"
+import { isRetryForbidden } from "./completed-response.js"
 
 export { type Identity, type IdentityCell, makeIdentityCell } from "./attempt/identity.js"
 export type { InstrumentOptions } from "./attempt/instrumentation.js"
@@ -90,6 +91,7 @@ const beginCall = (
       ),
       classify: memoized((error) => {
         if (
+          isRetryForbidden(error) ||
           isInvocationLifecycleFailed(error) ||
           providerClassification(error) === "context-overflow" ||
           isInvalidToolCallParameters(error) ||

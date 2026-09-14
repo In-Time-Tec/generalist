@@ -61,9 +61,13 @@ The owning Effect `Scope` owns the provider connection and its resources. The ev
 
 Command success means the adapter locally accepted an operation. It is not remote acknowledgement, exactly-once execution, durability, or permission to retry after ambiguous connection loss.
 
-## Durability boundary
+## Runtime binding
 
-Live events and frames are transient process-local observations. They have no replay cursor and are never Session entries or Runtime authority. A durable host may later attach its own assignment identity and commit `TurnCompleted.response` through the existing model-operation boundary, but that integration belongs to the durable integration contract—not `generalist/live`.
+`generalist/runtime/live` adapts an application-provided `LiveProvider` to the existing Agent and Runtime model-operation boundary. Supply its `layer` from a Runtime `executionServices` factory. It opens one fresh scoped connection for each model operation, sends the canonical Session-derived prompt and complete active toolkit, and assigns the durable operation identity to the Live turn.
+
+Only the matching `TurnCompleted.response` enters the Agent response builder, tool scheduler, Session, or Runtime journal. Provisional `Output` and `ToolCall` events are available through the binding's `onEvent` observer for immediate playback or display, but are never treated as semantic completion. A stale assignment, turn interruption, overflow, closure, or connection loss fails the operation with a sanitized unknown-outcome error and is never retried automatically.
+
+Live events and frames remain transient process-local observations. They have no replay cursor and are never Session entries or Runtime authority. Complete file parts in `TurnCompleted.response` use the existing optional `BlobStore` boundary; raw provisional audio or image frames are not persisted implicitly.
 
 The durable `Session` remains the authority for model-facing conversation history. Runtime journals remain the authority for accepted work, execution ownership, cancellation intent, tool outcomes, and terminal facts. Closing or losing a Live observer never rewrites those facts, and live interruption is distinct from durable cancellation.
 
@@ -74,5 +78,6 @@ The durable `Session` remains the authority for model-facing conversation histor
 ## Related
 
 - Source: `packages/generalist/src/live/`
+- Runtime binding: `packages/generalist/src/runtime/live/`
 - Testing: `packages/generalist/src/testing/live/`
 - Durable authority: [`runtime.md`](./runtime.md), [`session-and-compaction.md`](./session-and-compaction.md)
