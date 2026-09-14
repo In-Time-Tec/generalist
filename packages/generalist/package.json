@@ -83,6 +83,10 @@
       "types": "./dist/hooks/index.d.ts",
       "import": "./dist/hooks/index.js"
     },
+    "./live": {
+      "types": "./dist/live/index.d.ts",
+      "import": "./dist/live/index.js"
+    },
     "./eval": {
       "types": "./dist/eval/index.d.ts",
       "import": "./dist/eval/index.js"
@@ -166,6 +170,10 @@
     "./testing/durability": {
       "types": "./dist/testing/durability/index.d.ts",
       "import": "./dist/testing/durability/index.js"
+    },
+    "./testing/live": {
+      "types": "./dist/testing/live/index.d.ts",
+      "import": "./dist/testing/live/index.js"
     },
     "./trajectory": {
       "types": "./dist/trajectory/index.d.ts",

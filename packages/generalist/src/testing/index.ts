@@ -1,4 +1,5 @@
 import { blobStore } from "./blob-store.js"
+import { register as live } from "./live/conformance.js"
 import { memory } from "./memory.js"
 import { memo } from "./memo.js"
 import { write } from "./report.js"
@@ -7,6 +8,7 @@ import { runtimeDriver } from "./runtime-driver/index.js"
 import { sandbox } from "./sandbox.js"
 
 export * as TestModel from "./model/service.js"
+export * as Live from "./live/index.js"
 
 export { codeExecutorConformance } from "./code-executor.js"
 export type { Options as CodeExecutorConformanceOptions } from "./code-executor.js"
@@ -17,6 +19,7 @@ export * as KernelProviderConformance from "./repl/kernel-provider.js"
 /** Public conformance suites and certification reporting. */
 export const Testing = {
   blobStore,
+  live,
   runtimeDriver,
   memory,
   memo,
