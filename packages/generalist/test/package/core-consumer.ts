@@ -1,6 +1,7 @@
-import { Context, Effect, Layer, Schema } from "effect"
-import { LanguageModel, Tool } from "effect/unstable/ai"
+import { Cause, Context, Effect, Fiber, Layer, Queue, Ref, Schema, Stream } from "effect"
+import { LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/unstable/ai"
 import { ModelRegistry } from "generalist"
+import * as Live from "generalist/live"
 import * as ModelCatalog from "generalist/providers/model-catalog"
 import * as Deterministic from "generalist/providers/deterministic"
 import * as ModelRoute from "generalist/unstable/providers/model-route"
@@ -8,6 +9,66 @@ import * as ModelRoute from "generalist/unstable/providers/model-route"
 const assert = (condition: boolean, message: string): void => {
   if (!condition) throw new Error(message)
 }
+
+const qualifyLiveProvider = Effect.gen(function* () {
+  const capabilities: Live.Capabilities = {
+    input: [{ modality: "text", mediaTypes: [] }],
+    output: [{ modality: "text", mediaTypes: [] }],
+    tools: false,
+    interruption: true,
+  }
+  const requests = yield* Ref.make<ReadonlyArray<Live.TurnRequest>>([])
+  const provider: Live.Service = {
+    capabilities,
+    connect: () =>
+      Effect.gen(function* () {
+        const queue = yield* Queue.unbounded<Live.Event, Live.EventFailure | Cause.Done>()
+        yield* Effect.addFinalizer(() => Queue.shutdown(queue))
+        return {
+          id: "packed-external-live",
+          capabilities,
+          events: Stream.fromQueue(queue),
+          send: () => Effect.void,
+          commitInput: (request) =>
+            Ref.update(requests, (current) => [...current, request]).pipe(
+              Effect.andThen(Queue.offer(queue, { _tag: "TurnStarted", sequence: 0, assignment: request.assignment })),
+              Effect.andThen(
+                Queue.offer(queue, {
+                  _tag: "TurnCompleted",
+                  sequence: 1,
+                  assignment: request.assignment,
+                  response: [Response.makePart("text", { text: "live response" })],
+                }),
+              ),
+            ),
+          sendToolResult: () =>
+            Live.InvalidCommand.make({ connectionId: "packed-external-live", reason: "fixture has no tools" }),
+          interrupt: () => Effect.void,
+          close: Effect.void,
+        } satisfies Live.Connection
+      }),
+  }
+  const live = Context.get(yield* Layer.build(Layer.succeed(Live.LiveProvider, provider)), Live.LiveProvider)
+  const connection = yield* live.connect({ capabilities, delivery: { _tag: "Backpressure", capacity: 2 } })
+  const received = yield* Stream.runCollect(connection.events.pipe(Stream.take(2))).pipe(Effect.forkChild)
+  const toolkit = Toolkit.empty
+  const context = Prompt.fromMessages([
+    Prompt.makeMessage("system", { content: "packed qualification" }),
+    Prompt.makeMessage("user", {
+      content: [Prompt.makePart("text", { text: "use the external live provider" })],
+    }),
+  ])
+  yield* connection.commitInput({
+    assignment: { turnId: "packed-live-turn", assignmentId: "packed-live-operation" },
+    context,
+    toolkit,
+  })
+  const events = yield* Fiber.join(received)
+  const observed = yield* Ref.get(requests)
+  assert(events[0]?._tag === "TurnStarted" && events[1]?._tag === "TurnCompleted", "Live events diverged")
+  assert(observed.length === 1 && observed[0]?.context === context, "Live provider lost authoritative context")
+  assert(observed[0]?.toolkit === toolkit, "Live provider lost the active toolkit")
+})
 
 const program = Effect.gen(function* () {
   const compiler: ModelRegistry.ToolJsonSchemaCompiler = (tool) => Effect.succeed(Tool.getJsonSchema(tool))
@@ -67,6 +128,7 @@ const program = Effect.gen(function* () {
     ModelRegistry.toolJsonSchemaCompiler(activeModel) === undefined,
     "compiler metadata leaked outside the registry",
   )
+  yield* qualifyLiveProvider
   yield* Effect.log("qualified model/provider/catalog/compiler")
 })
 
