@@ -483,8 +483,7 @@ export const qualify = (config: Configuration, host: { readonly runId: string; r
       startedAt: DateTime.formatIso(DateTime.makeUnsafe(startedAt)),
       finishedAt: DateTime.formatIso(DateTime.makeUnsafe(finishedAt)),
       region: config.connection.region,
-      regionMeaning:
-        config.provider === "aws-s3" ? "configured AWS region" : "R2 signing region, not physical placement",
+      regionMeaning: "configured AWS region",
       namespace,
       environment: config.environment,
       tenant,

@@ -1,6 +1,5 @@
 import { Effect, type Layer, Ref } from "effect"
 import type { LanguageModel } from "effect/unstable/ai"
-import { make as makeSendClock } from "../../model/send-clock.js"
 import type { ModelSelection } from "../../model/registry.js"
 import type { ToolSchedulingPolicy } from "../service.js"
 import type { HandoffRunState } from "../handoff/state.js"
@@ -44,5 +43,4 @@ export const make = (input: {
           Effect.map((handoffRun) => handoffRun.active.agent.toolScheduling),
           Effect.orElseSucceed(() => input.agent.toolScheduling),
         ),
-  sendClock: makeSendClock(),
 })

@@ -2120,12 +2120,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(result).toBe("done")
         if (capturedPrompt === undefined) return yield* Effect.die("model did not capture prompt")
-        const expectedMessages = yield* Schema.decodeUnknownEffect(Schema.Array(Prompt.Message))(
-          Json.parse(
-            `[{"content":"plain instructions","options":{"anthropic":{"cacheControl":{"type":"ephemeral","ttl":"1h"}},"amazonBedrock":{"cachePoint":true}},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"system"},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{"anthropic":{"cacheControl":{"type":"ephemeral"}},"amazonBedrock":{"cachePoint":true}}}],"options":{},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user"}]`,
-          ),
+        expect(capturedPrompt).toEqual(
+          Prompt.fromMessages([
+            Prompt.makeMessage("system", { content: "plain instructions" }),
+            Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "hello" })] }),
+          ]),
         )
-        expect(capturedPrompt).toEqual(Prompt.fromMessages(expectedMessages))
         expect(capturedTools).toEqual([])
       }),
     ] as const
@@ -2150,12 +2150,12 @@ layer(unusedToolHandlerLayer)("Agent", (it) => {
 
         expect(result).toBe("done")
         if (capturedPrompt === undefined) return yield* Effect.die("model did not capture prompt")
-        const expectedMessages = yield* Schema.decodeUnknownEffect(Schema.Array(Prompt.Message))(
-          Json.parse(
-            `[{"content":"","options":{"anthropic":{"cacheControl":{"type":"ephemeral","ttl":"1h"}},"amazonBedrock":{"cachePoint":true}},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"system"},{"content":[{"text":"hello","~effect/ai/Prompt/Part":"~effect/ai/Prompt/Part","type":"text","options":{"anthropic":{"cacheControl":{"type":"ephemeral"}},"amazonBedrock":{"cachePoint":true}}}],"options":{},"~effect/ai/Prompt/Message":"~effect/ai/Prompt/Message","role":"user"}]`,
-          ),
+        expect(capturedPrompt).toEqual(
+          Prompt.fromMessages([
+            Prompt.makeMessage("system", { content: "" }),
+            Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: "hello" })] }),
+          ]),
         )
-        expect(capturedPrompt).toEqual(Prompt.fromMessages(expectedMessages))
       }),
     ] as const
   })

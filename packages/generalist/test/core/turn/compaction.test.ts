@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { Json } from "../json"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Ref, Schema, Stream } from "effect"
 import { LanguageModel, Prompt, Tokenizer } from "effect/unstable/ai"
-import { Compaction, Session, ToolOutput, withCacheBreakpoints } from "../../../src/index"
+import { Compaction, Session, ToolOutput } from "../../../src/index"
 import { ItLayer } from "../it-layer"
 import { estimatePromptTokens } from "../../../src/core/turn/prompt-token-estimate"
 import { make as makeThresholdState } from "../../../src/core/turn/compaction-threshold-state"
@@ -1043,7 +1043,7 @@ describe("Compaction", () => {
     const path = messages.map((message, index) => entry(String(index), message))
     const prefixLength = 3
     const encoded = (prompt: Prompt.Prompt): string => Json.stringify(Schema.encodeSync(Prompt.Prompt)(prompt))
-    const before = withCacheBreakpoints(Prompt.fromMessages(messages), "conversation", undefined)
+    const before = Prompt.fromMessages(messages)
     const prefixBefore = encoded(Prompt.fromMessages(before.content.slice(0, prefixLength)))
     const recentBefore = encoded(Prompt.fromMessages(before.content.slice(-1)))
 
@@ -1064,7 +1064,7 @@ describe("Compaction", () => {
 
         expect(Option.isSome(compacted)).toBe(true)
         if (Option.isNone(compacted) || compacted.value._tag !== "Summarize") return
-        const after = withCacheBreakpoints(compacted.value.history, "conversation", undefined)
+        const after = compacted.value.history
         expect(encoded(Prompt.fromMessages(after.content.slice(0, prefixLength)))).toBe(prefixBefore)
         expect(encoded(Prompt.fromMessages(after.content.slice(-1)))).toBe(recentBefore)
         expect(encoded(summarized ?? Prompt.empty)).toBe(encoded(Prompt.fromMessages([middleUser, middleAssistant])))

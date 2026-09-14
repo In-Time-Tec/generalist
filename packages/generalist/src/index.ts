@@ -1,6 +1,5 @@
 /** Stable identity of one Agent execution. */
 export { RunId } from "./core/durable/run-id.js"
-export { withCacheBreakpoints } from "./core/model/prompt-cache.js"
 
 export * as ActiveModelResponse from "./core/model/result/active-model-response.js"
 export * as Agent from "./core/agent/service.js"

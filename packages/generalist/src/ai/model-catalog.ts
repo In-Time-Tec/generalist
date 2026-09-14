@@ -19,7 +19,7 @@ export interface Metadata {
   readonly model: string
   readonly contextWindow: number
   readonly maxOutput: number
-  /** Whether Generalist's provider adapter preserves output token log probabilities. */
+  /** Whether the configured provider adapter preserves output token log probabilities. */
   readonly logprobs: boolean
   readonly pricing?: {
     readonly inputPerMTok?: number

@@ -64,7 +64,7 @@ This is Generalist's flattened branch interchange contract, not the native full 
 
 Generalist records token ids and log probabilities only on `ModelCall` operations whose persisted Effect AI response metadata contains either fact under the provider's `generalist` metadata. The deterministic model exposed by `generalist/testing/model` can emit this metadata through `TestModel.turn(..., { tokens, logprobs })`.
 
-Pinned Effect AI exposes provider metadata but no provider-neutral token-id or logprob fields. The current Generalist OpenAI, Anthropic, OpenRouter, Groq, and Mistral adapters do not preserve logprobs in normalized response metadata, so their bundled `ModelCatalog` entries declare `logprobs: false`. The exporter does not reconstruct token ids from text or probabilities from token counts.
+Pinned Effect AI exposes provider metadata but no provider-neutral token-id or logprob fields. An external adapter must preserve those facts in normalized response metadata and register accurate `ModelCatalog` metadata. The bundled catalog declares `logprobs: false`; the exporter does not reconstruct token ids from text or probabilities from token counts.
 
 With `include.logprobs: true`, a leaf gets concatenated model-call `logprobs` only when every model call in that Run segment supplied them; otherwise it gets `logprobs: null`. `tokens` is emitted only when every model call supplied token ids. Child paths start a new Run segment at the `child` edge. With `include.logprobs: false`, both optional fields are omitted. Malformed or misaligned metadata is treated as unavailable.
 

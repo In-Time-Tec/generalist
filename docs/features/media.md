@@ -52,17 +52,7 @@ The current object implementation resolves verified bytes; it does not create si
 
 ## Provider support
 
-Generalist resolves a ref to an Effect AI `Prompt.FilePart` immediately before provider dispatch. `ModelCatalog.Metadata.media` records `input`, optional `output`, and `preferredInput`. Missing model metadata conservatively selects bytes. Actual model support can be narrower than its adapter, so applications should register metadata for the exact model they use.
-
-| Released adapter         | Image input | PDF input         | Audio input                           | Video input       | Generated file output | Transport                                      |
-| ------------------------ | ----------- | ----------------- | ------------------------------------- | ----------------- | --------------------- | ---------------------------------------------- |
-| OpenAI Responses         | Yes         | Yes               | No                                    | No                | No                    | Bytes or URL; bundled catalog prefers bytes    |
-| OpenAI Chat / compatible | Yes         | Yes               | No                                    | No                | No                    | Bytes or URL                                   |
-| Anthropic                | Yes         | Yes               | No                                    | No                | No                    | Bytes or URL; bundled catalog prefers bytes    |
-| OpenRouter               | Yes         | Pass-through file | Yes, supported formats and bytes only | Pass-through file | Images                | Image/PDF/video bytes or URL; audio bytes only |
-| Amazon Bedrock Converse  | Yes         | Yes               | No                                    | No                | No                    | Bytes only                                     |
-
-OpenAI, Anthropic, and Bedrock document acceptance above is the adapter contract. OpenRouter's generic PDF/video file path is forwarded to the selected upstream model, which remains authoritative for acceptance. The bundled catalog currently records image input for `gpt-4o-mini`, image/PDF input for `gpt-4.1`, `gpt-4.1-mini`, and `claude-3-5-haiku-latest`, and no generated file output claims.
+Generalist resolves a ref to an Effect AI `Prompt.FilePart` immediately before provider dispatch. `ModelCatalog.Metadata.media` records `input`, optional `output`, and `preferredInput`. Missing model metadata conservatively selects bytes. Applications should register metadata for the exact externally qualified provider and model they use; Generalist does not ship or certify vendor media adapters. The bundled catalog is a metadata snapshot, not a provider-support claim.
 
 ## Journal and compaction
 

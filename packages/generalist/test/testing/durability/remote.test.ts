@@ -7,6 +7,17 @@ import { configuration, providers, qualify, writeEvidence } from "../../../src/t
 const runtime = `Bun ${process.versions.bun ?? "unavailable"}; ${process.platform}/${process.arch}`
 const directory = process.env.GENERALIST_DURABILITY_EVIDENCE_DIR ?? "artifacts/durability-provider"
 
+describe("remote durability configuration", () => {
+  it("exposes only the maintained AWS S3 qualification", () => {
+    expect(providers).toEqual(["aws-s3"])
+    const result = configuration("aws-s3", {})
+    expect(result.status).toBe("unmet")
+    if (result.status === "configured") return
+    expect(result.reasons).toContain("GENERALIST_DURABILITY_AWS_REGION is required")
+    expect(result.reasons.some((reason) => reason.includes("R2"))).toBe(false)
+  })
+})
+
 for (const provider of providers) {
   const configured = configuration(provider, process.env)
   describe(`real ${provider} object durability`, () => {

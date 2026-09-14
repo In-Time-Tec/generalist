@@ -104,7 +104,7 @@ terminal unstructured turn
 - Every admitted stage sibling settles as `Waiting`, `Completed`, `Unknown`, or `Cancelled`; waiting/completed siblings are checkpointed and not rerun on partial resume.
 - Concurrent lifecycle/progress events retain production order, while results, Session projection, and follow-up input retain provider order; the next model call waits for every authored framework call.
 - Provider-executed calls are not run locally; declared tool failures remain schema-valid results; routing, schema, handler-boundary, placement, and authorization failures are typed `FrameworkFailure` values.
-- Provider `error` parts become typed `AiError` failed attempts before telemetry/replay accounting; released OpenAI, Anthropic, and OpenRouter registrations preserve known semantics.
+- Provider `error` parts become typed `AiError` failed attempts before telemetry/replay accounting; external adapters register classifiers for provider-specific semantics.
 - Unknown custom payloads become bounded terminal `UnknownError`; custom `ModelResilience.resolve` may map known payloads before classification.
 - Default resilience retries rate-limit, internal, and transport failures five times — six attempts total — on a 500 ms exponential schedule with ±20% jitter.
 - A supplied `ModelResilience` replaces defaults; `ModelResilience.none` disables retries; every accepted retry emits `ModelRetryScheduled` with category and delay.
@@ -114,7 +114,7 @@ terminal unstructured turn
 - `invalidToolCallCorrectionLimit` is a safe integer from 0 through 2 and applies only to Generalist's pre-output, schema-backed `InvalidToolCallParameters`; generic `AiError.InvalidOutputError` and raw JSON Schema dynamic tools are excluded.
 - Correction exposes the exact permissive provider JSON Schema, validates with original Effect schemas, and releases only decoded calls; invalid attempts discard metadata and `tool-params-*` staging parts but retain terminal usage.
 - Correction feedback is bounded to the tool name, starts another instrumented attempt in the same call, and emits `ModelRetryScheduled` with `invalid-tool-call-correction`.
-- Direct/custom registrations need `ModelRegistry.withToolJsonSchemaCompiler`; released providers attach exact compilers, and OpenRouter selects Anthropic, OpenAI, or default compilation by upstream adapter prefix.
+- Registrations that enable correction need `ModelRegistry.withToolJsonSchemaCompiler`; external adapters attach the exact compiler required by their provider.
 - Every loop model call emits call, attempt, retry, and compaction lifecycle events; one `modelCallId` spans attempts, while `modelAttemptId` and zero-based `attempt` identify each invocation and `ModelPart`.
 - Purposes are `conversation`, `structured-output`, or `compaction-summary`; `ModelPart` is process-local, while Runtime stores normalized completion or terminal interruption.
 - Effect Clock timestamps mark actual lifecycle boundaries; events stay causal and flush at the next boundary or stream end; external interruption withholds in-flight telemetry from that consumer.

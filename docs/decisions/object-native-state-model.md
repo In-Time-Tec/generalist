@@ -1,6 +1,6 @@
 # One object-native state authority
 
-Generalist's clean v1 Runtime uses one object-storage engine with S3, native R2, and local-directory transports. The process-local Agent loop remains independent. Local processes, servers, Cloudflare Durable Objects, and Rivet actors own compute scopes; none supplies a competing Generalist database.
+Generalist's clean v1 Runtime uses one object-storage engine with S3 and local-directory transports. The process-local Agent loop remains independent. Application-owned processes and servers own compute scopes; none supplies a competing Generalist database.
 
 ## Commit and recovery boundary
 
@@ -33,6 +33,6 @@ Rewind changes the current projection while retaining append-only history, recei
 
 ## Evidence boundary
 
-Local qualification uses MinIO and persistent Miniflare/workerd with the committed exact-EOF emulator patch. Native/S3 shared-bucket checks pass through Miniflare's gateway and must be labeled accordingly. Local results do not certify AWS S3 or deployed R2. Protocol models prove only their recorded assumptions and explored bounds; they do not substitute for integration tests, measured workloads, full browser acceptance, or an exact detached release candidate.
+Local qualification uses the local-directory transport and MinIO's S3-compatible API. Local results do not certify AWS S3 or another deployed S3-compatible service. Protocol models prove only their recorded assumptions and explored bounds; they do not substitute for integration tests, measured workloads, full browser acceptance, or an exact detached release candidate.
 
 The [durability verification report](../features/durability-verification.md) maps these invariants to executable tests; current commands and limitations belong in [object durability](../features/durable-stores.md). This decision is not a release-ready or completion claim.

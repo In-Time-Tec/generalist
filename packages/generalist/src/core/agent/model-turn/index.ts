@@ -9,7 +9,6 @@ import type { Request } from "../../tools/tool-executor.js"
 import { classifyFailure as classifyModelFailure } from "../../model/registry.js"
 import { CurrentInstrumentation, CurrentPurpose } from "../../model/telemetry/context.js"
 import type { CallPurpose } from "../../model/telemetry/events.js"
-import { withWireCache } from "../../model/prompt-cache.js"
 import type { AnyToolCall } from "../tools/result.js"
 import type { ActiveModelServices, ModelTurnServices, RuntimeContext } from "./context.js"
 import {
@@ -67,7 +66,7 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
   const agentModel = modelSource._tag === "Registry" ? modelSource.selection : undefined
   const activeTurnInput: Parameters<typeof makeActiveTurn>[0] = { agent, agentModel }
   if (handoffStateRef !== undefined) Object.assign(activeTurnInput, { handoffStateRef })
-  const { activeAgentName, activeModelSelection, activeModelOverride, activeToolScheduling, sendClock } =
+  const { activeAgentName, activeModelSelection, activeModelOverride, activeToolScheduling } =
     makeActiveTurn(activeTurnInput)
   const withModelTelemetry =
     (turn: number, purpose: CallPurpose) =>
@@ -274,10 +273,9 @@ export const make = <T extends Record<string, Tool.Any>, R>(context: RuntimeCont
                       state.currentContext = responsePrompt
                       state.currentContextTokens = yield* countTokens(turn, responsePrompt)
                     }
-                    const cachedPrompt = yield* withWireCache(responsePrompt, yield* CurrentPurpose, sendClock)
-                    yield* Ref.set(context.lastWirePrompt, cachedPrompt)
+                    yield* Ref.set(context.lastWirePrompt, responsePrompt)
                     const wirePrompt = yield* resolveMediaPrompt({
-                      prompt: cachedPrompt,
+                      prompt: responsePrompt,
                       turn,
                     })
                     const rawParts = LanguageModel.streamText({

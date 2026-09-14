@@ -106,7 +106,7 @@ Effect.runPromise(writeCertification.pipe(Effect.provide(MyDriver.platformLayer)
 
 The report has `schemaVersion: 1` and sorted `{ name, capabilities }` entries. Runtime entries use `runtimeDriver:<driver-name>`; Sandbox entries use `sandbox:<provider-name>`; service suites use `blobStore`, `memory`, and `ruleStore`.
 
-The runtime-driver suite records capability evidence in `docs/features/hosts-report.json`. Treat that file as retained evidence for its recorded revision, not as live provider certification.
+The manually maintained `docs/features/hosts-report.json` records accepted Runtime capability evidence. It has no source-revision field; treat it as checked-in local evidence, not as live provider certification.
 
 ## Scripted model fixtures
 

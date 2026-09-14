@@ -3,7 +3,6 @@ import { expect, it, layer } from "@effect/vitest"
 import { Deferred, Effect, Exit, Fiber, Layer, Option, Schema, Scope, Stream } from "effect"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { Agent, ExecutableManifest, Handoff, Session, ToolExecutor } from "../../../src/index.js"
-import { withCacheBreakpoints } from "../../../src/core/model/prompt-cache.js"
 import { Address, Errors, ExecutableResolver, RunTree } from "../../../src/runtime/index.js"
 import { RunStore } from "../../../src/runtime/run/store.js"
 import { RunExecutor } from "../../../src/runtime/execution/run-executor.js"
@@ -487,7 +486,7 @@ it.live("requires explicit resolution of a handoff tool interrupted after its in
       const expectedSpecialistInput = Prompt.concat(Prompt.make("projected-for-specialist"), continuation)
       expect(conversationBeforeContinuation).toEqual(Prompt.make("projected-for-specialist"))
       expect(receivedByChild?.content.filter((message) => message.role !== "system")).toEqual(
-        withCacheBreakpoints(expectedSpecialistInput, "conversation", undefined).content,
+        expectedSpecialistInput.content,
       )
       const receivedJson = yield* Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown))(receivedByChild)
       expect(receivedJson).not.toContain("start with the supervisor")

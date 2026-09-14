@@ -180,12 +180,12 @@ const diagrams = {
   durability: {
     title: "Keep the work. Replace the compute.",
     caption:
-      "Rivet owns the actor’s compute lifecycle. Generalist’s shared object engine owns canonical state in S3 or native R2. Wake notifications and previews are derived, not storage authority.",
+      "Application-owned hosts manage compute lifecycles. Generalist’s object engine owns canonical state in a local directory or S3. Local-directory recovery stays on that machine; replacement-machine recovery needs reachable object storage.",
     height: 332,
     steps: [
       { x: 24, y: 28, width: 167, title: "Local / server host", detail: "Replaceable process", tone: "hint" },
-      { x: 223, y: 28, width: 167, title: "Rivet actor", detail: "Stable partition key", tone: "hint" },
-      { x: 422, y: 28, width: 167, title: "Cloudflare host", detail: "Independent option", tone: "hint" },
+      { x: 223, y: 28, width: 167, title: "Worker host", detail: "Application-owned", tone: "hint" },
+      { x: 422, y: 28, width: 167, title: "Replacement host", detail: "Same namespace", tone: "hint" },
       {
         x: 121,
         y: 140,
@@ -199,7 +199,7 @@ const diagrams = {
         y: 250,
         width: 371,
         title: "One object-storage engine",
-        detail: "S3 / native R2 • canonical journal and receipts",
+        detail: "Local directory / S3 • canonical journal and receipts",
         tone: "authority",
       },
     ],

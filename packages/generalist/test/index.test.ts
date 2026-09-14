@@ -227,7 +227,6 @@ describe("generalist public surface", () => {
         "ToolPlacement",
         "Triggers",
         "Watcher",
-        "withCacheBreakpoints",
       ])
     }),
   )

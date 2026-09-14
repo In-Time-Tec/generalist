@@ -21,10 +21,6 @@ rules:
       exclude:
         - "packages/*/test/**/*.tui.test.ts"
         - "packages/*/test/**/*.proc.test.ts"
-        # Cross-module Cloudflare harnesses (live workerd, conformance, export graphs) test no single src module
-        - "packages/*/test/unstable/cloudflare/*.test.ts"
-        # Cross-provider layerModel conformance exercises every provider's own module
-        - "packages/*/test/ai/provider/layer-model.test.ts"
         # Memo conformance spans the public facade, Agent loop, Runtime journal, and storage drivers
         - "packages/generalist/test/memo/*.test.ts"
         # Learning acceptance spans the unstable leaf, Hooks, approvals, Runtime recovery, and storage drivers

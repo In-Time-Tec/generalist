@@ -9,7 +9,8 @@ Generalist verifies the object-native Runtime and its two maintained transports 
 
 - `packages/generalist/test/testing/runtime-driver/` owns shared Runtime capability expectations.
 - `packages/generalist/test/durability/` covers canonical state, recovery, contention, fencing, receipts, snapshots, and object-transport conformance.
-- `packages/generalist/test/durability/object-store.test.ts` runs the S3-compatible transport against local MinIO and exercises the local-directory transport.
+- `packages/generalist/test/durability/object-store.test.ts` runs the S3-compatible transport against local MinIO.
+- `packages/generalist/test/durability/fs.test.ts` exercises the local-directory transport.
 - Fresh-Layer tests close and reopen Runtime services so process-local caches cannot masquerade as recovery.
 
 Run the complete maintained evidence with:

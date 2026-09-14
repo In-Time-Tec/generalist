@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Remove native R2 qualification and provider-specific prompt-cache mutation from the small core. Current documentation now describes application-owned vendor model, compute, sandbox, memory, realtime, and client adapters while retaining filesystem/S3 durability, generic hosting and protocols, and Foldkit only as documentation tooling.
+
 ## 0.66.1
 
 - Export the actor-owned `RunStore` and `RunExecutor` host controls from the unstable Rivet boundary so trusted actor integrations can preserve fixed-ID admission and exact execution-claim fencing without restoring those internals to the stable Runtime API.

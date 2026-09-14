@@ -403,7 +403,7 @@ const registerNotificationRecovery = <LayerError, ClaimsLayerError>(
 export const runtimeDriver = <LayerError, ClaimsLayerError>(options: Options<LayerError, ClaimsLayerError>): void => {
   const suite = options.skip === true ? describe.skip : describe
   suite(`${options.name} Generalist Runtime driver conformance`, () => {
-    // Suite `meta` reaches Vitest reporters; the repository certification reporter decodes it.
+    // Suite `meta` lets an application-owned Vitest reporter decode certification metadata.
     // oxlint-disable-next-line no-empty-pattern -- Vitest requires a destructuring pattern for the fixture argument.
     beforeAll(({}, task) => {
       Object.assign(task.meta, { generalistCertification: certification(options) })

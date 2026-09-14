@@ -98,6 +98,6 @@ The checkpoint and intercepted compaction result are journaled before execution 
 - `Session` remains the lossless authority; compaction changes only its active projection.
 - Verbatim regions retain Effect AI prompt messages and provider options without re-encoding through a parallel payload format.
 - Tool calls are never separated from their results at the recent-tail boundary.
-- Prompt-cache markers are derived only at provider send time and are not persisted by compaction.
+- Generalist does not derive provider cache markers. Verbatim regions preserve existing provider options; provider-specific cache mutation belongs to external adapters.
 - Summary calls use the ordinary model telemetry path with purpose `compaction-summary` and the enclosing `compactionId`.
 - Media compaction operates on references and never loads blob bytes.

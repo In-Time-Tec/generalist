@@ -24,7 +24,7 @@ export interface Evidence {
   readonly startedAt: string
   readonly finishedAt: string
   readonly region: string
-  readonly regionMeaning: "configured AWS region" | "R2 signing region, not physical placement"
+  readonly regionMeaning: "configured AWS region"
   readonly namespace: string
   readonly environment: string
   readonly tenant: string

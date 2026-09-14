@@ -294,7 +294,7 @@ export const sections: ReadonlyArray<Section> = [
           ],
           [
             "OpenAI-compatible endpoint",
-            "Use the compatible provider rather than assuming every endpoint implements all OpenAI features.",
+            "Use an upstream compatible provider rather than assuming every endpoint implements all OpenAI features.",
           ],
           [
             "ModelRegistry and model catalog",
@@ -306,7 +306,7 @@ export const sections: ReadonlyArray<Section> = [
           ],
           [
             "Embedding providers",
-            "Use the embedding subpaths for retrieval workflows; they are separate from a chat model’s generation contract.",
+            "Provide an upstream Effect AI EmbeddingModel Layer for retrieval; embeddings are separate from a chat model’s generation contract.",
           ],
         ],
       ),
@@ -722,10 +722,6 @@ export const sections: ReadonlyArray<Section> = [
             "Generalist transport",
             "Serve command, snapshot, and replay flows over an application-owned authenticated server.",
           ],
-          [
-            "Foldkit Chat / Connection",
-            "Headless client state and connection handling; your Foldkit application owns the UI and styling.",
-          ],
         ],
       ),
       note(
@@ -1123,7 +1119,7 @@ export const sections: ReadonlyArray<Section> = [
     group: "Connect",
     blocks: [
       p(
-        "Keep the coding agent’s execution contract independent of its interface. A CLI, Foldkit application, protocol adapter, server, or alternate compute host should observe the same accepted work.",
+        "Keep the coding agent’s execution contract independent of its interface. A CLI, application UI, protocol adapter, server, or alternate compute host should observe the same accepted work.",
       ),
       table(
         ["Surface", "Ownership"],
@@ -1133,7 +1129,7 @@ export const sections: ReadonlyArray<Section> = [
             "Application process boundaries, registration, and serving. Authentication and resource authorization remain yours.",
           ],
           ["Transport", "Commands plus snapshot-first observation and replay. Reconnect from committed state."],
-          ["Foldkit", "Headless Chat and Connection state for your own rendered interface."],
+          ["Application client", "Own interface state and reconnect from the server's snapshot and cursor contracts."],
           ["Application workers", "Reconstruct and execute work using the same canonical object engine."],
           [
             "Triggers / watchers",

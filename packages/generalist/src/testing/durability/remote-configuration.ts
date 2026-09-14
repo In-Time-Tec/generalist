@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import type { ConnectionOptions } from "../../durability/s3.js"
 
-export const providers = ["aws-s3", "r2-s3"] as const
+export const providers = ["aws-s3"] as const
 export type Provider = (typeof providers)[number]
 
 const Identity = Schema.String.check(Schema.isPattern(/^[a-z0-9][a-z0-9_-]{0,47}$/))
@@ -62,28 +62,6 @@ const validateIdentity = (name: string, value: string, reasons: Array<string>): 
   if (value !== "" && !isIdentity(value)) reasons.push(`${name} must match [a-z0-9][a-z0-9_-]{0,47}`)
 }
 
-const validateR2Endpoint = (endpoint: string | undefined, reasons: Array<string>): void => {
-  if (endpoint === undefined || endpoint === "") return
-  try {
-    const url = new URL(endpoint)
-    const valid =
-      url.protocol === "https:" &&
-      /^[a-f0-9]{32}(?:\.(?:eu|fedramp))?\.r2\.cloudflarestorage\.com$/.test(url.hostname) &&
-      url.port === "" &&
-      url.username === "" &&
-      url.password === "" &&
-      url.search === "" &&
-      url.hash === "" &&
-      url.pathname === "/"
-    if (!valid)
-      reasons.push(
-        "GENERALIST_DURABILITY_R2_ENDPOINT must be the HTTPS Cloudflare account S3 API origin, not a cached public or custom endpoint",
-      )
-  } catch {
-    reasons.push("GENERALIST_DURABILITY_R2_ENDPOINT must be a valid HTTPS Cloudflare account S3 API origin")
-  }
-}
-
 const boundedNumber = (
   env: Readonly<Record<string, string | undefined>>,
   name: string,
@@ -118,14 +96,12 @@ export const configuration = (
   const tenant = required(env, "GENERALIST_DURABILITY_TENANT", reasons)
   validateIdentity("GENERALIST_DURABILITY_ENVIRONMENT", environment, reasons)
   validateIdentity("GENERALIST_DURABILITY_TENANT", tenant, reasons)
-  const prefix = provider === "aws-s3" ? "GENERALIST_DURABILITY_AWS" : "GENERALIST_DURABILITY_R2"
+  const prefix = "GENERALIST_DURABILITY_AWS"
   const bucket = required(env, `${prefix}_BUCKET`, reasons)
   const accessKeyId = required(env, `${prefix}_ACCESS_KEY_ID`, reasons)
   const secretAccessKey = required(env, `${prefix}_SECRET_ACCESS_KEY`, reasons)
   const sessionToken = env[`${prefix}_SESSION_TOKEN`]
-  const region = provider === "aws-s3" ? required(env, `${prefix}_REGION`, reasons) : "auto"
-  const endpoint = provider === "r2-s3" ? required(env, `${prefix}_ENDPOINT`, reasons) : undefined
-  validateR2Endpoint(endpoint, reasons)
+  const region = required(env, `${prefix}_REGION`, reasons)
   const seed = boundedNumber(env, "GENERALIST_DURABILITY_SEED", 1, 0, 0xffff_ffff, reasons)
   const concurrency = boundedNumber(env, "GENERALIST_DURABILITY_CONCURRENCY", 4, 2, 16, reasons)
   validateCleanup(env.GENERALIST_DURABILITY_CLEANUP, reasons)
@@ -139,7 +115,7 @@ export const configuration = (
       seed,
       concurrency,
       cleanup: env.GENERALIST_DURABILITY_CLEANUP === "1",
-      connection: buildConnection({ bucket, region, accessKeyId, secretAccessKey, sessionToken, endpoint }),
+      connection: buildConnection({ bucket, region, accessKeyId, secretAccessKey, sessionToken, endpoint: undefined }),
     },
   }
 }

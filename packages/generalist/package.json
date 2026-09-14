@@ -253,7 +253,6 @@
     "@types/bun": "catalog:",
     "alchemy": "catalog:",
     "effect": "catalog:",
-    "esbuild": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "yjs": "catalog:"
