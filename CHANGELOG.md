@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.67.0
+
+- Add the provider-neutral scoped Live contract as `generalist/live` and the deterministic `generalist/testing/live` harness: connections carry ordered turn assignments, provisional output stays observer-only, and only `TurnCompleted.response` is semantic.
+- Add `generalist/runtime/live`, binding a Live provider to the durable Runtime model-operation boundary: a fresh scoped connection per operation, canonical prompt and toolkit, stable turn and assignment identities, sanitized ambiguous outcomes that are never silently retried, and recovery through explicit operator resolution.
+- Add provider-neutral child coordination through `generalist/runtime/child-coordination` so trusted hosts expose safe cross-partition child admission without a second agent loop.
 - Remove native R2 qualification and provider-specific prompt-cache mutation from the small core. Current documentation now describes application-owned vendor model, compute, sandbox, memory, realtime, and client adapters while retaining filesystem/S3 durability, generic hosting and protocols, and Foldkit only as documentation tooling.
 
 ## 0.66.1
