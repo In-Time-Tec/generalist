@@ -84,6 +84,7 @@ export interface StoredRun {
   readonly attempt: number
   readonly attemptFence: number
   readonly ownerId?: string
+  readonly agentPermitParked?: string
   readonly operationNamespace?: string
   readonly checkpoint?: ExecutionCheckpoint
   readonly suspension?: ExecutionSuspension

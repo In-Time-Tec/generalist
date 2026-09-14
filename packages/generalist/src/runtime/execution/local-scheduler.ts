@@ -41,6 +41,8 @@ export interface Service {
   >
   /** Awaits every execution this scheduler admitted and has not yet observed finish. */
   readonly idle: Effect.Effect<void, SchedulerError | SchedulerLifecycleError>
+  /** @internal Awaits runnable executions while allowing parked parent continuations to remain owned. */
+  readonly runnableIdle: Effect.Effect<void, SchedulerError | SchedulerLifecycleError, RunStore>
 }
 
 export class LocalScheduler extends Context.Service<LocalScheduler, Service>()(

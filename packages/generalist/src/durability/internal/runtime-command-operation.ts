@@ -42,6 +42,7 @@ export const ExecutionRecord = Schema.Struct({
   executableManifest: ExecutableManifest,
   attempt: Schema.Finite,
   attemptFence: ExecutionClaim.fields.attemptFence,
+  agentPermitParked: Schema.optionalKey(Schema.String),
   cancellationRequested: Schema.Boolean,
   checkpoint: Schema.optionalKey(ExecutionCheckpoint),
   suspension: Schema.optionalKey(ExecutionSuspension),
@@ -169,6 +170,8 @@ type Method =
   | "acknowledgeOperationCancellation"
   | "resolveOperation"
   | "releaseExecution"
+  | "parkAgentPermit"
+  | "resumeAgentPermit"
   | "reserveProgramOperation"
   | "suspendProgramOperation"
   | "admitProgramAgents"
@@ -366,6 +369,18 @@ export const commands: Commands = {
     input: Schema.Tuple([ExecutionClaim]),
     receipt: Schema.Void,
     identity: ([input]) => digest(["releaseExecution", input.runId, input.attemptFence]),
+  },
+  parkAgentPermit: {
+    tag: "parkAgentPermit" as const,
+    input: Schema.Tuple([Schema.Struct({ ...ExecutionClaim.fields, token: Schema.String })]),
+    receipt: Schema.Void,
+    identity: ([input]) => digest(["parkAgentPermit", input.runId, input.attemptFence, input.token]),
+  },
+  resumeAgentPermit: {
+    tag: "resumeAgentPermit" as const,
+    input: Schema.Tuple([Schema.Struct({ ...ExecutionClaim.fields, token: Schema.String })]),
+    receipt: Schema.Void,
+    identity: ([input]) => digest(["resumeAgentPermit", input.runId, input.attemptFence, input.token]),
   },
   saveExecution: {
     tag: "saveExecution" as const,

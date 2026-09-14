@@ -1,61 +1,18 @@
-import { Context, Effect, Equal, Layer, Option } from "effect"
+import { Effect, Equal, Layer, Option } from "effect"
 import { type Placement, identifyRequest, type PageInput } from "./placement.js"
 import { ExternalChildStore, type Service } from "./store.js"
 import { RuntimeUnavailable } from "../../errors.js"
+import { Peer, type BoundRoute } from "../coordination.js"
+import { resolve } from "../coordination-internal.js"
 
 /** The application authorizes and scopes each peer connection; no marker or envelope grants access. @experimental */
-export interface Options<E = never, R = never> {
+export interface Options<R = never> {
   readonly partition: string
   readonly limit?: number
   readonly placementCursor?: string
   readonly rootCursor?: string
-  readonly connect: (partition: string) => Effect.Effect<Option.Option<Layer.Layer<ExternalChildStore, E, R>>, E, R>
+  readonly connect: (partition: string) => Effect.Effect<Option.Option<BoundRoute>, RuntimeUnavailable, R>
 }
-
-/** A HOST-owned, requirement-closed peer router used by the native Runtime. @experimental */
-export interface PeerRoutesService {
-  readonly connect: (
-    partition: string,
-  ) => Effect.Effect<Option.Option<Layer.Layer<ExternalChildStore, RuntimeUnavailable>>, RuntimeUnavailable>
-}
-
-/** Explicit peer authorization for native cross-partition child placement. @experimental */
-export class ExternalChildPeerRoutes extends Context.Service<ExternalChildPeerRoutes, PeerRoutesService>()(
-  "generalist/runtime/child/external/reconciliation/ExternalChildPeerRoutes",
-) {}
-
-const routeUnavailable = (partition: string) =>
-  RuntimeUnavailable.make({ message: `External child peer ${partition} is unavailable` })
-
-/**
- * Capture a HOST's peer dependencies and translate its private connection failures at the
- * framework boundary. Returning None remains the authorization decision; a partition string
- * alone never grants access.
- * @experimental
- */
-export const layerPeerRoutes = <E, R>(
-  connect: Options<E, R>["connect"],
-): Layer.Layer<ExternalChildPeerRoutes, never, R> =>
-  Layer.effect(
-    ExternalChildPeerRoutes,
-    Effect.map(Effect.context<R>(), (context) =>
-      ExternalChildPeerRoutes.of({
-        connect: (partition) =>
-          connect(partition).pipe(
-            Effect.provide(context),
-            Effect.mapError(() => routeUnavailable(partition)),
-            Effect.map(
-              Option.map((peer) =>
-                peer.pipe(
-                  Layer.provide(Layer.succeedContext(context)),
-                  Layer.catchCause(() => Layer.effect(ExternalChildStore, Effect.fail(routeUnavailable(partition)))),
-                ),
-              ),
-            ),
-          ),
-      }),
-    ),
-  )
 
 const deliver = (parent: Service, child: Service, placement: Placement) =>
   Effect.gen(function* () {
@@ -93,18 +50,33 @@ const deliver = (parent: Service, child: Service, placement: Placement) =>
     })
   })
 
-const withPeer = <E, R, A, E2, R2>(
-  options: Options<E, R>,
+const withPeer = <A, E, R, R2>(
+  options: Options<R2>,
   partition: string,
-  use: (peer: Service) => Effect.Effect<A, E2, R2>,
+  use: (peer: Service) => Effect.Effect<A, E, R>,
 ) =>
   Effect.scoped(
     Effect.gen(function* () {
       const authorized = yield* options.connect(partition)
       if (Option.isNone(authorized)) return false
-      const services = yield* Layer.build(authorized.value)
-      const peer = yield* ExternalChildStore.pipe(Effect.provide(services))
-      yield* use(peer)
+      const services = yield* Layer.build(authorized.value.endpoint)
+      const endpoint = yield* Peer.pipe(Effect.provide(services))
+      const binding = resolve(endpoint)
+      if (binding === undefined || binding.partition !== partition) {
+        return yield* RuntimeUnavailable.make({ message: `External child peer ${partition} is invalid` })
+      }
+      yield* use(binding.store)
+      const wake = yield* authorized.value.wake.pipe(
+        Effect.exit,
+        Effect.forkScoped({ startImmediately: true, uninterruptible: false }),
+      )
+      const awaitWake = (remaining: number): Effect.Effect<void> =>
+        Effect.suspend(() =>
+          remaining === 0 || wake.pollUnsafe() !== undefined
+            ? Effect.void
+            : Effect.sleep("10 millis").pipe(Effect.andThen(awaitWake(remaining - 1))),
+        )
+      yield* awaitWake(100)
       return true
     }),
   )
@@ -115,7 +87,7 @@ const withPeer = <E, R, A, E2, R2>(
  * leave canonical obligations for a fresh host, not a process-local delivery queue.
  * @experimental
  */
-export const reconcilePage = <E, R>(options: Options<E, R>) =>
+export const reconcilePage = <R>(options: Options<R>) =>
   Effect.gen(function* () {
     const local = yield* ExternalChildStore
     const placementPage: PageInput = { limit: options.limit ?? 64 }

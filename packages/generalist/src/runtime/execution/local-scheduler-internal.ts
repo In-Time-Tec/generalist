@@ -1,15 +1,16 @@
-import { Effect, FiberMap, Layer, Ref, Schedule, Schema, type Scope, Semaphore } from "effect"
+import { Effect, FiberMap, Layer, Option, Ref, Schedule, Schema, type Scope, Semaphore } from "effect"
 import { ActiveExecutions } from "./active-executions.js"
 import { RuntimeUnavailable } from "../errors.js"
 import { RunExecutor } from "./run-executor.js"
-import { RunStore, type Service as RunStoreService } from "../run/store.js"
+import { RunStore, type ExecutionClaim, type ExecutionRecord, type Service as RunStoreService } from "../run/store.js"
 import { LocalScheduler, type DrainResult, type Options, type Service } from "./local-scheduler.js"
 import type { ActivationFailure } from "../../durability/internal/runtime.js"
+import type { Controller as AgentPermitController } from "./agent-permits.js"
 
 const encodeRunId = Schema.encodeSync(Schema.fromJsonString(Schema.String))
 
 export const make = (
-  options: Options & { readonly commandIdPrefix?: string },
+  options: Options & { readonly commandIdPrefix?: string; readonly agentPermits?: AgentPermitController },
 ): Effect.Effect<
   Service & { readonly failure: Effect.Effect<never, ActivationFailure> },
   never,
@@ -110,6 +111,15 @@ export const make = (
         // Re-admitting a Run this process is already executing would fence out and interrupt that execution.
         const executing = yield* active.active
         const admitted = yield* Effect.sync(() => new Set(Array.from(executions, ([runId]) => runId)))
+        const occupied =
+          concurrency === undefined
+            ? admitted.size
+            : (yield* Effect.forEach([...admitted], (runId) =>
+                store.loadExecution(runId).pipe(
+                  Effect.map((record) => record.agentPermitParked === undefined),
+                  Effect.catchTag("generalist/runtime/RunNotFound", () => Effect.succeed(false)),
+                ),
+              )).filter(Boolean).length
         const available = yield* Effect.filter(
           [...running, ...queued.filter((run) => run.parentRunId !== undefined && run.childReadiness === "ready")],
           (run) =>
@@ -129,25 +139,39 @@ export const make = (
           )
         }
         yield* Effect.forEach(
-          concurrency === undefined ? available : available.slice(0, Math.max(0, concurrency - admitted.size)),
+          concurrency === undefined ? available : available.slice(0, Math.max(0, concurrency - occupied)),
           (run) =>
             FiberMap.run(
               executions,
               run.runId,
-              store
-                .claimExecution({
-                  commandId: `${commandId}:execute:${encodeRunId(run.runId)}`,
-                  runId: run.runId,
-                  ownerId: options.workerId,
-                })
-                .pipe(
-                  Effect.flatMap(host.execute),
-                  Effect.catchTags({
-                    "generalist/runtime/StaleClaim": () => Effect.void,
-                    "generalist/runtime/RunNotFound": () => Effect.void,
-                    "generalist/runtime/RunTerminal": () => Effect.void,
-                  }),
+              Effect.gen(function* () {
+                yield* options.agentPermits === undefined ? Effect.void : options.agentPermits.acquire(run.runId)
+                const claim: Option.Option<ExecutionRecord & ExecutionClaim> = yield* store
+                  .claimExecution({
+                    commandId: `${commandId}:execute:${encodeRunId(run.runId)}`,
+                    runId: run.runId,
+                    ownerId: options.workerId,
+                  })
+                  .pipe(
+                    Effect.map(Option.some),
+                    Effect.catchTags({
+                      "generalist/runtime/RuntimeUnavailable": () =>
+                        Effect.succeed(Option.none<ExecutionRecord & ExecutionClaim>()),
+                      "generalist/runtime/StaleClaim": () =>
+                        Effect.succeed(Option.none<ExecutionRecord & ExecutionClaim>()),
+                      "generalist/runtime/RunNotFound": () =>
+                        Effect.succeed(Option.none<ExecutionRecord & ExecutionClaim>()),
+                      "generalist/runtime/RunTerminal": () =>
+                        Effect.succeed(Option.none<ExecutionRecord & ExecutionClaim>()),
+                    }),
+                  )
+                if (Option.isNone(claim)) return
+                yield* host.execute(claim.value)
+              }).pipe(
+                Effect.ensuring(
+                  options.agentPermits === undefined ? Effect.void : options.agentPermits.release(run.runId),
                 ),
+              ),
               { onlyIfMissing: true },
             ),
           { discard: true },
@@ -178,6 +202,22 @@ export const make = (
       }).pipe((effect) => tickLock.withPermit(effect))
     }
 
+    const idle = Effect.raceFirst(FiberMap.awaitEmpty(executions), FiberMap.join(executions))
+    const awaitParked: Service["runnableIdle"] = Effect.suspend(() =>
+      Effect.gen(function* () {
+        const admitted = Array.from(executions, ([runId]) => runId)
+        const store = yield* RunStore
+        const parked = yield* Effect.findFirst(admitted, (runId) =>
+          store.loadExecution(runId).pipe(
+            Effect.map((record) => record.agentPermitParked !== undefined),
+            Effect.catchTag("generalist/runtime/RunNotFound", () => Effect.succeed(false)),
+          ),
+        )
+        if (Option.isNone(parked)) yield* Effect.sleep("1 millis").pipe(Effect.andThen(awaitParked))
+      }),
+    )
+    const runnableIdle: Service["runnableIdle"] = Effect.raceFirst(idle, awaitParked)
+
     return {
       ...LocalScheduler.of({
         tick: Effect.suspend(() => drain({ fuel: selectionWindow + reconcileWindow })).pipe(Effect.asVoid),
@@ -186,7 +226,8 @@ export const make = (
           const commandId = `${commandIdPrefix}:cancel:${++commandCounter}`
           return Effect.flatMap(RunStore, (store) => reconcileCancellation(store, runId, commandId))
         },
-        idle: Effect.raceFirst(FiberMap.awaitEmpty(executions), FiberMap.join(executions)),
+        idle,
+        runnableIdle,
       }),
       failure: FiberMap.join(executions).pipe(Effect.andThen(Effect.never)),
     }

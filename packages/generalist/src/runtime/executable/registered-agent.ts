@@ -624,6 +624,7 @@ const resolveCodeModeProgram = (
   registration: RegisteredAgent,
   input: ResolverInput,
 ): Effect.Effect<ProgramResolution, ExecutableRegistrationInvalid> =>
+  // oxlint-disable-next-line eslint/complexity -- Resolution validates every persisted CodeMode authority boundary before binding handlers.
   Effect.gen(function* () {
     const closure = registration.codeMode
     if (closure === undefined) {

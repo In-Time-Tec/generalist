@@ -774,6 +774,25 @@ export interface Service {
     | import("./ownership-errors.js").StaleSessionClaim
   >
   readonly releaseExecution: (input: ExecutionClaim) => Effect.Effect<void, RuntimeUnavailable | DurabilityFailure>
+  readonly parkAgentPermit: (
+    input: ExecutionClaim & { readonly token: string },
+  ) => Effect.Effect<
+    void,
+    | RuntimeUnavailable
+    | import("./ownership-errors.js").StaleClaim
+    | import("./ownership-errors.js").StaleSessionClaim
+    | DurabilityFailure
+  >
+  readonly resumeAgentPermit: (
+    input: ExecutionClaim & { readonly token: string },
+  ) => Effect.Effect<
+    void,
+    | import("../state/store/execution.js").AgentPermitUnavailable
+    | RuntimeUnavailable
+    | import("./ownership-errors.js").StaleClaim
+    | import("./ownership-errors.js").StaleSessionClaim
+    | DurabilityFailure
+  >
   readonly saveExecution: (
     input: CommandIdentity &
       ExecutionClaim & {

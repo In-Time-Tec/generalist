@@ -5,11 +5,20 @@ import { RunNotFound, RunTerminal, RuntimeUnavailable } from "../../errors.js"
 import { isTerminal } from "../../run.js"
 import type { ExecutionClaim, ExecutionRecord, SessionWriteClaim } from "../../run/store.js"
 import { StaleClaim, StaleSessionClaim } from "../../run/ownership-errors.js"
-import { activeChildCount, requireFamilyCapacity } from "./child/capacity.js"
+import { activeChildCount, promoteChildCapacity, requireFamilyCapacity } from "./child/capacity.js"
 import { runWaits, type RuntimeState, type StoredRun } from "../projection.js"
 import { checkpointRef } from "../../executable/manifest-internal.js"
 import { appendLifecycle, attemptStartedEvent } from "../append.js"
 import { requireExecutionClaim } from "./claim.js"
+import { ActionableTaggedError, errorHint } from "../../../core/error-hint.js"
+
+export class AgentPermitUnavailable extends ActionableTaggedError<AgentPermitUnavailable>()(
+  "generalist/runtime/internal/AgentPermitUnavailable",
+  {
+    runId: Schema.String,
+    hint: errorHint("Retry after another Agent in this execution family releases capacity."),
+  },
+) {}
 
 const requireRun = (state: RuntimeState, runId: string) => {
   if (state.closed) return Effect.fail(RuntimeUnavailable.make({ message: "runtime store released" }))
@@ -44,6 +53,7 @@ const executionRecord = (
   if (components !== undefined) record = { ...record, sessionComponents: components }
   if (run.invocationId !== undefined) record = { ...record, invocationId: run.invocationId }
   if (run.ownerId !== undefined) record = { ...record, ownerId: run.ownerId }
+  if (run.agentPermitParked !== undefined) record = { ...record, agentPermitParked: run.agentPermitParked }
   if (run.checkpoint !== undefined) record = { ...record, checkpoint: run.checkpoint }
   if (run.operationNamespace !== undefined) record = { ...record, operationNamespace: run.operationNamespace }
   if (run.suspension !== undefined) record = { ...record, suspension: run.suspension }
@@ -156,11 +166,56 @@ export const releaseExecution: {
   if (run === undefined || run.ownerId !== input.ownerId || run.attemptFence !== input.attemptFence) {
     return Effect.succeed([undefined, state] as const)
   }
-  const { ownerId: _, ...released } = run
+  const { ownerId: _, agentPermitParked: _parked, ...released } = run
   const runs = new Map(state.runs)
   runs.set(run.runId, released)
   return Effect.succeed([undefined, revokeSession({ ...state, runs }, input)] as const)
 })
+
+export const parkAgentPermit: {
+  (input: ExecutionClaim & { readonly token: string }): (state: RuntimeState) => ReturnType<typeof parkAgentPermitImpl>
+  (state: RuntimeState, input: ExecutionClaim & { readonly token: string }): ReturnType<typeof parkAgentPermitImpl>
+} = Function.dual(2, parkAgentPermitImpl)
+
+function parkAgentPermitImpl(state: RuntimeState, input: ExecutionClaim & { readonly token: string }) {
+  return Effect.gen(function* () {
+    yield* requireExecutionClaim(state, input)
+    const run = state.runs.get(input.runId)!
+    if (run.agentPermitParked !== undefined && run.agentPermitParked !== input.token) {
+      return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} already parked another Agent permit` })
+    }
+    if (run.agentPermitParked === input.token) return [undefined, state] as const
+    const runs = new Map(state.runs)
+    runs.set(run.runId, { ...run, agentPermitParked: input.token })
+    const parked = { ...state, runs }
+    return [undefined, yield* promoteChildCapacity(parked, run.runId)] as const
+  })
+}
+
+export const resumeAgentPermit: {
+  (
+    input: ExecutionClaim & { readonly token: string },
+  ): (state: RuntimeState) => ReturnType<typeof resumeAgentPermitImpl>
+  (state: RuntimeState, input: ExecutionClaim & { readonly token: string }): ReturnType<typeof resumeAgentPermitImpl>
+} = Function.dual(2, resumeAgentPermitImpl)
+
+function resumeAgentPermitImpl(state: RuntimeState, input: ExecutionClaim & { readonly token: string }) {
+  return Effect.gen(function* () {
+    yield* requireExecutionClaim(state, input)
+    const run = state.runs.get(input.runId)!
+    if (run.agentPermitParked !== input.token) {
+      return yield* RuntimeUnavailable.make({ message: `Run ${run.runId} does not own the parked Agent permit` })
+    }
+    const now = yield* occurredAtMillis
+    yield* requireFamilyCapacity({ state, run, now }).pipe(
+      Effect.mapError(() => AgentPermitUnavailable.make({ runId: run.runId })),
+    )
+    const { agentPermitParked: _, ...resumed } = run
+    const runs = new Map(state.runs)
+    runs.set(run.runId, resumed)
+    return [undefined, { ...state, runs }] as const
+  })
+}
 
 const requireClaimable = (state: RuntimeState, run: StoredRun, now: number) =>
   Effect.gen(function* () {
@@ -215,8 +270,9 @@ export const claimExecution: {
       return yield* RuntimeUnavailable.make({ message: `Session ${run.message.sessionId} is not open` })
     const now = yield* occurredAtMillis
     yield* requireClaimable(state, run, now)
+    const { agentPermitParked: _parked, ...claimable } = run
     const claimed = {
-      ...run,
+      ...claimable,
       initialSessionComponents:
         run.initialSessionComponents ?? state.sessions.get(run.message.sessionId)?.components ?? [],
       status: run.cancellationRequested ? ("cancelling" as const) : ("running" as const),

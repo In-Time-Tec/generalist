@@ -107,15 +107,40 @@ RO "child-admit:run_parent:child-admit:call-1:
 
 ## External placement
 
-Cross-partition hosts import placement schemas and implement `ExternalChildStore`.
+Cross-partition execution keeps the same `ExecutionScope.children` API. Applications authorize partition routes
+and supply best-effort wake delivery; Generalist owns the durable placement protocol and exposes no store,
+claim, checkpoint, accounting, or settlement authority.
 
-```text
-reserve(placement, digests, optional parent suspension)
-└── admitRoot(...) [durable and fenced]
-    └── activateRoot() -> rootSettlement() -> acknowledge
+```ts
+import { Effect, Layer, Option } from "effect"
+import { layerPeer, layerRoutes } from "generalist/runtime/child-coordination"
+
+const childPeer = layerPeer({ storage, namespace: childNamespace })
+const routes = layerRoutes({
+  connect: (partition) =>
+    Effect.succeed(
+      partition === childNamespace.partition
+        ? Option.some({ endpoint: childPeer, wake: wakeChildHost })
+        : Option.none(),
+    ),
+})
 ```
 
-Exact retries are idempotent; changed immutable placement, root, executable, or settlement facts fail with a typed conflict or mismatch.
+```text
+ExecutionScope.children.start(..., { placement })
+└── Runtime reserves -> admits -> activates
+    └── receiver settles -> parent records -> Runtime acknowledges
+```
+
+The peer endpoint is opaque and non-executing. `layerPeer` reconstructs it over the same filesystem or
+S3-compatible storage configured for that partition; it does not acquire execution ownership or start a
+scheduler. Wakes carry no authority and may be duplicated or lost because bounded Runtime reconciliation
+recovers every retained obligation. Wake effects must be promptly interruptible with bounded cleanup; the
+delivery deadline is cooperative so Runtime can finish their scope without leaking background work. Exact retries preserve their original result; changed immutable facts fail
+with a typed conflict. While awaiting a child, Runtime parks only the parent's Agent scheduling permit, retains
+its fenced execution and Session ownership, and reacquires capacity before parent code continues. This allows
+family and host concurrency of one without exposing internal coordination state. Interrupting an await retires
+the whole execution attempt rather than allowing parent code to continue without its permits.
 
 ## Invariants
 

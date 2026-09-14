@@ -67,7 +67,9 @@ import { cancelSession } from "./store/session.js"
 import {
   claimExecution,
   loadExecution,
+  parkAgentPermit,
   releaseExecution,
+  resumeAgentPermit,
   revokeSession,
   retryExecution,
   saveExecution,
@@ -823,6 +825,14 @@ const makeStoreServices = (options: Options) =>
       releaseExecution: (input) =>
         modifyState(commands.releaseExecution, [input], (state, [preparedInput]) =>
           releaseExecution(state, preparedInput),
+        ),
+      parkAgentPermit: (input) =>
+        modifyState(commands.parkAgentPermit, [input], (state, [preparedInput]) =>
+          parkAgentPermit(state, preparedInput),
+        ),
+      resumeAgentPermit: (input) =>
+        modifyState(commands.resumeAgentPermit, [input], (state, [preparedInput]) =>
+          resumeAgentPermit(state, preparedInput),
         ),
       saveExecution: (input) =>
         validatePayload({ value: input, boundary: "checkpoint" }).pipe(

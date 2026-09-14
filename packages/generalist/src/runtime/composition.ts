@@ -39,7 +39,7 @@ import {
   RuntimeOptionsInvalid,
 } from "./errors.js"
 import type { ErasedExecutionServicesFactory, ExecutionServicesFactory } from "./execution/scope.js"
-import { ExternalChildPeerRoutes } from "./child/external/reconciliation.js"
+import { Routes } from "./child/coordination.js"
 import { CommandTool, type Registration as ComponentRegistration } from "../core/durable/component.js"
 import { namespace as componentNamespace } from "../core/durable/component/definition.js"
 import { Registry as ComponentRegistry } from "../core/durable/component/services.js"
@@ -778,12 +778,10 @@ const make = (options: AnyOptions) =>
       }
       if (options.scheduler !== undefined) innerOptions.scheduler = options.scheduler
       const inner = reconstructedLayer(innerOptions)
-      const peerRoutes = Context.getOption(services, ExternalChildPeerRoutes)
+      const peerRoutes = Context.getOption(services, Routes)
       const kernelServices = Option.isNone(peerRoutes)
         ? Context.merge(storage, Context.make(ExecutableResolver, resolver))
-        : Context.merge(storage, Context.make(ExecutableResolver, resolver)).pipe(
-            Context.add(ExternalChildPeerRoutes, peerRoutes.value),
-          )
+        : Context.merge(storage, Context.make(ExecutableResolver, resolver)).pipe(Context.add(Routes, peerRoutes.value))
       const built = yield* Layer.build(inner).pipe(Effect.provide(kernelServices))
       const runtime = Context.get(built, EngineRuntime)
       const declared = Object.values(options.agents)

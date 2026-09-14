@@ -149,14 +149,16 @@ type GrantedToolRequirements<C> = [GrantedTool<C>] extends [never]
 type SelectedAgentRequirements<C> = [GrantedAgent<C>] extends [never]
   ? never
   : GrantedAgentRequirements<Extract<GrantedAgent<C>, AnyAgent>>
+type GrantedRequirements<C> = AnyOptions extends C
+  ? never
+  :
+      | GrantedToolRequirements<C>
+      | SelectedAgentRequirements<C>
+      | StepRequirements<GrantedStep<C>>
+      | StepCodecRequirements<GrantedStep<C>>
 
 /** Services inferred from one declaration without widening its handlers or step environments. */
-export type Requirements<C> =
-  | (C extends AnyOptions ? CodeExecutor : never)
-  | GrantedToolRequirements<C>
-  | SelectedAgentRequirements<C>
-  | StepRequirements<GrantedStep<C>>
-  | StepCodecRequirements<GrantedStep<C>>
+export type Requirements<C> = (C extends AnyOptions ? CodeExecutor : never) | GrantedRequirements<C>
 
 /** Agent option fragment retained for declaration-oriented type composition. */
 export interface AgentOptionsWithCodeMode<

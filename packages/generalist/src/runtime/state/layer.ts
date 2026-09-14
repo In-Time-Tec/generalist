@@ -22,7 +22,8 @@ import {
 } from "../../durability/internal/runtime.js"
 import type { ObjectStore } from "../../durability/object-store.js"
 import { ExternalChildStore } from "../child/external/store.js"
-import { ExternalChildPeerRoutes, reconcilePage } from "../child/external/reconciliation.js"
+import { reconcilePage } from "../child/external/reconciliation.js"
+import { Routes } from "../child/coordination.js"
 import { bind as bindExternalChildRuntime } from "../child/external/binding.js"
 import { DurabilityFailure } from "../../durability/errors.js"
 import { ScheduleInvalid } from "../execution/trigger/schedule.js"
@@ -45,6 +46,7 @@ import { layerRunStore } from "./store.js"
 import { make as makeTriggerScheduler } from "../execution/trigger/scheduler.js"
 import { bind as bindExportRuntime } from "../reward/export.js"
 import { bind as bindArtifactRuntime } from "../artifact/export.js"
+import { bind as bindAgentPermits, make as makeAgentPermits } from "../execution/agent-permits.js"
 
 interface LeaseNamespace {
   readonly environment: string
@@ -82,7 +84,6 @@ export type RuntimeServices =
   | Runtime
   | ApplicationRuntime
   | RunStore
-  | ExternalChildStore
   | RunExecutor
   | LocalScheduler
   | Activation
@@ -103,7 +104,7 @@ export const layer = (
         const ownership = yield* StoreActivation
         const runStore = yield* RunStore
         const externalChildStore = yield* ExternalChildStore
-        const peerRoutes = yield* Effect.serviceOption(ExternalChildPeerRoutes)
+        const peerRoutes = yield* Effect.serviceOption(Routes)
         const executor = yield* RunExecutor
         const active = yield* ActiveExecutions
         const hostRuntime = yield* Runtime
@@ -169,10 +170,13 @@ export const layer = (
           const lease = yield* ownership.acquire
           const terminated = yield* Deferred.make<void, RuntimeOwnershipLost | RuntimeRetired>()
           const termination = Deferred.await(terminated).pipe(Effect.andThen(Effect.never))
+          const agentPermits = makeAgentPermits(options.scheduler?.concurrency)
+          bindAgentPermits(application, agentPermits)
           const scheduler = yield* makeLocalScheduler({
             workerId: lease.workerId,
             ...options.scheduler,
             commandIdPrefix: lease.incarnation,
+            agentPermits,
           })
           const triggers = yield* makeTriggerScheduler({
             ownerId: `trigger:${lease.incarnation}`,
@@ -242,7 +246,7 @@ export const layer = (
               Effect.gen(function* () {
                 const triggered = yield* trigger
                 const scheduled = yield* execute
-                yield* scheduler.idle
+                yield* scheduler.runnableIdle
                 const reconciled =
                   externalFuel === 0 ? { processed: 0, hasMore: false } : yield* reconcileExternal(externalFuel)
                 const nextDueAt = yield* ownership.nextDueAt
@@ -272,6 +276,7 @@ export const layer = (
               tick: owned(tick),
               drain,
               idle: owned(scheduler.idle),
+              runnableIdle: owned(scheduler.runnableIdle),
               reconcileCancellation: (runId) => owned(scheduler.reconcileCancellation(runId)),
             },
           }
@@ -323,6 +328,7 @@ export const layer = (
               tick: Effect.suspend(() => prepare((scheduler) => scheduler.tick)),
               drain: (input) => prepare((scheduler) => scheduler.drain(input)),
               idle: Effect.suspend(() => prepare((scheduler) => scheduler.idle)),
+              runnableIdle: Effect.suspend(() => prepare((scheduler) => scheduler.runnableIdle)),
               reconcileCancellation: (runId) => prepare((scheduler) => scheduler.reconcileCancellation(runId)),
             }),
           ),

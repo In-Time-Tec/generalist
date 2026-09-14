@@ -1,6 +1,7 @@
 import { BunCrypto } from "@effect/platform-bun"
 import { expect, layer } from "@effect/vitest"
-import { Effect, Layer, Option, Schema, Stream } from "effect"
+import { Crypto, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect"
+import { TestClock } from "effect/testing"
 import { LanguageModel, Prompt, Response } from "effect/unstable/ai"
 import { close, make } from "../../../../src/core/agent/service.js"
 import { activate, layer as durabilityLayer, layerRunStore } from "../../../../src/durability/index.js"
@@ -12,9 +13,11 @@ import {
   type RootAdmission,
   identifyRequest,
 } from "../../../../src/runtime/child/external/placement.js"
-import { reconcilePage } from "../../../../src/runtime/child/external/reconciliation.js"
+import { type Options, reconcilePage } from "../../../../src/runtime/child/external/reconciliation.js"
 import { ExternalChildStore, type Service } from "../../../../src/runtime/child/external/store.js"
 import { RuntimeUnavailable } from "../../../../src/runtime/errors.js"
+import { Peer } from "../../../../src/runtime/child/coordination.js"
+import { make as makePeer } from "../../../../src/runtime/child/coordination-internal.js"
 import { layerStatic } from "../../../../src/runtime/executable/resolver.js"
 import { LocalScheduler } from "../../../../src/runtime/execution/local-scheduler.js"
 import { RunStore } from "../../../../src/runtime/run/store.js"
@@ -45,6 +48,7 @@ type Fault =
   | "acknowledgeRootSettlement"
 
 const makeFixture = Effect.gen(function* () {
+  const crypto = yield* Crypto.Crypto
   const bucket = yield* makeSimulator()
   const faults = new Set<Fault>()
   const counts = { executions: 0, writes: 0 }
@@ -109,12 +113,26 @@ const makeFixture = Effect.gen(function* () {
         return yield* effect.pipe(Effect.provide(services))
       }),
     )
-  const options = (partition: string) => ({
+  const endpointFor = (partition: string) =>
+    Layer.effect(
+      Peer,
+      Effect.map(ExternalChildStore, (store) => makePeer(partition, store)),
+    ).pipe(
+      Layer.provide(layerFor(partition)),
+      Layer.provide(Layer.succeed(Crypto.Crypto, crypto)),
+      Layer.catchCause(() =>
+        Layer.effect(Peer, RuntimeUnavailable.make({ message: `Peer ${partition} is unavailable` })),
+      ),
+    )
+  const options = (partition: string): Options => ({
     partition,
     connect: (peer: string) =>
       Effect.succeed(
         peer === "parent" || peer === "child"
-          ? Option.some(Layer.effect(ExternalChildStore, ExternalChildStore).pipe(Layer.provide(layerFor(peer))))
+          ? Option.some({
+              endpoint: endpointFor(peer),
+              wake: Effect.void,
+            })
           : Option.none(),
       ),
   })
@@ -326,6 +344,111 @@ layer(BunCrypto.layer)("external obligation recovery", (it) => {
           Effect.flatMap(ExternalChildStore, (store) => store.outstandingRoots({ limit: 10 })),
         ),
       ).toEqual({ items: [] })
+    }),
+  )
+
+  for (const mode of ["failure", "defect", "timeout"] as const) {
+    it.effect(`commits delivery when peer wake ends in ${mode}`, () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture
+        yield* fixture.reserve(`wake-${mode}`)
+        const routes = fixture.options("parent")
+        let wake: Effect.Effect<void, RuntimeUnavailable>
+        if (mode === "failure") wake = RuntimeUnavailable.make({ message: "wake failed" })
+        else if (mode === "defect") wake = Effect.die("wake defect")
+        else wake = Effect.sleep("1 day")
+        const reconciliation = yield* fixture
+          .withHost(
+            "parent",
+            // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The fixture deliberately erases heterogeneous peer Layer environments.
+            reconcilePage({
+              partition: "parent",
+              connect: (partition) =>
+                routes.connect(partition).pipe(Effect.map(Option.map((route) => ({ ...route, wake })))),
+            }),
+          )
+          .pipe(Effect.forkChild({ startImmediately: true }))
+        if (mode === "timeout") {
+          yield* Effect.yieldNow
+          yield* TestClock.adjust("2 seconds")
+        }
+        const result = yield* Fiber.join(reconciliation)
+        expect(result).toMatchObject({ placements: 1, denied: 0 })
+        expect(
+          yield* fixture.withHost(
+            "parent",
+            Effect.flatMap(ExternalChildStore, (store) => store.inspectPlacement(`wake-${mode}`)),
+          ),
+        ).toMatchObject({ acknowledged: true })
+        expect(
+          yield* fixture.withHost(
+            "child",
+            Effect.flatMap(ExternalChildStore, (store) => store.inspectRoot(`wake-${mode}`)),
+          ),
+        ).toMatchObject({ placementId: `wake-${mode}` })
+      }),
+    )
+  }
+
+  it.effect("finalizes an in-flight wake when reconciliation is interrupted after commit", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture
+      yield* fixture.reserve("wake-interrupted")
+      const started = yield* Deferred.make<void>()
+      const finalized = yield* Deferred.make<void>()
+      const routes = fixture.options("parent")
+      const wake = Effect.scoped(
+        Effect.acquireRelease(Deferred.succeed(started, undefined), () => Deferred.succeed(finalized, undefined)).pipe(
+          Effect.andThen(Effect.never),
+        ),
+      )
+      const reconciliation = yield* fixture
+        .withHost(
+          "parent",
+          // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The fixture deliberately erases heterogeneous peer Layer environments.
+          reconcilePage({
+            partition: "parent",
+            connect: (partition) =>
+              routes.connect(partition).pipe(Effect.map(Option.map((route) => ({ ...route, wake })))),
+          }),
+        )
+        .pipe(Effect.forkChild({ startImmediately: true }))
+      yield* Deferred.await(started)
+      yield* Fiber.interrupt(reconciliation)
+      yield* Deferred.await(finalized)
+      expect(
+        yield* fixture.withHost(
+          "parent",
+          Effect.flatMap(ExternalChildStore, (store) => store.inspectPlacement("wake-interrupted")),
+        ),
+      ).toMatchObject({ acknowledged: true })
+      expect(
+        yield* fixture.withHost(
+          "child",
+          Effect.flatMap(ExternalChildStore, (store) => store.inspectRoot("wake-interrupted")),
+        ),
+      ).toMatchObject({ placementId: "wake-interrupted" })
+    }),
+  )
+
+  it.effect("rejects a route whose opaque endpoint belongs to another partition", () =>
+    Effect.gen(function* () {
+      const fixture = yield* makeFixture
+      yield* fixture.reserve("wrong-peer")
+      const routes = fixture.options("parent")
+      const failure = yield* fixture
+        .withHost(
+          "parent",
+          reconcilePage({
+            partition: "parent",
+            connect: () => routes.connect("parent"),
+          }),
+        )
+        .pipe(Effect.flip)
+      expect(failure).toMatchObject({
+        _tag: "generalist/runtime/RuntimeUnavailable",
+        message: "External child peer child is invalid",
+      })
     }),
   )
 

@@ -25,6 +25,7 @@ import {
   AgentEvent,
   Approvals,
   Compaction,
+  CodeExecutor,
   DurableDriver,
   ExecutableManifest,
   Instructions,
@@ -148,7 +149,7 @@ const agentRequirementProofs: ReadonlyArray<true> = [
   true satisfies Assert<
     Equal<
       Agent.Requirements<typeof widenedRequiredAgent>,
-      LanguageModel.LanguageModel | ModelRegistry.ModelRegistry | Memory.Memory
+      LanguageModel.LanguageModel | ModelRegistry.ModelRegistry | Memory.Memory | CodeExecutor.CodeExecutor
     >
   >,
   true satisfies Assert<

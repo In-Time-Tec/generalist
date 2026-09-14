@@ -152,6 +152,7 @@ export interface ExecutionRecord {
   readonly executableManifest: ExecutableManifest
   readonly attempt: number
   readonly attemptFence: number
+  readonly agentPermitParked?: string
   readonly cancellationRequested: boolean
   readonly operationNamespace?: string
   readonly checkpoint?: ExecutionCheckpoint

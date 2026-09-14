@@ -1,5 +1,19 @@
 /* oxlint-disable effecttsgo/any-unknown-in-error-context -- This internal bridge deliberately erases heterogeneous registered Agent and Layer environments, then restores them from exact registration metadata. */
-import { Context, Deferred, Effect, Equal, Layer, Option, Predicate, Schema, Scope, Semaphore, Stream } from "effect"
+import {
+  Cause,
+  Context,
+  Deferred,
+  Effect,
+  Equal,
+  Exit,
+  Layer,
+  Option,
+  Predicate,
+  Schema,
+  Scope,
+  Semaphore,
+  Stream,
+} from "effect"
 import { Prompt } from "effect/unstable/ai"
 import type { Any as AnyAgent, Input, Output } from "../../core/agent/lifecycle/definition.js"
 import { encode as encodeAgentInput } from "../../core/agent/lifecycle/input.js"
@@ -26,9 +40,12 @@ import { normalizePrompt } from "../state/prompt.js"
 import type { Service as EngineService } from "../engine.js"
 import { Runtime, type Service as RuntimeService } from "../service.js"
 import { get as getExternalChildRuntime } from "../child/external/binding.js"
-import { ExternalChildStore, type Service as ExternalChildStoreService } from "../child/external/store.js"
+import type { Service as ExternalChildStoreService } from "../child/external/store.js"
+import { Peer } from "../child/coordination.js"
+import { resolve as resolvePeer } from "../child/coordination-internal.js"
 import type { Placement, ScopedAdmissionRequest } from "../child/external/placement.js"
 import { ActionableTaggedError, errorHint } from "../../core/error-hint.js"
+import { get as getAgentPermits } from "./agent-permits.js"
 
 const ExecutionScopeTypeId: unique symbol = Symbol("generalist/runtime/ExecutionScope")
 const ChildReceiptTypeId: unique symbol = Symbol("generalist/runtime/ChildReceipt")
@@ -146,12 +163,10 @@ export interface ExecutionScope<Agents extends Readonly<Record<string, AnyAgent>
   readonly children: ChildCapabilities<Agents>
 }
 
-/** Infallible per-execution service declaration. */
 export type ExecutionServicesFactory<Agents extends Readonly<Record<string, AnyAgent>>, Services, Requirements> = (
   scope: ExecutionScope<Agents>,
 ) => Layer.Layer<Services, never, Requirements>
 
-/** @internal Erased factory retained beside one exact registered revision. */
 export type ErasedExecutionServicesFactory = ExecutionServicesFactory<
   Readonly<Record<string, AnyAgent>>,
   unknown,
@@ -175,7 +190,6 @@ const identityCell = (runtime: RuntimeIdentityOwner): RuntimeIdentityCell => {
   return created
 }
 
-/** @internal Preserve the late-bound Runtime identity when a facade copies a service. */
 export const copyRuntimeBinding = <Target extends RuntimeIdentityOwner>(input: {
   readonly source: RuntimeIdentityOwner
   readonly target: Target
@@ -185,7 +199,6 @@ export const copyRuntimeBinding = <Target extends RuntimeIdentityOwner>(input: {
   return input.target
 }
 
-/** @internal Publish one Runtime identity only after its activation is ready. */
 export const markRuntimeReady = (runtime: RuntimeService): Effect.Effect<void> =>
   Effect.suspend(() => {
     const cell = identityCell(runtime)
@@ -205,7 +218,6 @@ const readyRuntime = (runtime: EngineService | undefined): Effect.Effect<Runtime
     return cell.current === undefined ? Deferred.await(cell.readiness) : Effect.succeed(cell.current)
   })
 
-/** @internal Exact registered environment used to acquire one attempt's services. */
 export interface RegisteredExecutionBinding {
   readonly agents: RegisteredAgents
   readonly registration: RegisteredAgent
@@ -256,14 +268,13 @@ type FencedChildCancellation = (input: {
   ChildCapabilityFailure | ChildParentageInvalid | PayloadTooLarge | StaleClaim | StaleSessionClaim
 >
 
-/** @internal One issued scope together with its attempt-owned environment and finalizer. */
 export interface IssuedExecutionScope {
   readonly scope: ExecutionScope<Readonly<Record<string, AnyAgent>>>
   readonly context: Context.Context<unknown>
   readonly retire: Effect.Effect<void>
+  readonly interrupt: Effect.Effect<never>
 }
 
-/** @internal Acquire the exact revision factory once for one claimed Agent attempt. */
 export const issue = (options: {
   readonly binding: RegisteredExecutionBinding
   readonly claim: ExecutionClaim
@@ -285,6 +296,9 @@ export const issue = (options: {
     let isRetired = false
     const retirement = yield* Deferred.make<void>()
     const admissions = yield* Semaphore.make(1)
+    const childWaits = yield* Semaphore.make(1)
+    let childWaitCounter = 0
+    const agentPermits = getAgentPermits(boundRuntime)
     const retiredFailure = retired(options.claim.runId, incarnation)
     const placementDenied = (partition: string) =>
       ChildPlacementDenied.make({ parentRunId: options.claim.runId, partition })
@@ -309,10 +323,14 @@ export const issue = (options: {
     const withPeer = <A, E>(partition: string, use: (peer: ExternalChildStoreService) => Effect.Effect<A, E>) =>
       Effect.scoped(
         Effect.gen(function* () {
-          const peerLayer = yield* routeFor(partition)
-          const services = yield* Layer.build(peerLayer)
-          const peer = yield* ExternalChildStore.pipe(Effect.provide(services))
-          return yield* use(peer)
+          const route = yield* routeFor(partition)
+          const services = yield* Layer.build(route.endpoint)
+          const endpoint = yield* Peer.pipe(Effect.provide(services))
+          const binding = resolvePeer(endpoint)
+          if (binding === undefined || binding.partition !== partition) {
+            return yield* RuntimeUnavailable.make({ message: `External child peer ${partition} is invalid` })
+          }
+          return yield* use(binding.store)
         }),
       )
     const retire = Effect.suspend(() => {
@@ -320,6 +338,7 @@ export const issue = (options: {
       isRetired = true
       return Deferred.succeed(retirement, undefined).pipe(Effect.asVoid)
     })
+    const interrupt = Deferred.await(retirement).pipe(Effect.andThen(Effect.interrupt))
     let attemptContext = Context.omit(Scope.Scope)(options.binding.base)
     yield* Effect.addFinalizer(() => retire)
     const assertLive: Effect.Effect<void, ChildCapabilityFailure> = Effect.suspend(() => {
@@ -785,17 +804,68 @@ export const issue = (options: {
     const awaitChild = <Name extends string, ChildOutput>(
       receipt: ChildReceipt<Name, ChildOutput>,
     ): Effect.Effect<ChildOutcome<ChildOutput>, ChildCapabilityFailure> =>
-      readWhileLive(
-        Effect.gen(function* () {
-          const metadata = yield* metadataFor(receipt)
-          const outcome =
-            metadata.external === undefined
-              ? yield* terminalSnapshot(metadata.childRunId)
-              : yield* routeFor(metadata.external.partition).pipe(
-                  Effect.andThen(terminalExternalPlacement(metadata.external, metadata.childRunId)),
+      childWaits.withPermit(
+        readWhileLive(
+          Effect.gen(function* () {
+            const metadata = yield* metadataFor(receipt)
+            const token = digest([
+              "execution-scope-child-wait",
+              options.claim.runId,
+              options.claim.attemptFence,
+              metadata.childRunId,
+              ++childWaitCounter,
+            ])
+            const permit = { ...options.claim, token }
+            return yield* Effect.uninterruptibleMask((restore) =>
+              Effect.gen(function* () {
+                const abandonAttempt = retire.pipe(
+                  Effect.ensuring(agentPermits?.release(options.claim.runId) ?? Effect.void),
                 )
-          return yield* decodeOutcome<ChildOutput>(metadata, outcome)
-        }),
+                yield* options.store.parkAgentPermit(permit).pipe(
+                  Effect.catchTags({
+                    "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
+                    "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
+                  }),
+                )
+                yield* agentPermits?.park(options.claim.runId) ?? Effect.void
+                const observed = yield* restore(
+                  metadata.external === undefined
+                    ? terminalSnapshot(metadata.childRunId)
+                    : routeFor(metadata.external.partition).pipe(
+                        Effect.andThen(terminalExternalPlacement(metadata.external, metadata.childRunId)),
+                      ),
+                ).pipe(Effect.exit)
+                if (Exit.isFailure(observed) && Cause.hasInterrupts(observed.cause)) {
+                  yield* abandonAttempt
+                  return yield* Effect.failCause(observed.cause)
+                }
+                const stillLive = yield* assertLive.pipe(Effect.exit)
+                if (Exit.isFailure(stillLive)) {
+                  yield* abandonAttempt
+                  return yield* Effect.failCause(stillLive.cause)
+                }
+                const reacquire = (): Effect.Effect<void, ChildCapabilityFailure> =>
+                  (agentPermits?.resume(options.claim.runId) ?? Effect.void).pipe(
+                    Effect.andThen(options.store.resumeAgentPermit(permit)),
+                    Effect.catchTag("generalist/runtime/internal/AgentPermitUnavailable", () =>
+                      (agentPermits?.park(options.claim.runId) ?? Effect.void).pipe(
+                        Effect.andThen(Effect.sleep("10 millis")),
+                        Effect.andThen(reacquire()),
+                      ),
+                    ),
+                    Effect.catchTags({
+                      "generalist/runtime/StaleClaim": () => Effect.fail(retiredFailure),
+                      "generalist/runtime/StaleSessionClaim": () => Effect.fail(retiredFailure),
+                    }),
+                  )
+                yield* restore(reacquire()).pipe(Effect.onError(() => abandonAttempt))
+                const outcome = yield* observed
+                yield* assertLive
+                return yield* decodeOutcome<ChildOutput>(metadata, outcome)
+              }),
+            )
+          }),
+        ),
       )
     const children: ChildCapabilities<Readonly<Record<string, AnyAgent>>> = {
       start,
@@ -838,17 +908,6 @@ export const issue = (options: {
               placement.request.ref.partition !== metadata.external.partition
             ) {
               return yield* notAChild(metadata.childRunId)
-            }
-            if (placement.cancelRequested) {
-              if (placement.cancelReason !== input.reason) {
-                return yield* ChildCommandConflict.make({
-                  parentRunId: options.claim.runId,
-                  commandId: input.commandId,
-                  existingChildRunId: metadata.childRunId,
-                })
-              }
-              yield* assertLive
-              return
             }
             yield* assertLive
             yield* externalRuntime.store
@@ -936,5 +995,6 @@ export const issue = (options: {
       scope,
       context: attemptContext,
       retire,
+      interrupt,
     }
   })

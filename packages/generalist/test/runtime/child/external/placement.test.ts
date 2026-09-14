@@ -1,6 +1,9 @@
+import { BunCrypto } from "@effect/platform-bun"
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Layer, Option } from "effect"
+import { Context, Effect, Layer, Option } from "effect"
 import { ProgramCapabilities } from "../../../../src/index.js"
+import { layerRunStore } from "../../../../src/durability/index.js"
+import { ObjectStore } from "../../../../src/durability/object-store.js"
 import { identifyRequest } from "../../../../src/runtime/child/external/placement.js"
 import { ExternalChildStore } from "../../../../src/runtime/child/external/store.js"
 import { Address, Message } from "../../../../src/runtime/index.js"
@@ -10,13 +13,30 @@ import {
   assistantAddress,
   assistantRef,
   completedResult,
-  objectLayer,
   registrationsFor,
   resolverLayer,
   textPrompt,
 } from "../../execution/fixtures.js"
 import { provideScoped } from "../../execution/scoped-provide.js"
 import { makeObjectStorage, objectRuntimeLayer, objectWorkerId } from "../../execution/object.js"
+
+const objectPlacementLayer = (options: Parameters<typeof objectRuntimeLayer>[0], storage = makeObjectStorage()) => {
+  const namespace = {
+    environment: "test",
+    tenant: "runtime",
+    partition: "conformance",
+    workerId: objectWorkerId,
+    ...options,
+  }
+  const objectStorage = Layer.merge(Layer.succeed(ObjectStore, storage.store), BunCrypto.layer)
+  const runtime = objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer))
+  const protocol = layerRunStore(namespace).pipe(Layer.provide(objectStorage))
+  const external = Layer.effect(
+    ExternalChildStore,
+    Layer.build(protocol).pipe(Effect.map(Context.get(ExternalChildStore))),
+  )
+  return Layer.merge(runtime, external)
+}
 const externalRoot = (id: string) =>
   Effect.gen(function* () {
     const request = {
@@ -410,7 +430,12 @@ const suite = <E>(name: string, layer: Layer.Layer<Runtime.Runtime | RunStore | 
   })
 }
 
-suite("object", objectLayer)
+suite(
+  "object",
+  objectPlacementLayer({
+    addresses: [{ address: assistantAddress, executable: assistantRef, registrations: registrationsFor(assistantRef) }],
+  }),
+)
 
 it.live("recovers external root identity and unacknowledged terminal delivery after object-host reopen", () => {
   const storage = makeObjectStorage()
@@ -420,7 +445,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
   return Effect.gen(function* () {
     const input = yield* externalRoot("object:reopen")
     const settlementId = yield* provideScoped(
-      objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
+      objectPlacementLayer(options, storage),
       Effect.gen(function* () {
         const external = yield* ExternalChildStore
         yield* external.admitRoot(input)
@@ -431,7 +456,7 @@ it.live("recovers external root identity and unacknowledged terminal delivery af
       }),
     )
     yield* provideScoped(
-      objectRuntimeLayer(options, storage).pipe(Layer.provide(resolverLayer)),
+      objectPlacementLayer(options, storage),
       Effect.gen(function* () {
         const external = yield* ExternalChildStore
         expect(yield* external.inspectRoot(input.placementId)).toMatchObject({

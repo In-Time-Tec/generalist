@@ -48,11 +48,12 @@ const semanticMemory = SemanticRecall.layer({ limit: 20 }).pipe(
   Layer.provideMerge(embeddingLayer),
 )
 
-const runtimeLayer = objectRuntimeLayer(
-  { addresses: [], ownershipLeaseMillis: 31_536_000_000, reconcileInterval: "30 days" },
-  undefined,
-  false,
-).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)))
+const runtimeLayer = () =>
+  objectRuntimeLayer(
+    { addresses: [], ownershipLeaseMillis: 31_536_000_000, reconcileInterval: "30 days" },
+    undefined,
+    false,
+  ).pipe(Layer.provide(ExecutableResolver.layerStatic([]).pipe(Layer.orDie)))
 
 const learningKey: Memory.Key = { agent: "learning", subject: "learning" }
 const sourceAgent = Agent.make({ name: "consolidation-source", toolkit: Toolkit.empty })
@@ -87,12 +88,13 @@ const handlers = (
 
 it.effect("consolidates contradictory episodes into an evidenced version and can revert it", () =>
   provideScoped(
-    runtimeLayer,
+    runtimeLayer(),
     Effect.gen(function* () {
       const runtime = yield* Runtime
       const executor = yield* RunExecutor
       const store = yield* RunStore
       const scheduler = yield* LocalScheduler
+      yield* activate
       const memoryContext = yield* Layer.build(semanticMemory)
       const memory = Context.get(memoryContext, Memory.Memory)
       const memoryLayer = Layer.succeed(Memory.Memory, memory)
@@ -111,7 +113,6 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
         Layer.mergeAll(sourceModel, Permissions.layerAllowAll, Approvals.layerAutoApprove),
       )
       yield* runtime.register(sourceAgent).pipe(Effect.provideContext(sourceContext))
-      yield* activate
       const sourceRuns: Array<Memory.OperationRef["runId"]> = []
       for (const index of [1, 2, 3]) {
         const handle = yield* runtime.start(sourceAgent, `Episode ${index}: the preferred color is green.`, {
@@ -219,10 +220,11 @@ it.effect("consolidates contradictory episodes into an evidenced version and can
 
 it.effect("runs once per UTC day with its own budget", () =>
   provideScoped(
-    runtimeLayer,
+    runtimeLayer(),
     Effect.gen(function* () {
       const runtime = yield* Runtime
       const scheduler = yield* LocalScheduler
+      yield* activate
       const memoryContext = yield* Layer.build(semanticMemory)
       const memory = Context.get(memoryContext, Memory.Memory)
       const fixture = yield* TestModel.make([TestModel.text("must not run")], { model: "budgeted-consolidation" })
@@ -232,7 +234,6 @@ it.effect("runs once per UTC day with its own budget", () =>
         fixture.registryLayer,
         Approvals.layerAutoApprove,
       )
-      yield* activate
       const context = yield* Layer.build(
         Layer.mergeAll(
           dependencies,

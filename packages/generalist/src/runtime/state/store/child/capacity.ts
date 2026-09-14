@@ -240,6 +240,7 @@ export const activeChildCount: {
     familyRuns(state, parent.rootRunId).filter(
       (run) =>
         run.childReadiness === "ready" &&
+        run.agentPermitParked === undefined &&
         run.status !== "waiting" &&
         run.status !== "needs-resolution" &&
         !isTerminal(run.status),
@@ -304,6 +305,7 @@ export const requireFamilyCapacity = ({ state, run, now }: CapacityInput) =>
       const live = familyRuns(state, run.rootRunId).filter((candidate) => {
         if (candidate.runId === run.runId || candidate.ownerId === undefined || candidate.status !== "running")
           return false
+        if (candidate.agentPermitParked !== undefined) return false
         const owner = state.workers.get(candidate.ownerId)
         return (
           (owner === undefined || owner.expiresAt > now) &&
@@ -373,6 +375,7 @@ export const reserveSessions: {
   ): Effect.Effect<void, ChildLimitExceeded | RuntimeUnavailable>
 } = Function.dual(
   3,
+  // oxlint-disable-next-line eslint/complexity -- Reservation validates existing local, hosted, and external Session ownership in one atomic pass.
   (
     state: RuntimeState,
     parent: StoredRun,
@@ -400,6 +403,11 @@ export const reserveSessions: {
         )
         .map((run) => run.message.sessionId),
     )
+    for (const placement of state.externalChildPlacements.values()) {
+      if (state.runs.get(placement.parentRunId)?.rootRunId === parent.rootRunId) {
+        retained.add(placement.request.root.message.sessionId)
+      }
+    }
     const current = retained.size
     for (const sessionId of sessionIds) retained.add(sessionId)
     return retained.size <= parent.treePolicy.maxSessions

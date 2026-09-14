@@ -250,9 +250,11 @@ const stepCodecRoot = Agent.make({
   },
 })
 
+// oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- This negative type fixture intentionally leaves the Step failure encoder unavailable.
 Runtime.layer({
   agents: { "step-codec-root": stepCodecRoot },
   revision: "step-codec-root-v1",
+  // @ts-expect-error a Step's failure encoding service is part of the root declaration environment.
   services: modelExecutorAndStep,
   storage: codeModeStorage,
   namespace: { environment: "test", tenant: "code-mode-types", partition: "local" },

@@ -8,6 +8,8 @@ import { Runtime } from "generalist/runtime"
 import { RunBudget } from "../../../src/index.js"
 import { layerAutoApprove } from "../../../src/core/policy/approvals.js"
 import { layerAllowAll } from "../../../src/core/policy/permissions.js"
+import { RunStore } from "../../../src/runtime/run/store.js"
+import { layerRunStore } from "../../../src/runtime/state/store.js"
 import { makeObjectStorage } from "./object.js"
 
 const usage = Response.Usage.make({
@@ -300,6 +302,155 @@ describe("ExecutionScope", () => {
           scope.children.cancel(receipt, { commandId: "cancel-command", reason: "changed cancellation" }),
         ),
       ).toBe("generalist/runtime/ChildCommandConflict")
+    }).pipe(Effect.scoped),
+  )
+
+  it.live("lets nested agents await children when family and scheduler concurrency are one", () =>
+    Effect.gen(function* () {
+      const grandchild = Agent.make({ name: "single-grandchild" })
+      const child = Agent.make({ name: "single-child", children: ["single-grandchild"] })
+      const parent = Agent.make({ name: "single-parent", children: ["single-child"] })
+      const agents = { "single-parent": parent, "single-child": child, "single-grandchild": grandchild }
+      let parentAwaited = false
+      let childExecutions = 0
+      let grandchildExecutions = 0
+      const executionServices = (scope: Runtime.ExecutionScope<typeof agents>) =>
+        Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              if (scope.sessionId === "single-parent-session") {
+                return Stream.fromEffect(
+                  Effect.gen(function* () {
+                    const receipt = yield* scope.children.start({
+                      agent: "single-child",
+                      input: "work",
+                      commandId: "single-child-start",
+                    })
+                    const outcome = yield* scope.children.await(receipt)
+                    expect(outcome).toEqual({ _tag: "Succeeded", output: "done" })
+                    parentAwaited = true
+                  }).pipe(Effect.orDie),
+                ).pipe(Stream.flatMap(() => completed))
+              }
+              if (childExecutions === 0) {
+                childExecutions++
+                return Stream.fromEffect(
+                  Effect.gen(function* () {
+                    const receipt = yield* scope.children.start({
+                      agent: "single-grandchild",
+                      input: "nested work",
+                      commandId: "single-grandchild-start",
+                    })
+                    expect(yield* scope.children.await(receipt)).toEqual({ _tag: "Succeeded", output: "done" })
+                  }).pipe(Effect.orDie),
+                ).pipe(Stream.flatMap(() => completed))
+              }
+              grandchildExecutions++
+              return completed
+            },
+          }),
+        )
+      const runtime = yield* Layer.build(
+        Runtime.layer({
+          agents,
+          revision: "single-concurrency-v1",
+          services: Layer.merge(layerAllowAll, layerAutoApprove),
+          executionServices,
+          storage: Layer.merge(Layer.succeed(ObjectStore, makeObjectStorage().store), BunCrypto.layer),
+          namespace: { ...namespace, tenant: "single-concurrency" },
+          scheduler: { concurrency: 1, pollInterval: "10 millis" },
+        }),
+      ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime)))
+      const run = yield* runtime.start(parent, "coordinate", {
+        sessionId: "single-parent-session",
+        idempotencyKey: "single-parent",
+        treePolicy: { maxDepth: 2, maxSessions: 3, concurrency: { agents: 1, tools: 1 } },
+      })
+      expect(yield* run.await.pipe(Effect.timeout("5 seconds"))).toBe("done")
+      expect(parentAwaited).toBe(true)
+      expect(childExecutions).toBe(1)
+      expect(grandchildExecutions).toBe(1)
+    }).pipe(Effect.scoped),
+  )
+
+  it.live("retires an attempt whose child await is interrupted", () =>
+    Effect.gen(function* () {
+      const childGate = yield* Deferred.make<void>()
+      const firstAttemptStarted = yield* Deferred.make<void>()
+      const child = Agent.make({ name: "interrupt-child" })
+      const parent = Agent.make({ name: "interrupt-parent", children: ["interrupt-child"] })
+      const agents = { "interrupt-parent": parent, "interrupt-child": child }
+      const storage = Layer.merge(Layer.succeed(ObjectStore, makeObjectStorage().store), BunCrypto.layer)
+      let parentAttempts = 0
+      let childExecutions = 0
+      const executionServices = (scope: Runtime.ExecutionScope<typeof agents>) =>
+        Layer.effect(
+          LanguageModel.LanguageModel,
+          LanguageModel.make({
+            generateText: () => Effect.succeed([{ type: "text", text: "unused" }]),
+            streamText: () => {
+              if (scope.sessionId !== "interrupt-parent-session") {
+                childExecutions++
+                return Stream.fromEffect(Deferred.await(childGate)).pipe(Stream.flatMap(() => completed))
+              }
+              parentAttempts++
+              return Stream.fromEffect(
+                Effect.gen(function* () {
+                  const receipt = yield* scope.children.start({
+                    agent: "interrupt-child",
+                    input: "work",
+                    commandId: "interrupt-child-start",
+                  })
+                  if (parentAttempts === 1) {
+                    yield* Deferred.succeed(firstAttemptStarted, undefined)
+                    yield* scope.children.await(receipt).pipe(Effect.timeout("50 millis"))
+                  }
+                  expect(yield* scope.children.await(receipt)).toEqual({ _tag: "Succeeded", output: "done" })
+                }).pipe(Effect.orDie),
+              ).pipe(Stream.flatMap(() => completed))
+            },
+          }),
+        )
+      const runtime = yield* Layer.build(
+        Runtime.layer({
+          agents,
+          revision: "interrupt-await-v1",
+          services: Layer.merge(layerAllowAll, layerAutoApprove),
+          executionServices,
+          storage,
+          namespace: { ...namespace, tenant: "interrupt-await" },
+          scheduler: { concurrency: 1, pollInterval: "10 millis" },
+        }),
+      ).pipe(Effect.map((context) => Context.get(context, Runtime.Runtime)))
+      const run = yield* runtime.start(parent, "coordinate", {
+        sessionId: "interrupt-parent-session",
+        idempotencyKey: "interrupt-parent",
+        treePolicy: { maxDepth: 1, maxSessions: 2, concurrency: { agents: 1, tools: 1 } },
+      })
+      yield* Deferred.await(firstAttemptStarted).pipe(Effect.timeout("2 seconds"))
+      yield* Effect.sleep("100 millis")
+      yield* Deferred.succeed(childGate, undefined)
+      yield* Effect.sleep("500 millis")
+      expect(yield* runtime.inspect(run.runId)).toMatchObject({ status: "waiting" })
+      const recovered = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* Layer.build(
+            layerRunStore({
+              environment: "test",
+              tenant: "interrupt-await",
+              partition: "local",
+              addresses: [],
+            }).pipe(Layer.provide(storage)),
+          )
+          return yield* Context.get(context, RunStore).loadExecution(run.runId)
+        }),
+      )
+      expect(recovered.ownerId).toBeUndefined()
+      expect(recovered.agentPermitParked).toBeUndefined()
+      expect(parentAttempts).toBe(1)
+      expect(childExecutions).toBe(1)
     }).pipe(Effect.scoped),
   )
 })

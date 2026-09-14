@@ -187,17 +187,9 @@
       "types": "./dist/ai/provider/deterministic.d.ts",
       "import": "./dist/ai/provider/deterministic.js"
     },
-    "./unstable/runtime/external-child-placement": {
-      "types": "./dist/runtime/child/external/placement.d.ts",
-      "import": "./dist/runtime/child/external/placement.js"
-    },
-    "./unstable/runtime/external-child-store": {
-      "types": "./dist/runtime/child/external/store.d.ts",
-      "import": "./dist/runtime/child/external/store.js"
-    },
-    "./unstable/runtime/external-child-reconciliation": {
-      "types": "./dist/runtime/child/external/reconciliation.d.ts",
-      "import": "./dist/runtime/child/external/reconciliation.js"
+    "./runtime/child-coordination": {
+      "types": "./dist/runtime/child/coordination.d.ts",
+      "import": "./dist/runtime/child/coordination.js"
     },
     "./unstable/mcp": {
       "types": "./dist/unstable/mcp/index.d.ts",
@@ -259,6 +251,7 @@
     "@modelcontextprotocol/sdk": "catalog:",
     "@smithy/fetch-http-handler": "catalog:",
     "@types/bun": "catalog:",
+    "alchemy": "catalog:",
     "effect": "catalog:",
     "esbuild": "catalog:",
     "typescript": "catalog:",

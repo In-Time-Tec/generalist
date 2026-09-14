@@ -133,7 +133,7 @@ const releaseExpiredOwners = (state: RuntimeState, now: number) => {
     workers.delete(id)
     for (const [runId, run] of runs) {
       if (run.ownerId !== id) continue
-      const { ownerId: _, ...released } = run
+      const { ownerId: _, agentPermitParked: _parked, ...released } = run
       runs.set(runId, { ...released, attemptFence: run.attemptFence + 1 })
       const session = sessions.get(run.message.sessionId)
       if (session?.writer?.runId === runId && session.writer.ownerId === id) {

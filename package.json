@@ -42,6 +42,7 @@
       "@types/bun": "1.4.0",
       "@types/node": "24.12.2",
       "@vitest/coverage-v8": "4.1.11",
+      "alchemy": "2.0.0-beta.76",
       "class-variance-authority": "0.7.1",
       "clsx": "2.1.1",
       "effect": "4.0.0-rc.112",

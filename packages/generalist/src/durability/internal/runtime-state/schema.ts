@@ -89,6 +89,7 @@ const makeRun = (reuse: Reuse) =>
       attempt: Counter,
       attemptFence: Counter,
       ownerId: Schema.optionalKey(Schema.String),
+      agentPermitParked: Schema.optionalKey(Schema.String),
       initialSessionComponents: Schema.optionalKey(Schema.Array(ComponentCheckpoint)),
       checkpoint: Schema.optionalKey(reuse(ExecutionCheckpoint)),
       suspension: Schema.optionalKey(reuse(ExecutionSuspension)),

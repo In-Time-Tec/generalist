@@ -274,12 +274,15 @@ export function make<
   const complete = {
     ...definition,
     [AgentTypeId]: {
+      // oxlint-disable-next-line typescript/no-unsafe-return -- RuntimeTools is a phantom invariant witness inferred from Effect AI's heterogeneous Toolkit type.
       tools: (value: RuntimeTools) => value,
+      // oxlint-disable-next-line typescript/no-unsafe-return -- AgentRequirements is the corresponding phantom environment witness.
       requirements: (value: AgentRequirements) => value,
     },
     handoff: <A>(f: (agent: HandoffAgent<AgentRequirements>) => A): A => {
       const handoffAgent: HandoffAgent<AgentRequirements> = {
         name: options.name,
+        // oxlint-disable-next-line typescript/no-unsafe-return -- AgentRequirements is a phantom invariant witness preserved only for handoff type inference.
         requirements: (value) => value,
       }
       if (options.instructions !== undefined) return f({ ...handoffAgent, description: options.instructions })
@@ -322,6 +325,8 @@ export interface RunOptions {
     readonly attempt: number
     readonly admittedAt?: string
     readonly inheritedSandboxSnapshot?: Ref.Ref<string | undefined>
+    /** @internal Exact storage-issued authority propagated to Runtime-hosted tools. */
+    readonly executionClaim?: NonNullable<import("../tools/tool-context.js").Service["executionClaim"]>
   }
   /** First model-call ordinal for a host resuming from a durable checkpoint. */
   readonly modelCallOrdinalStart?: number

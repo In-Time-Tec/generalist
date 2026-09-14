@@ -206,13 +206,16 @@ const makeFor = (
                 }),
               )
               if (resources === undefined) return
-              yield* executeProgram({
-                claim,
-                claimed,
-                store,
-                resolution: resources,
-                children: issued.scope.children,
-              })
+              yield* Effect.raceFirst(
+                executeProgram({
+                  claim,
+                  claimed,
+                  store,
+                  resolution: resources,
+                  children: issued.scope.children,
+                }),
+                issued.interrupt,
+              )
               return
             }
             const registeredAgent = registeredResolution(resolved.agent)
@@ -724,8 +727,8 @@ const makeFor = (
                 yield* runHosted(codeMode === undefined ? withChildren : withCodeModeTool(withChildren, codeMode))
               })
 
-            yield* resolved.agent.open((agent, environment) =>
-              Effect.gen(function* () {
+            yield* resolved.agent.open((agent, environment) => {
+              const run = Effect.gen(function* () {
                 // SAFETY: Runtime.layer statically proves base plus execution-service coverage,
                 // and issueExecutionScope has built and merged that exact revision factory once.
                 // The resolver erases the Agent's invariant service parameters before this point.
@@ -749,8 +752,9 @@ const makeFor = (
                     ? withInheritedTasks(inherited, tasks.value)
                     : inherited
                 return yield* runClosed(child, completeEnvironment)
-              }).pipe(Effect.orDie),
-            )
+              }).pipe(Effect.orDie)
+              return issuedScope === undefined ? run : Effect.raceFirst(run, issuedScope.interrupt)
+            })
           }),
         )
         const cancellationRequested = store.loadExecution(runId).pipe(

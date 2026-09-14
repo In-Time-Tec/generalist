@@ -28,14 +28,20 @@ const allowAll = {
 }
 
 class AttemptToolDependency extends Context.Service<AttemptToolDependency, string>()(
-  "generalist/test/code-mode/AttemptToolDependency",
+  "generalist/test/runtime/code-mode/registration.test/AttemptToolDependency",
 ) {}
-class AttemptValue extends Context.Service<AttemptValue, string>()("generalist/test/code-mode/AttemptValue") {}
+class AttemptValue extends Context.Service<AttemptValue, string>()(
+  "generalist/test/runtime/code-mode/registration.test/AttemptValue",
+) {}
 class AttemptAuthorization extends Context.Service<AttemptAuthorization, string>()(
-  "generalist/test/code-mode/AttemptAuthorization",
+  "generalist/test/runtime/code-mode/registration.test/AttemptAuthorization",
 ) {}
-class AttemptCodec extends Context.Service<AttemptCodec, string>()("generalist/test/code-mode/AttemptCodec") {}
-class AttemptLifetime extends Context.Service<AttemptLifetime, number>()("generalist/test/code-mode/AttemptLifetime") {}
+class AttemptCodec extends Context.Service<AttemptCodec, string>()(
+  "generalist/test/runtime/code-mode/registration.test/AttemptCodec",
+) {}
+class AttemptLifetime extends Context.Service<AttemptLifetime, number>()(
+  "generalist/test/runtime/code-mode/registration.test/AttemptLifetime",
+) {}
 
 const revisionBudget = {
   agentRuns: 0,
@@ -747,12 +753,12 @@ describe("CodeMode registration", () => {
             tool: "attempt_echo",
             input: "echo",
           })
-          const step = yield* capabilities.callStep({
+          const stepResult = yield* capabilities.callStep({
             operation: "attempt-value",
             step: "attempt_value",
             input: "read",
           })
-          return { tool, step }
+          return { tool, step: stepResult }
         }),
       )
       const storage = makeObjectStorage()

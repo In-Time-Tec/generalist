@@ -1,13 +1,13 @@
 import { Function, type Option } from "effect"
 import type { Service as RuntimeService } from "../../service.js"
-import type { PeerRoutesService } from "./reconciliation.js"
+import type { Service as RoutesService } from "../coordination.js"
 import type { Service as ExternalChildStoreService } from "./store.js"
 
 /** @internal Current-host placement authority retained beside the ready Runtime identity. */
 export interface RuntimePlacement {
   readonly partition: string
   readonly store: ExternalChildStoreService
-  readonly routes: Option.Option<PeerRoutesService>
+  readonly routes: Option.Option<RoutesService>
 }
 
 const bindings = new WeakMap<RuntimeService, RuntimePlacement>()
