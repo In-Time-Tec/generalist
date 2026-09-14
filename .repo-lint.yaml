@@ -105,8 +105,8 @@ rules:
     - pattern: "packages/*/test"
       childCase: kebab
       maxFiles: 12
-      # Artifact acceptance adds the one required public-feature test directory.
-      maxDirectories: 22
+      # Artifact acceptance and the provider-neutral Live contract add the two required public-feature test directories.
+      maxDirectories: 23
     - pattern: "packages/*/test/*"
       case: kebab
       childCase: kebab
